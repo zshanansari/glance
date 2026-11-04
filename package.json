@@ -16,7 +16,8 @@
     "test:rust": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
     "test:ui": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "symbols": "swift scripts/generate-symbols.swift"
+    "symbols": "swift scripts/generate-symbols.swift",
+    "dmg:unnotarized": "node scripts/release-dmg.mjs --unnotarized"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

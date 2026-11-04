@@ -110,7 +110,12 @@ function newestDmg() {
 loadCredentials();
 loadSigningKey();
 
-const missing = REQUIRED.filter((key) => !process.env[key]);
+/// --unnotarized ships without Apple's notarization, for a project with no
+/// Developer ID yet: Gatekeeper then asks on first launch (right-click, Open).
+/// The update payload is still signed with the updater key either way.
+const unnotarized = process.argv.includes("--unnotarized");
+
+const missing = unnotarized ? [] : REQUIRED.filter((key) => !process.env[key]);
 if (missing.length) {
   console.error(
     `Cannot build a release image without ${missing.join(", ")}.\n` +
@@ -124,27 +129,31 @@ if (missing.length) {
 run("pnpm", ["tauri", "build", "--bundles", "app,dmg"], "Bundling");
 
 const dmg = newestDmg();
-console.log(`\nNotarizing ${dmg}`);
-// The password reaches notarytool as an argument, which is visible to other
-// processes on this machine for the life of the call.
-run(
-  "xcrun",
-  [
-    "notarytool",
-    "submit",
-    dmg,
-    "--apple-id",
-    process.env.APPLE_ID,
-    "--team-id",
-    process.env.APPLE_TEAM_ID,
-    "--password",
-    process.env.APPLE_PASSWORD,
-    "--wait",
-  ],
-  "Notarizing the disk image",
-);
-run("xcrun", ["stapler", "staple", dmg], "Stapling the disk image");
-run("spctl", ["--assess", "--type", "install", "-vv", dmg], "Gatekeeper assessment");
+if (unnotarized) {
+  console.warn(`\nNot notarizing ${dmg}: first launch will need right-click, Open.`);
+} else {
+  console.log(`\nNotarizing ${dmg}`);
+  // The password reaches notarytool as an argument, which is visible to other
+  // processes on this machine for the life of the call.
+  run(
+    "xcrun",
+    [
+      "notarytool",
+      "submit",
+      dmg,
+      "--apple-id",
+      process.env.APPLE_ID,
+      "--team-id",
+      process.env.APPLE_TEAM_ID,
+      "--password",
+      process.env.APPLE_PASSWORD,
+      "--wait",
+    ],
+    "Notarizing the disk image",
+  );
+  run("xcrun", ["stapler", "staple", dmg], "Stapling the disk image");
+  run("spctl", ["--assess", "--type", "install", "-vv", dmg], "Gatekeeper assessment");
+}
 
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 const update = writeManifest(version);
