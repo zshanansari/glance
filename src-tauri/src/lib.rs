@@ -1,4 +1,4 @@
-//! Menu bar host for Calendo.
+//! Menu bar host for Glance.
 //!
 //! There is no main window. The process is an accessory: a status item whose
 //! left click opens a month popover, and a settings window opened on demand.
@@ -37,8 +37,8 @@ const EVENTS_SCREEN_SHARE: f64 = 0.9;
 /** Stands in when the monitor cannot be read. */
 const EVENTS_FALLBACK_SCREEN: f64 = 800.0;
 const SETTINGS_LABEL: &str = "settings";
-const TRAY_ID: &str = "calendo";
-const EVENT_TRAY_ID: &str = "calendo-event";
+const TRAY_ID: &str = "glance";
+const EVENT_TRAY_ID: &str = "glance-event";
 const AUTOSTART_ARG: &str = "--autostart";
 const CALENDAR_WIDTH: f64 = 264.0;
 const CALENDAR_WIDTH_WEEKS: f64 = 288.0;
@@ -171,7 +171,7 @@ fn calendar_width(show_week_numbers: bool) -> f64 {
 fn user_data_dir(app: &AppHandle) -> PathBuf {
     if cfg!(target_os = "macos") {
         if let Some(home) = std::env::var_os("HOME") {
-            return Path::new(&home).join("Library/Application Support/Calendo");
+            return Path::new(&home).join("Library/Application Support/Glance");
         }
     }
     app.path()
@@ -973,7 +973,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
-    let quit = MenuItem::with_id(app, "quit", "Quit Calendo", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Glance", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     Menu::with_items(
         app,
@@ -1005,7 +1005,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let calendar = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .icon_as_template(true)
-        .tooltip("Calendo")
+        .tooltip("Glance")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| handle_menu_action(app, event.id().as_ref()))
@@ -1061,7 +1061,7 @@ fn build_calendar_window(app: &AppHandle) -> tauri::Result<()> {
         calendar_window_size(initial.show_week_numbers, initial.show_upcoming_event);
     let window =
         WebviewWindowBuilder::new(app, CALENDAR_LABEL, WebviewUrl::App("calendar.html".into()))
-            .title("Calendo")
+            .title("Glance")
             .inner_size(initial_width, initial_height)
             .decorations(false)
             .transparent(true)
@@ -1133,7 +1133,7 @@ fn build_events_window(app: &AppHandle) -> tauri::Result<()> {
 fn build_settings_window(app: &AppHandle) -> tauri::Result<()> {
     let window =
         WebviewWindowBuilder::new(app, SETTINGS_LABEL, WebviewUrl::App("settings.html".into()))
-            .title("Calendo Settings")
+            .title("Glance Settings")
             .inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
             .resizable(false)
             .skip_taskbar(false)
@@ -1749,7 +1749,7 @@ fn update_available() -> Option<String> {
 
 /// Shown on the About pane, and the way out when an update cannot be applied
 /// and the only route left is a hand-installed disk image.
-const REPOSITORY_URL: &str = "https://github.com/vipinsight/calendo";
+const REPOSITORY_URL: &str = "https://github.com/zshanansari/glance";
 
 #[tauri::command]
 fn open_repository() -> Result<(), String> {
@@ -1761,7 +1761,7 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
     if updates::install(&app).await? {
         Ok(())
     } else {
-        Err("Calendo is already up to date".into())
+        Err("Glance is already up to date".into())
     }
 }
 
@@ -1854,7 +1854,7 @@ pub fn run() {
             open_event,
         ])
         .run(tauri::generate_context!())
-        .expect("Calendo failed to start");
+        .expect("Glance failed to start");
 }
 
 #[cfg(test)]

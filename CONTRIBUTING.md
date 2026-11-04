@@ -16,7 +16,7 @@ For security issues, use [private reporting](SECURITY.md).
 
 ## What is in scope
 
-Calendo is a month view in the menu bar. It can optionally read local macOS
+Glance is a month view in the menu bar. It can optionally read local macOS
 Calendar events through EventKit for upcoming meeting awareness. It does not
 sync accounts or send calendar data off the Mac.
 

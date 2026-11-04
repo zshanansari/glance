@@ -29,16 +29,16 @@ rather than producing a release that looks fine and updates nothing:
   `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_PASSWORD` (an app-specific password),
   and `APPLE_SIGNING_IDENTITY`. Exported variables win over the file, so CI
   can supply them as secrets.
-- **Updater signing key** at
-  `~/Library/CloudStorage/OneDrive-Personal/keys/macos-dev/updater.key`
-  (or `~/.calendo/updater.key`, or `TAURI_SIGNING_PRIVATE_KEY`). The key is
-  never in the repository. Its public half is in `tauri.conf.json`.
+- **Updater signing key** at `~/.glance/updater.key` (or
+  `TAURI_SIGNING_PRIVATE_KEY`), protected by a password passed as
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Keep it out of the repository and out
+  of synced folders. Its public half is in `tauri.conf.json`.
 
 Then the script:
 
 1. Runs `pnpm tauri build --bundles app,dmg`. Tauri signs the `.app`,
    notarizes and staples it, wraps it in a disk image, and writes the updater
-   payload (`Calendo.app.tar.gz` and `.sig`).
+   payload (`Glance.app.tar.gz` and `.sig`).
 2. Submits the **DMG** to Apple with `notarytool`. Tauri notarizes the app
    but not the disk image, and Gatekeeper rejects an unnotarized image.
 3. Staples the ticket onto the DMG and runs `spctl --assess`, which has to
@@ -62,15 +62,15 @@ Use the paths the script printed:
 
 ```bash
 gh release create v<version> --target main \
-  src-tauri/target/release/bundle/dmg/Calendo_<version>_aarch64.dmg \
-  src-tauri/target/release/bundle/macos/Calendo.app.tar.gz \
+  src-tauri/target/release/bundle/dmg/Glance_<version>_aarch64.dmg \
+  src-tauri/target/release/bundle/macos/Glance.app.tar.gz \
   src-tauri/target/release/bundle/dmg/latest.json
 ```
 
 All three have to go up together:
 
-- `Calendo_<version>_aarch64.dmg` — new installs (drag to Applications)
-- `Calendo.app.tar.gz` — what installed copies download
+- `Glance_<version>_aarch64.dmg` — new installs (drag to Applications)
+- `Glance.app.tar.gz` — what installed copies download
 - `latest.json` — what installed copies read from
   `releases/latest/download/latest.json`
 

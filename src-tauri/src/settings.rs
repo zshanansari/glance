@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn migrates_a_format_from_before_icon_styles() {
         let dir = std::env::temp_dir().join(format!(
-            "calendo-settings-{}",
+            "glance-settings-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("clock")
@@ -349,7 +349,7 @@ mod tests {
     fn migrates_the_hour_look_ahead_to_days() {
         for (hours, days) in [(24u8, 1u16), (48, 2)] {
             let dir = std::env::temp_dir().join(format!(
-                "calendo-horizon-{hours}-{}",
+                "glance-horizon-{hours}-{}",
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .expect("clock")
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn migrates_dim_weekends_off_to_no_highlights() {
         let dir = std::env::temp_dir().join(format!(
-            "calendo-settings-{}",
+            "glance-settings-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("clock")

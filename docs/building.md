@@ -1,6 +1,6 @@
 # Building
 
-Calendo is a Tauri 2 app. The web UI is TypeScript; the menu bar extra is Rust.
+Glance is a Tauri 2 app. The web UI is TypeScript; the menu bar extra is Rust.
 
 Shipping a notarized disk image is a separate step; see [Releasing](release.md).
 
@@ -17,11 +17,11 @@ pnpm test
 pnpm app
 ```
 
-`pnpm app` builds and opens a debug `Calendo.app` bundle. It layers
+`pnpm app` builds and opens a debug `Glance.app` bundle. It layers
 `src-tauri/tauri.dev.conf.json` over the config to skip the update payload,
 which would otherwise ask for the signing key on every local build. This includes the
 app identity and Calendar usage descriptions needed for macOS permission prompts.
-Look for Calendo in the menu bar.
+Look for Glance in the menu bar.
 
 `pnpm dev` runs the unbundled executable with file watching for UI development.
 Use `pnpm app` when testing Calendar permissions.

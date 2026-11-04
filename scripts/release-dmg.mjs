@@ -23,14 +23,8 @@ const REQUIRED = ["APPLE_ID", "APPLE_TEAM_ID", "APPLE_PASSWORD"];
 /// the other macOS signing material rather than in the repository: it cannot
 /// be revoked or rotated, since every installed copy trusts exactly the one
 /// key compiled into it.
-const SIGNING_KEYS = [
-  join(
-    homedir(),
-    "Library/CloudStorage/OneDrive-Personal/keys/macos-dev/updater.key",
-  ),
-  join(homedir(), ".calendo", "updater.key"),
-];
-const REPOSITORY = "vipinsight/calendo";
+const SIGNING_KEYS = [join(homedir(), ".glance", "updater.key")];
+const REPOSITORY = "zshanansari/glance";
 
 function loadCredentials() {
   if (!existsSync(ENV_FILE)) return;

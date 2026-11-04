@@ -1,4 +1,4 @@
-# <img src="icons/icon.png" alt="" width="48" height="48" align="absmiddle"> Calendo
+# <img src="icons/icon.png" alt="" width="48" height="48" align="absmiddle"> Glance
 
 A month calendar in the macOS menu bar. No account, no main window, and
 nothing leaves this Mac.
@@ -32,11 +32,11 @@ the first time a system-wide shortcut fires.
 ## Install
 
 Download the disk image from
-[Releases](https://github.com/vipinsight/calendo/releases/latest) and drag
-Calendo to Applications.
+[Releases](https://github.com/zshanansari/glance/releases/latest) and drag
+Glance to Applications.
 
 Installed copies can update themselves from Settings → About. Automatic
-updates are on by default; switched off, Calendo still checks and puts a dot on
+updates are on by default; switched off, Glance still checks and puts a dot on
 its menu bar icon when a release is ready.
 
 To build from source:
@@ -48,7 +48,7 @@ pnpm dmg
 ```
 
 Then open the disk image in `src-tauri/target/release/bundle/dmg` and drag
-Calendo to Applications. See [Building](docs/building.md) for the toolchain
+Glance to Applications. See [Building](docs/building.md) for the toolchain
 and [Releasing](docs/release.md) to ship.
 
 ## License

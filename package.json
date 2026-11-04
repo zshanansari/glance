@@ -1,12 +1,12 @@
 {
-  "name": "calendo",
+  "name": "glance",
   "version": "0.7.1",
   "private": true,
   "license": "MIT",
   "description": "A menu bar calendar for macOS.",
   "packageManager": "pnpm@9.4.0",
   "scripts": {
-    "app": "tauri build --debug --bundles app --config src-tauri/tauri.dev.conf.json && open src-tauri/target/debug/bundle/macos/Calendo.app",
+    "app": "tauri build --debug --bundles app --config src-tauri/tauri.dev.conf.json && open src-tauri/target/debug/bundle/macos/Glance.app",
     "build": "pnpm typecheck && node scripts/copy-static.mjs",
     "dev": "pnpm build && tauri dev",
     "dmg": "node scripts/release-dmg.mjs",

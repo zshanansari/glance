@@ -40,8 +40,8 @@ it("waits for the native calendar permission result", async () => {
 it("opens an https address in the system browser", async () => {
   const invoke = vi.fn().mockResolvedValue(undefined);
   vi.stubGlobal("window", { __TAURI__: { core: { invoke } } });
-  await expect(api.openUrl("https://vipinyadav.com")).resolves.toBeUndefined();
-  expect(invoke).toHaveBeenCalledWith("join_meeting", { url: "https://vipinyadav.com" });
+  await expect(api.openUrl("https://example.com")).resolves.toBeUndefined();
+  expect(invoke).toHaveBeenCalledWith("join_meeting", { url: "https://example.com" });
 });
 
 it("opens the Calendar and Reminders privacy panes", async () => {

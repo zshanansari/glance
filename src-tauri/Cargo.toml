@@ -1,14 +1,14 @@
 [package]
-name = "calendo"
+name = "glance"
 version = "0.7.1"
 description = "A menu bar calendar for macOS"
-authors = ["Vipin Yadav"]
+authors = ["Zishan Ansari", "Vipin Yadav"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "calendo_lib"
+name = "glance_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

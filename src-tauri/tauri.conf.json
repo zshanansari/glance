@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Calendo",
+  "productName": "Glance",
   "version": "0.7.1",
-  "identifier": "com.webtiara.calendo",
+  "identifier": "com.zshanansari.glance",
   "build": {
     "frontendDist": "../dist/renderer",
     "beforeBuildCommand": "pnpm build",
@@ -33,7 +33,7 @@
       "minimumSystemVersion": "13.0",
       "infoPlist": "Info.plist",
       "entitlements": "Entitlements.plist",
-      "signingIdentity": "Developer ID Application: Vipin Yadav (H6892VVKC5)",
+      "signingIdentity": "-",
       "dmg": {
         "background": "../icons/dmg/background.tiff",
         "windowSize": {
@@ -55,9 +55,9 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/vipinsight/calendo/releases/latest/download/latest.json"
+        "https://github.com/zshanansari/glance/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY5QkQzNkEwQTA5NUMyNTQKUldSVXdwV2dvRGE5YVRLQWgwdHowMnFGZVBsMGZMam5YS29oOHU0cHRBYWZ6aU5OdmJFSkd6cUQK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyRjA0M0MzRDVDRDk2QTkKUldTcGxzM1Z3MFB3MG9DNE1maGVMdkRsQUUwWkF4MDN1S2dKSE5ROEZJNmcwSjh0N2VEU3lCaDIK"
     }
   }
 }

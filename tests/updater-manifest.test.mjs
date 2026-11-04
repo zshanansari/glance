@@ -5,7 +5,7 @@ const base = {
   version: "v0.3.0",
   notes: "Fixes things",
   signature: "dW50cnVzdGVk",
-  url: "https://github.com/o/r/releases/download/v0.3.0/Calendo.app.tar.gz",
+  url: "https://github.com/o/r/releases/download/v0.3.0/Glance.app.tar.gz",
   date: new Date("2026-09-09T12:00:00Z"),
 };
 
@@ -34,7 +34,7 @@ describe("updater manifest", () => {
 
   it("points at the asset the tag publishes", () => {
     expect(
-      payloadUrl({ repository: "o/r", tag: "v0.3.0", file: "Calendo.app.tar.gz" }),
-    ).toBe("https://github.com/o/r/releases/download/v0.3.0/Calendo.app.tar.gz");
+      payloadUrl({ repository: "o/r", tag: "v0.3.0", file: "Glance.app.tar.gz" }),
+    ).toBe("https://github.com/o/r/releases/download/v0.3.0/Glance.app.tar.gz");
   });
 });

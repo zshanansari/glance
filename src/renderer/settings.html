@@ -11,7 +11,7 @@
       <div class="tabs" id="tabs" role="tablist" aria-label="Settings">
         <div class="brand" aria-hidden="true">
           <img class="brand-icon" src="icon.png" alt="" />
-          <span>Calendo</span>
+          <span>Glance</span>
         </div>
         <button
           type="button"
@@ -107,7 +107,7 @@
             <div class="row">
               <div class="copy">
                 <label for="auto-update">Install updates automatically</label>
-                <p>Off, Calendo only marks the menu bar icon when a release is ready.</p>
+                <p>Off, Glance only marks the menu bar icon when a release is ready.</p>
               </div>
               <input id="auto-update" name="autoUpdate" type="checkbox" switch />
             </div>
@@ -346,7 +346,7 @@
               <div class="row" id="calendar-access-row">
                 <div class="copy">
                   <label for="calendar-access">Calendar access</label>
-                  <p>macOS will ask. After a denial, allow Calendo under Privacy &amp; Security.</p>
+                  <p>macOS will ask. After a denial, allow Glance under Privacy &amp; Security.</p>
                   <p id="calendar-access-status" aria-live="polite" hidden></p>
                 </div>
                 <button type="button" class="action" id="calendar-access">Allow Access…</button>
@@ -366,7 +366,7 @@
               <div class="row" id="reminders-access-row" hidden>
                 <div class="copy">
                   <label for="reminders-access">Reminders access</label>
-                  <p>macOS will ask. After a denial, allow Calendo under Privacy &amp; Security.</p>
+                  <p>macOS will ask. After a denial, allow Glance under Privacy &amp; Security.</p>
                 </div>
                 <button type="button" class="action" id="reminders-access">Allow Access…</button>
               </div>
@@ -390,27 +390,23 @@
         >
           <div class="about">
             <div class="about-identity">
-              <img class="about-icon" src="icon.png" alt="Calendo app icon" />
+              <img class="about-icon" src="icon.png" alt="Glance app icon" />
               <div class="about-intro">
-                <p class="about-name">Calendo</p>
-                <p class="about-version" id="version">Calendo</p>
+                <p class="about-name">Glance</p>
+                <p class="about-version" id="version">Glance</p>
                 <p class="about-copy">
                   A month calendar in the macOS menu bar. Nothing leaves this Mac.
                 </p>
               </div>
             </div>
-            <div class="about-links" role="group" aria-label="Calendo online">
+            <div class="about-links" role="group" aria-label="Glance online">
               <button type="button" id="open-repository">
                 <span>Contribute</span>
+                <span class="about-dest">github.com/zshanansari/glance</span>
+              </button>
+              <button type="button" id="open-original">
+                <span>Based on Calendo</span>
                 <span class="about-dest">github.com/vipinsight/calendo</span>
-              </button>
-              <button type="button" id="open-profile">
-                <span>Follow</span>
-                <span class="about-dest">x.com/vip_iny</span>
-              </button>
-              <button type="button" id="open-donate">
-                <span>Donate</span>
-                <span class="about-dest">buymeacoffee.com/vip_iny</span>
               </button>
             </div>
             <div class="about-foot">
@@ -420,8 +416,8 @@
                 </button>
               </div>
               <p class="about-legal">
-                © 2026 Calendo
-                <button type="button" class="link" id="open-site">vipinyadav.com</button>
+                © 2026 Glance
+                <button type="button" class="link" id="open-site">Zishan Ansari</button>
               </p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 //! Finding a newer release, saying so, and installing it.
 //!
-//! Calendo is not in the App Store, so nothing tells anyone a release
+//! Glance is not in the App Store, so nothing tells anyone a release
 //! happened. It looks for itself every few hours. With "Install updates
 //! automatically" on, it installs what it finds and relaunches; with it off,
 //! it only says so: a dot on the menu bar icon, an item at the top of the
@@ -67,7 +67,7 @@ fn auto_update_enabled(app: &AppHandle) -> bool {
 
 /// Looks for a new version in the background for as long as the app runs.
 ///
-/// Calendo starts at login and can sit in the menu bar for weeks, so a check
+/// Glance starts at login and can sit in the menu bar for weeks, so a check
 /// at launch alone would fire once and never again. The setting is read each
 /// time round rather than captured, so switching it takes effect on the next
 /// pass without a restart.

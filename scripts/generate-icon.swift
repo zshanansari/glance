@@ -304,7 +304,7 @@ for day in 1...31 {
     try pngAtSize(trayFilled(day: day)).write(to: filledDir.appendingPathComponent(name))
 }
 
-let iconset = icons.appendingPathComponent("Calendo.iconset")
+let iconset = icons.appendingPathComponent("Glance.iconset")
 try? FileManager.default.removeItem(at: iconset)
 try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
 

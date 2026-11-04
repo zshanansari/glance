@@ -149,8 +149,7 @@ function startSettings(api: DesktopApi): void {
   const updatePillTitle = requireElement<HTMLElement>("update-pill-title");
   const updatePillAction = requireElement<HTMLElement>("update-pill-action");
   const openRepository = requireElement<HTMLButtonElement>("open-repository");
-  const openProfile = requireElement<HTMLButtonElement>("open-profile");
-  const openDonate = requireElement<HTMLButtonElement>("open-donate");
+  const openOriginal = requireElement<HTMLButtonElement>("open-original");
   const openSite = requireElement<HTMLButtonElement>("open-site");
 
   buildIconStyles(iconStyles);
@@ -588,7 +587,7 @@ function startSettings(api: DesktopApi): void {
     updatePill.hidden = state === null;
     if (state === null) return;
     updatePill.dataset.state = state;
-    updatePillTitle.textContent = waiting ? `Calendo ${waiting}` : "Calendo update";
+    updatePillTitle.textContent = waiting ? `Glance ${waiting}` : "Glance update";
     updatePillAction.textContent = action;
     updatePill.title = detail;
     updatePill.disabled = state === "working";
@@ -654,11 +653,10 @@ function startSettings(api: DesktopApi): void {
   void api.getUpdateAvailable().then(showWaiting);
 
   openRepository.addEventListener("click", () => void api.openRepository());
-  openProfile.addEventListener("click", () => void api.openUrl("https://x.com/vip_iny"));
-  openDonate.addEventListener("click", () =>
-    void api.openUrl("https://buymeacoffee.com/vip_iny"),
+  openOriginal.addEventListener("click", () =>
+    void api.openUrl("https://github.com/vipinsight/calendo"),
   );
-  openSite.addEventListener("click", () => void api.openUrl("https://vipinyadav.com"));
+  openSite.addEventListener("click", () => void api.openUrl("https://github.com/zshanansari"));
   // Also arrives for an install started from the menu bar.
   api.onUpdateProgress(({ downloaded, total }) => {
     installing = true;
