@@ -591,7 +591,10 @@ fn handle_tray_click(
         return;
     };
     match tray_click_intent(button, button_state) {
-        TrayClickIntent::Toggle => toggle(tray.app_handle(), clicked_rect(tray.app_handle(), rect)),
+        TrayClickIntent::Toggle => toggle(
+            tray.app_handle(),
+            clicked_rect(tray.app_handle(), button_rect(tray, rect)),
+        ),
         TrayClickIntent::Menu => {
             #[cfg(target_os = "macos")]
             {
@@ -763,15 +766,19 @@ fn caret_offset(window_x: f64, window_w: f64, tray_x: f64, tray_w: f64) -> f64 {
 fn popover_origin(
     tray_x: f64,
     tray_y: f64,
-    tray_w: f64,
+    _tray_w: f64,
     tray_h: f64,
     win_w: f64,
     win_h: f64,
     screen: ScreenBounds,
 ) -> (f64, f64, PopoverPlacement) {
-    const GAP: f64 = 0.0;
+    // Measured off a native status item menu on the same item: its frame
+    // starts 3pt left of the item and 1pt under the menu bar, so the popover
+    // lines up with every other app's menu instead of centring on its icon.
+    const LEAD: f64 = 3.0;
+    const GAP: f64 = 1.0;
     const PAD: f64 = 8.0;
-    let mut x = tray_x + tray_w / 2.0 - win_w / 2.0;
+    let mut x = tray_x - LEAD;
     let mut y = tray_y + tray_h + GAP;
     let mut placement = PopoverPlacement::Below;
     let min_x = screen.x + PAD;
@@ -959,8 +966,72 @@ fn toggle_events(app: &AppHandle, tray_rect: tauri::Rect) {
 
 /// The status item's frame, which a shortcut has no click to carry.
 fn tray_anchor(app: &AppHandle) -> Option<tauri::Rect> {
-    app.tray_by_id(TRAY_ID)
-        .and_then(|tray| tray.rect().ok().flatten())
+    let tray = app.tray_by_id(TRAY_ID)?;
+    let rect = tray.rect().ok().flatten()?;
+    Some(button_rect(&tray, rect))
+}
+
+/// Narrows the status item's window rect to its button.
+///
+/// The window is a few points wider than the button, and not evenly: the
+/// button sits ~5pt in from its left edge. AppKit lines a status menu up with
+/// the button, so the popover has to start from the same place to match.
+#[cfg(target_os = "macos")]
+fn button_rect(tray: &tauri::tray::TrayIcon, rect: tauri::Rect) -> tauri::Rect {
+    use objc2_foundation::MainThreadMarker;
+
+    let inset = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let found = inset.clone();
+    let _ = tray.with_inner_tray_icon(move |inner| {
+        let Some(item) = inner.ns_status_item() else {
+            return;
+        };
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
+        if let Some(button) = item.button(mtm) {
+            let frame = button.frame();
+            if let Ok(mut slot) = found.lock() {
+                *slot = Some((frame.origin.x, frame.size.width));
+            }
+        }
+    });
+    let Some((left, width)) = inset.lock().ok().and_then(|slot| *slot) else {
+        return rect;
+    };
+    let scale = tray
+        .app_handle()
+        .get_webview_window(CALENDAR_LABEL)
+        .and_then(|window| window.scale_factor().ok())
+        .unwrap_or(1.0);
+    let position: PhysicalPosition<f64> = rect.position.to_physical(scale);
+    let size: PhysicalSize<f64> = rect.size.to_physical(scale);
+    let monitor_scale = tray
+        .app_handle()
+        .get_webview_window(CALENDAR_LABEL)
+        .and_then(|window| {
+            window
+                .monitor_from_point(position.x, position.y)
+                .ok()
+                .flatten()
+        })
+        .map(|monitor| monitor.scale_factor())
+        .unwrap_or(scale);
+    tauri::Rect {
+        position: tauri::Position::Physical(PhysicalPosition::new(
+            (position.x + left * monitor_scale).round() as i32,
+            position.y.round() as i32,
+        )),
+        size: tauri::Size::Physical(PhysicalSize::new(
+            (width * monitor_scale).round() as u32,
+            size.height.round() as u32,
+        )),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn button_rect(_tray: &tauri::tray::TrayIcon, rect: tauri::Rect) -> tauri::Rect {
+    rect
 }
 
 /// Opens the month popover from anywhere, closing the events popover first.
@@ -2204,11 +2275,17 @@ mod tests {
     #[test]
     fn sits_under_the_tray_on_a_1x_display_above_the_laptop() {
         let (x, y, placement) = popover_origin(500.0, -1080.0, 40.0, 24.0, 340.0, 326.0, EXTERNAL);
-        assert_eq!(x, 350.0);
-        assert_eq!(y, -1056.0);
+        assert_eq!(x, 497.0);
+        assert_eq!(y, -1055.0);
         assert_eq!(placement, PopoverPlacement::Below);
         assert!(point_in_screen(x, y, EXTERNAL));
         assert!(!point_in_screen(x, y, LAPTOP));
+    }
+
+    #[test]
+    fn lines_up_with_a_native_menu_on_the_same_item() {
+        let (x, y, _) = popover_origin(1010.0, 0.0, 31.0, 33.0, 264.0, 541.0, LAPTOP);
+        assert_eq!((x, y), (1007.0, 34.0));
     }
 
     #[test]
@@ -2227,16 +2304,17 @@ mod tests {
                 height: 982.0,
             },
         );
-        assert_eq!(x, 1050.0);
-        assert_eq!(y, 24.0);
+        // Left-aligned would run past the edge, so it stops 8pt short of it.
+        assert_eq!(x, 1164.0);
+        assert_eq!(y, 25.0);
         assert_eq!(placement, PopoverPlacement::Below);
     }
 
     #[test]
     fn stays_on_the_tray_screen_when_the_icon_is_near_the_edge() {
-        let (x, y, placement) = popover_origin(-180.0, -1080.0, 40.0, 24.0, 340.0, 326.0, EXTERNAL);
+        let (x, y, placement) = popover_origin(-195.0, -1080.0, 40.0, 24.0, 340.0, 326.0, EXTERNAL);
         assert_eq!(x, EXTERNAL.x + 8.0);
-        assert_eq!(y, -1056.0);
+        assert_eq!(y, -1055.0);
         assert_eq!(placement, PopoverPlacement::Below);
         assert!(point_in_screen(x, y, EXTERNAL));
     }
