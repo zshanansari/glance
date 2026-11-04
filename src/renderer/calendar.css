@@ -1,81 +1,71 @@
 /*
- * Calendar popover. Native popover material sits behind a light or dark card;
- * this page draws the popover, type, month outline, and weekday bands.
+ * Calendar popover, drawn to read as a native status menu: the system font at
+ * menu sizes, AppKit's semantic colors, menu-style rows and separators, over
+ * the window's own glass or menu material.
  */
 :root {
-  --paper: #ffffff;
-  --ink: #1c1c1e;
-  --ink-soft: #6e6e73;
-  --fill: rgb(0 0 0 / 6%);
-  --fill-strong: rgb(0 0 0 / 10%);
-  --month-stroke: rgb(0 0 0 / 13%);
-  --column-fill: rgb(0 0 0 / 6%);
-  --rim: rgb(0 0 0 / 12%);
-  /* Tints the menu material rather than replacing it. */
+  /* Fallbacks for the semantic colors below, for anything but WebKit. */
+  --label: rgb(0 0 0 / 85%);
+  --secondary: rgb(0 0 0 / 50%);
+  --tertiary: rgb(0 0 0 / 26%);
+  --quaternary: rgb(0 0 0 / 10%);
+  --separator: rgb(0 0 0 / 10%);
+  --accent: #007aff;
+  --on-accent: #fff;
+  --today: #ff3b30;
   --scrim: rgb(255 255 255 / 16%);
-  --accent: #338ce6;
-  --accent-text: #fff;
-  --selection-fill: #1c1c1e;
-  --selection-ink: #ffffff;
-  --selection-border: #000;
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
-    sans-serif;
 
-  color: var(--ink);
-  color-scheme: light;
-  font-family: var(--font);
+  color: var(--label);
+  color-scheme: light dark;
+  font: 13px / 16px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
   accent-color: var(--accent);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #2c2c2e;
-    --ink: #f5f5f7;
-    --ink-soft: #a1a1a6;
-    --fill: rgb(255 255 255 / 8%);
-    --fill-strong: rgb(255 255 255 / 14%);
-    --month-stroke: rgb(255 255 255 / 16%);
-    --column-fill: rgb(255 255 255 / 7%);
-    --rim: rgb(255 255 255 / 12%);
+    --label: rgb(255 255 255 / 85%);
+    --secondary: rgb(255 255 255 / 55%);
+    --tertiary: rgb(255 255 255 / 25%);
+    --quaternary: rgb(255 255 255 / 10%);
+    --separator: rgb(255 255 255 / 12%);
+    --accent: #0a84ff;
+    --today: #ff453a;
     --scrim: rgb(0 0 0 / 22%);
-    --selection-fill: #f5f5f7;
-    --selection-ink: #1c1c1e;
-    --selection-border: #fff;
-    color-scheme: dark;
   }
 }
 
 :root[data-theme="light"] {
-  --paper: #ffffff;
-  --ink: #1c1c1e;
-  --ink-soft: #6e6e73;
-  --fill: rgb(0 0 0 / 6%);
-  --fill-strong: rgb(0 0 0 / 10%);
-  --month-stroke: rgb(0 0 0 / 13%);
-  --column-fill: rgb(0 0 0 / 6%);
-  --rim: rgb(0 0 0 / 12%);
-  --scrim: rgb(255 255 255 / 16%);
-  --selection-fill: #1c1c1e;
-  --selection-ink: #ffffff;
-  --selection-border: #000;
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --paper: #2c2c2e;
-  --ink: #f5f5f7;
-  --ink-soft: #a1a1a6;
-  --fill: rgb(255 255 255 / 8%);
-  --fill-strong: rgb(255 255 255 / 14%);
-  --month-stroke: rgb(255 255 255 / 16%);
-  --column-fill: rgb(255 255 255 / 7%);
-  --rim: rgb(255 255 255 / 12%);
+  --label: rgb(255 255 255 / 85%);
+  --secondary: rgb(255 255 255 / 55%);
+  --tertiary: rgb(255 255 255 / 25%);
+  --quaternary: rgb(255 255 255 / 10%);
+  --separator: rgb(255 255 255 / 12%);
+  --accent: #0a84ff;
+  --today: #ff453a;
   --scrim: rgb(0 0 0 / 22%);
-  --selection-fill: #f5f5f7;
-  --selection-ink: #1c1c1e;
-  --selection-border: #fff;
   color-scheme: dark;
+}
+
+/* AppKit's own colors, which follow the window's appearance and the user's
+   accent and highlight choices exactly as a menu does. */
+@supports (color: -apple-system-label) {
+  :root,
+  :root[data-theme] {
+    --label: -apple-system-label;
+    --secondary: -apple-system-secondary-label;
+    --tertiary: -apple-system-tertiary-label;
+    --quaternary: -apple-system-quaternary-label;
+    --separator: -apple-system-separator;
+    --accent: -apple-system-control-accent;
+    --on-accent: -apple-system-alternate-selected-text;
+    --today: -apple-system-red;
+  }
 }
 
 * {
@@ -95,7 +85,20 @@ body {
   background: transparent;
   user-select: none;
   cursor: default;
-  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+button:focus {
+  outline: none;
 }
 
 .visually-hidden {
@@ -115,386 +118,140 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding-bottom: 0;
+  padding: 5px 0;
   border-radius: 12px;
   background: var(--scrim);
-  box-shadow: inset 0 0 0 0.5px var(--rim);
-  color: var(--ink);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
 }
 
-.calendar-footer {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: auto;
-  padding: 2px 8px 8px;
-}
-
-.calendar-footer .icon-button {
-  width: 28px;
-  height: 28px;
-}
-
-.calendar-footer .icon-button svg {
-  width: 16px;
-  height: 16px;
-}
 /* Liquid Glass shades and edges itself; a scrim only muddies it. */
 :root[data-material="glass"] .popover {
   background: transparent;
   box-shadow: none;
 }
 
+/* A menu's separator: a hairline inset to the text. */
+.separator {
+  flex-shrink: 0;
+  height: 1px;
+  margin: 5px 14px;
+  border: 0;
+  background: var(--separator);
+}
 
+/* Header: the month as Calendar titles it, with compact arrows. */
 .header {
   display: flex;
-  align-items: flex-start;
+  flex-shrink: 0;
+  align-items: center;
   justify-content: space-between;
-  padding: 8px 8px 10px;
+  height: 28px;
+  padding: 0 8px 0 14px;
 }
 
 .header h1 {
   margin: 0;
-  /* Cap-height sits a little below the button tops so the row still reads
-     aligned, without the extra air that vertical centering added above. */
-  padding-top: 4px;
-  color: var(--ink);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.event-card {
-  position: relative;
-  margin: 0 12px 8px;
-  padding: 10px 12px 11px;
-  border: 1px solid var(--rim);
-  border-radius: 10px;
-  background: var(--fill);
-}
-
-.event-heading {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.event-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-.event-card h2 {
-  overflow: hidden;
-  margin: 5px 0 2px;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 16px;
   white-space: nowrap;
 }
 
-.event-meta {
-  overflow: hidden;
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 11px;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.month-name {
+  font-weight: 600;
 }
 
-.join-meeting {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
-  padding: 5px 9px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--accent);
-  color: var(--accent-text);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.join-meeting:hover {
-  filter: brightness(1.08);
-}
-
-.join-meeting:active {
-  filter: brightness(0.94);
-}
-
-.join-meeting:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.month-year {
+  color: var(--secondary);
 }
 
 .nav {
   display: flex;
-  flex-shrink: 0;
   align-items: center;
-  gap: 0;
-  cursor: pointer;
+  gap: 2px;
 }
 
 .icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  color: var(--secondary);
 }
 
 .icon-button svg {
   display: block;
-  width: 18px;
-  height: 18px;
+}
+
+.icon-button:hover {
+  background: var(--quaternary);
+  color: var(--label);
+}
+
+.icon-button:active {
+  color: var(--label);
 }
 
 .today-button {
-  height: 24px;
+  height: 20px;
   margin-right: 4px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--fill);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  transition: opacity 120ms ease-out;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--quaternary);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .today-button:hover {
-  background: var(--fill-strong);
-}
-
-.today-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  background: var(--tertiary);
 }
 
 /* Kept in the row so the arrows never jump when it comes and goes. */
 .today-button.is-hidden {
   visibility: hidden;
-  opacity: 0;
+}
+
+/* Rings only once the keyboard is in use: WebKit focuses the first button
+   when the window turns key, and a menu never shows a ring for that. */
+:root[data-keyboard] .icon-button:focus,
+:root[data-keyboard] .today-button:focus,
+:root[data-keyboard] .day:focus .day-number,
+:root[data-keyboard] .day-event-join:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Month grid. */
+#grid {
+  flex-shrink: 0;
+  padding: 0 9px;
+}
+
+.month {
+  position: relative;
 }
 
 .month.slide-next {
-  animation: month-in-next 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: month-in-next 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .month.slide-prev {
-  animation: month-in-prev 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: month-in-prev 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes month-in-next {
   from {
     opacity: 0;
-    transform: translateX(14px);
+    transform: translateX(10px);
   }
 }
 
 @keyframes month-in-prev {
   from {
     opacity: 0;
-    transform: translateX(-14px);
+    transform: translateX(-10px);
   }
-}
-
-.icon-button:hover {
-  background: var(--fill);
-}
-
-.icon-button:active {
-  background: var(--fill-strong);
-}
-
-#grid {
-  padding: 0 10px 2px;
-}
-
-.day-events {
-  flex-shrink: 0;
-  margin: 2px 10px 0;
-  padding: 10px 0 2px;
-  border-top: 1px solid var(--rim);
-}
-
-.day-events-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0 6px 6px;
-}
-
-.day-events-heading h2 {
-  overflow: hidden;
-  margin: 0;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.day-events-heading span {
-  flex: 0 0 auto;
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.day-events-list {
-  display: grid;
-  gap: 2px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.day-event {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  border-radius: 7px;
-}
-
-.day-event:hover {
-  background: var(--fill);
-}
-
-.day-event.is-past .day-event-title,
-.day-event.is-past .day-event-time {
-  opacity: 0.55;
-}
-
-/* Title over time, so a long title keeps the row's full width. */
-.day-event-open {
-  display: grid;
-  flex: 1;
-  grid-template-areas:
-    "dot title"
-    "dot time";
-  grid-template-columns: 8px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 8px;
-  row-gap: 1px;
-  min-width: 0;
-  min-height: 34px;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-}
-
-.day-event-open .day-event-dot {
-  grid-area: dot;
-  align-self: start;
-  margin-top: 4px;
-}
-
-.day-event-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--event-color, var(--accent));
-}
-
-.day-event-title {
-  grid-area: title;
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.day-event-when {
-  margin-left: 6px;
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.day-event-time {
-  grid-area: time;
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.day-event-join {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-right: 2px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-text);
-}
-
-.day-event-join:hover {
-  filter: brightness(1.08);
-}
-
-.day-event-open:focus-visible,
-.day-event-join:focus-visible,
-.day-events-access:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.day-events-empty {
-  margin: 0 6px 4px;
-  color: var(--ink-soft);
-  font-size: 12px;
-}
-
-.day-events-access {
-  margin: 0 6px 4px;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-text);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.month {
-  position: relative;
 }
 
 .column-highlights {
@@ -506,21 +263,9 @@ body {
 
 .column-highlight {
   position: absolute;
-  border-radius: 8px;
-  background: var(--column-fill);
-}
-
-.month-outline {
-  position: absolute;
-  z-index: 2;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.month-outline path {
-  fill: none;
-  stroke: var(--month-stroke);
-  stroke-width: 1;
+  border-radius: 7px;
+  background: var(--quaternary);
+  opacity: 0.6;
 }
 
 .grid {
@@ -544,145 +289,254 @@ body {
 
 .grid.with-weeks th:first-child,
 .grid.with-weeks td:first-child {
-  width: 26px;
-}
-
-.weekday,
-.weeknum {
-  color: var(--ink-soft);
-  font-weight: 700;
+  width: 22px;
 }
 
 .weekday {
-  height: 30px;
-  padding-bottom: 16px;
-  font-size: 15px;
-  letter-spacing: 0.02em;
-  line-height: 15px;
+  height: 22px;
+  color: var(--secondary);
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .weeknum {
-  height: 20px;
-  padding-bottom: 2px;
-  font-size: 11px;
+  color: var(--tertiary);
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-  line-height: 16px;
-}
-
-thead .weeknum {
-  height: 30px;
-  padding-bottom: 16px;
 }
 
 .grid tbody td {
-  height: 32px;
-}
-
-.grid tbody .weeknum {
-  height: 32px;
-  line-height: 32px;
-}
-
-.day {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  cursor: default;
-}
-
-.day-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  line-height: 1;
-  text-align: center;
-  transition:
-    background-color 80ms ease-out,
-    box-shadow 80ms ease-out,
-    color 80ms ease-out;
+  height: 28px;
 }
 
 .day {
   position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 28px;
 }
 
-/* Under the number, inside its 30px box, so rows keep their height. */
+.day-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.day.is-outside .day-number {
+  color: var(--tertiary);
+}
+
+.day:hover:not(.is-today):not(.is-selected) .day-number {
+  background: var(--quaternary);
+}
+
+.day.is-selected:not(.is-today) .day-number {
+  background: var(--quaternary);
+  font-weight: 600;
+}
+
+/* Today, as Calendar marks it. */
+.day.is-today .day-number {
+  background: var(--today);
+  color: #fff;
+  font-weight: 600;
+}
+
+.day.is-outside.is-today .day-number {
+  opacity: 0.6;
+}
+
+/* A day with events: one quiet mark under the number. */
 .day-mark {
   position: absolute;
-  bottom: 3px;
+  bottom: 1px;
   left: 50%;
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  background: var(--ink-soft);
-  opacity: 0.8;
+  background: var(--secondary);
   transform: translateX(-50%);
   pointer-events: none;
 }
 
 .day.is-outside .day-mark {
-  opacity: 0.45;
+  background: var(--tertiary);
 }
 
-.day.is-today .day-mark {
-  background: var(--selection-ink);
+/* The selected day's events, as menu rows. */
+.day-events {
+  flex-shrink: 0;
 }
 
-.day.is-outside .day-number {
-  color: var(--ink-soft);
+.day-events-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 14px 3px;
+}
+
+/* A menu's section header. */
+.day-events-heading h2 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--secondary);
+  font-size: 11px;
   font-weight: 600;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.day.is-today .day-number {
-  background: var(--selection-fill);
-  color: var(--selection-ink);
-  box-shadow: none;
+.day-events-heading span {
+  flex: 0 0 auto;
+  color: var(--tertiary);
+  font-size: 11px;
+  line-height: 14px;
 }
 
-.day.is-selected:not(.is-today) .day-number {
-  box-shadow: inset 0 0 0 2px var(--selection-border);
+.day-events-list {
+  max-height: 252px;
+  overflow-y: auto;
 }
 
-.day.is-outside.is-today .day-number {
-  color: var(--selection-ink);
+.day-event {
+  display: flex;
+  align-items: center;
+  margin: 0 5px;
+  border-radius: 6px;
 }
 
-.day:hover:not(.is-today):not(.is-selected) .day-number {
-  box-shadow: inset 0 0 0 2px var(--rim);
+.day-event-open {
+  display: grid;
+  flex: 1;
+  grid-template-areas:
+    "dot title"
+    ". time";
+  grid-template-columns: 8px minmax(0, 1fr);
+  column-gap: 8px;
+  min-width: 0;
+  padding: 3px 9px 4px;
+  text-align: left;
 }
 
-.day:focus {
-  outline: none;
+.day-event-dot {
+  grid-area: dot;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--event-color, var(--accent));
 }
 
-.day:focus-visible:not(.is-today):not(.is-selected) .day-number {
-  box-shadow: inset 0 0 0 2px var(--accent);
+.day-event-title {
+  grid-area: title;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.icon-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.day-event-time {
+  grid-area: time;
+  color: var(--secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  white-space: nowrap;
 }
 
-button:not(.day),
-a {
-  cursor: pointer !important;
+.day-event-when {
+  margin-left: 6px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.day-event.is-past .day-event-title {
+  color: var(--secondary);
+}
+
+.day-event-join {
+  flex: 0 0 auto;
+  height: 20px;
+  margin-right: 9px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* The menu highlight: the row takes the accent, its text turns white. */
+.day-event:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.day-event:hover .day-event-time,
+.day-event:hover .day-event-when,
+.day-event.is-past:hover .day-event-title {
+  color: var(--on-accent);
+}
+
+.day-event:hover .day-event-dot {
+  box-shadow: 0 0 0 1px var(--on-accent);
+}
+
+.day-event:hover .day-event-join {
+  background: var(--on-accent);
+  color: var(--accent);
+}
+
+.day-events-empty {
+  margin: 0;
+  padding: 3px 14px 4px;
+  color: var(--tertiary);
+  font-size: 13px;
+  line-height: 16px;
+}
+
+/* A plain menu item: Settings…, Allow Calendar Access…. */
+.menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - 10px);
+  height: 22px;
+  margin: 0 5px;
+  padding: 0 9px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.menu-row kbd {
+  color: var(--tertiary);
+  font: inherit;
+}
+
+.menu-row:hover,
+:root[data-keyboard] .menu-row:focus {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.menu-row:hover kbd,
+:root[data-keyboard] .menu-row:focus kbd {
+  color: var(--on-accent);
+}
+
+.calendar-footer {
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

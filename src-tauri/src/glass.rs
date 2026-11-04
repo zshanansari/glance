@@ -62,37 +62,23 @@ pub fn fade_out(window: &tauri::WebviewWindow) {
     }
 }
 
-/// Opening is quicker than closing, so the popover answers the click at once
-/// but still eases in rather than appearing in a single frame.
-pub const OPEN_FADE: std::time::Duration = std::time::Duration::from_millis(110);
-
-/// Clears the window to transparent before it is shown, for `fade_in`.
-pub fn prepare_fade_in(window: &tauri::WebviewWindow) {
+/// Puts the popover on screen already key, in one step, the way a status
+/// menu appears: no fade in, and no first frame drawn in the inactive look
+/// that `show` then `set_focus` produced before the window became key.
+pub fn present(window: &tauri::WebviewWindow) {
     let Some(ns_window) = window_object(window) else {
+        let _ = window.show();
+        let _ = window.set_focus();
         return;
     };
     unsafe {
-        let _: () = msg_send![ns_window, setAlphaValue: 0.0f64];
-    }
-}
-
-/// Animates the popover up to full opacity from wherever it is.
-pub fn fade_in(window: &tauri::WebviewWindow) {
-    let Some(ns_window) = window_object(window) else {
-        return;
-    };
-    unsafe {
-        let context = class!(NSAnimationContext);
-        let _: () = msg_send![context, beginGrouping];
-        let current: *mut AnyObject = msg_send![context, currentContext];
-        if !current.is_null() {
-            let _: () = msg_send![&*current, setDuration: OPEN_FADE.as_secs_f64()];
+        let app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
+        if !app.is_null() {
+            let _: () = msg_send![&*app, activateIgnoringOtherApps: Bool::YES];
         }
-        let animator: *mut AnyObject = msg_send![ns_window, animator];
-        if !animator.is_null() {
-            let _: () = msg_send![&*animator, setAlphaValue: 1.0f64];
-        }
-        let _: () = msg_send![context, endGrouping];
+        let _: () = msg_send![ns_window, setAlphaValue: 1.0f64];
+        let nil: *const AnyObject = std::ptr::null();
+        let _: () = msg_send![ns_window, makeKeyAndOrderFront: nil];
     }
 }
 

@@ -42,7 +42,8 @@ const EVENT_TRAY_ID: &str = "glance-event";
 const AUTOSTART_ARG: &str = "--autostart";
 const CALENDAR_WIDTH: f64 = 264.0;
 const CALENDAR_WIDTH_WEEKS: f64 = 288.0;
-const CALENDAR_HEIGHT: f64 = 324.0;
+/// The first size, before the page has measured itself, and the floor after.
+const CALENDAR_HEIGHT: f64 = 240.0;
 /// Wide enough that a row's explanation sits on one line beside its control,
 /// which is what keeps the grouped lists readable.
 const SETTINGS_WIDTH: f64 = 780.0;
@@ -273,12 +274,8 @@ fn close_events(app: &AppHandle) {
     }
 }
 
-/// Keeps the status item in AppKit's own pressed look while its popover is
-/// open, the way a status menu holds it.
-///
-/// `tray-icon` lights the button on mouse-down and clears it in `mouseUp:`,
-/// so this runs from the main queue after that, and again clears it when
-/// the popover closes.
+/// Clears AppKit's pressed look on the status item when its popover closes.
+/// `keep_highlight_while_open` is what keeps it on until then.
 #[cfg(target_os = "macos")]
 fn hold_native_highlight(app: &AppHandle, id: &'static str, on: bool) {
     use objc2_foundation::MainThreadMarker;
@@ -453,25 +450,7 @@ fn handle_tray_click(
                 }
             }
         }
-        TrayClickIntent::Ignore => {
-            // The release that ends the opening click: put the pressed look
-            // back once `tray-icon` has cleared it, if the popover is up.
-            if (button, button_state) == (MouseButton::Left, MouseButtonState::Up) {
-                let app = tray.app_handle();
-                let (id, label) = if tray.id().as_ref() == EVENT_TRAY_ID {
-                    (EVENT_TRAY_ID, EVENTS_LABEL)
-                } else {
-                    (TRAY_ID, CALENDAR_LABEL)
-                };
-                let open = app
-                    .get_webview_window(label)
-                    .and_then(|window| window.is_visible().ok())
-                    .unwrap_or(false);
-                if open {
-                    hold_native_highlight(app, id, true);
-                }
-            }
-        }
+        TrayClickIntent::Ignore => {}
     }
 }
 
@@ -762,14 +741,9 @@ fn show_calendar(app: &AppHandle, tray_rect: tauri::Rect) {
     cancel_fade(app, CALENDAR_LABEL);
     position_calendar(app, tray_rect);
     if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
-        if !window.is_visible().unwrap_or(false) {
-            glass::prepare_fade_in(&window);
-        }
-        let _ = window.show();
+        glass::present(&window);
         // Showing can let AppKit park the window on the previous screen.
         position_calendar(app, tray_rect);
-        let _ = window.set_focus();
-        glass::fade_in(&window);
     }
     let _ = app.emit("calendar-shown", ());
 }
@@ -804,12 +778,7 @@ fn show_events(app: &AppHandle, tray_rect: tauri::Rect) {
     let Some(window) = app.get_webview_window(EVENTS_LABEL) else {
         return;
     };
-    if !window.is_visible().unwrap_or(false) {
-        glass::prepare_fade_in(&window);
-    }
-    let _ = window.show();
-    let _ = window.set_focus();
-    glass::fade_in(&window);
+    glass::present(&window);
     let _ = window.emit("events-shown", ());
 }
 
@@ -1306,6 +1275,65 @@ fn watch_outside_clicks(app: AppHandle) {
 
 #[cfg(not(target_os = "macos"))]
 fn watch_outside_clicks(_app: AppHandle) {}
+
+/// Keeps the status item pressed for as long as the popover it opened is up,
+/// as a status menu's item stays.
+///
+/// `tray-icon` lights the button on mouse-down and clears it first thing in
+/// `mouseUp:`. Lighting it again afterwards left a frame without it, a blink
+/// that the glass behind the popover picked up too. So the release that ends
+/// an opening click never reaches `tray-icon`: the press look simply stays,
+/// and closing the popover clears it.
+#[cfg(target_os = "macos")]
+fn keep_highlight_while_open(app: AppHandle) {
+    use block2::RcBlock;
+    use objc2_app_kit::{NSEvent, NSEventMask};
+    use objc2_foundation::MainThreadMarker;
+    use std::ptr::NonNull;
+
+    let block = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
+        let passthrough = event.as_ptr();
+        let number = unsafe { event.as_ref() }.windowNumber();
+        for (id, label) in [(TRAY_ID, CALENDAR_LABEL), (EVENT_TRAY_ID, EVENTS_LABEL)] {
+            let open = app
+                .get_webview_window(label)
+                .and_then(|window| window.is_visible().ok())
+                .unwrap_or(false);
+            if !open {
+                continue;
+            }
+            let Some(tray) = app.tray_by_id(id) else {
+                continue;
+            };
+            let on_item = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let found = on_item.clone();
+            let _ = tray.with_inner_tray_icon(move |inner| {
+                let Some(mtm) = MainThreadMarker::new() else {
+                    return;
+                };
+                let window = inner
+                    .ns_status_item()
+                    .and_then(|item| item.button(mtm))
+                    .and_then(|button| button.window());
+                if window.is_some_and(|window| window.windowNumber() == number) {
+                    found.store(true, Ordering::SeqCst);
+                }
+            });
+            if on_item.load(Ordering::SeqCst) {
+                return std::ptr::null_mut();
+            }
+        }
+        passthrough
+    });
+    let monitor = unsafe {
+        NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::LeftMouseUp, &block)
+    };
+    // The watch lasts as long as the app; nothing ever removes it.
+    std::mem::forget(monitor);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn keep_highlight_while_open(_app: AppHandle) {}
 
 #[tauri::command]
 fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
@@ -1947,6 +1975,7 @@ pub fn run() {
             apply_shortcuts(app.handle(), &initial);
             spawn_clock(app.handle().clone());
             watch_outside_clicks(app.handle().clone());
+            keep_highlight_while_open(app.handle().clone());
             updates::spawn_checks(app.handle().clone());
             Ok(())
         })

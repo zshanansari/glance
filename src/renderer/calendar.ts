@@ -5,13 +5,7 @@ import {
   dayName,
   fromIso,
   toIso,
-  type CalendarMonth,
 } from "../shared/calendar";
-import {
-  MONTH_OUTLINE_RADIUS,
-  monthOutlinePath,
-  occupancyFromWeeks,
-} from "../shared/month-outline";
 import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } from "../shared/settings";
 import {
   eventsOnDay,
@@ -27,7 +21,7 @@ import { eventGlyphPng, framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
 import { bandBox } from "./column-bands";
 import { installTauriBridge, type DesktopApi } from "./host";
-import { ChevronLeft, ChevronRight, Settings, Video } from "lucide";
+import { ChevronLeft, ChevronRight } from "lucide";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -42,40 +36,6 @@ function applyTheme(theme: AppSettings["theme"]): void {
 
 function announce(message: string): void {
   requireElement("live").textContent = message;
-}
-
-function paintMonthOutline(
-  table: HTMLTableElement,
-  svg: SVGSVGElement,
-  month: CalendarMonth,
-  settings: AppSettings,
-): void {
-  const path = svg.querySelector("path");
-  const firstCell = table.querySelector<HTMLElement>("tbody td");
-  const firstRow = table.querySelector<HTMLElement>("tbody tr");
-  if (!path || !firstCell || !firstRow) return;
-  const wrap = svg.parentElement;
-  if (!wrap) return;
-  const wrapRect = wrap.getBoundingClientRect();
-  const cellRect = firstCell.getBoundingClientRect();
-  const rowRect = firstRow.getBoundingClientRect();
-  if (cellRect.width === 0 || rowRect.height === 0) return;
-  const rows = month.weeks.length;
-  const cols = month.weeks[0]?.length ?? 0;
-  svg.setAttribute("width", String(cols * cellRect.width));
-  svg.setAttribute("height", String(rows * rowRect.height));
-  svg.style.left = `${cellRect.left - wrapRect.left}px`;
-  svg.style.top = `${cellRect.top - wrapRect.top}px`;
-  path.setAttribute(
-    "d",
-    monthOutlinePath(
-      occupancyFromWeeks(month.weeks),
-      cellRect.width,
-      rowRect.height,
-      MONTH_OUTLINE_RADIUS,
-    ),
-  );
-  paintColumnHighlights(table, wrap, settings);
 }
 
 function paintColumnHighlights(
@@ -127,21 +87,13 @@ function startCalendar(api: DesktopApi): void {
   const prev = requireElement<HTMLButtonElement>("prev-month");
   const todayButton = requireElement<HTMLButtonElement>("today-month");
   const next = requireElement<HTMLButtonElement>("next-month");
-  const eventCard = requireElement<HTMLElement>("event-card");
-  const eventStatusLabel = requireElement<HTMLElement>("event-status");
-  const eventTitle = requireElement<HTMLElement>("event-title");
-  const eventMeta = requireElement<HTMLElement>("event-meta");
-  const joinMeeting = requireElement<HTMLButtonElement>("join-meeting");
-  const calendarAccess = requireElement<HTMLButtonElement>("calendar-access");
   const dayEvents = requireElement<HTMLElement>("day-events");
   const dayEventsTitle = requireElement<HTMLElement>("day-events-title");
   const dayEventsCount = requireElement<HTMLElement>("day-events-count");
   const dayEventsList = requireElement<HTMLElement>("day-events-list");
   const openSettings = requireElement<HTMLButtonElement>("open-settings");
-  prev.append(lucideIcon(ChevronLeft, 18));
-  next.append(lucideIcon(ChevronRight, 18));
-  openSettings.append(lucideIcon(Settings, 16));
-  joinMeeting.append(lucideIcon(Video, 15), document.createTextNode("Join Meeting"));
+  prev.append(lucideIcon(ChevronLeft, 14, { "stroke-width": 2.25 }));
+  next.append(lucideIcon(ChevronRight, 14, { "stroke-width": 2.25 }));
 
   let settings: AppSettings | null = null;
   let viewYear = new Date().getFullYear();
@@ -159,11 +111,10 @@ function startCalendar(api: DesktopApi): void {
   let eventRequest = 0;
   // Which way the month just moved, so the grid can slide in from that side.
   let slide = 0;
-
-  const paintEvent = (): void => {
-    eventCard.hidden = true;
-    calendarAccess.hidden = true;
-  };
+  // The day the grid was last drawn for, and what the events looked like, so
+  // opening the popover redraws nothing that is already right on screen.
+  let renderedDay = "";
+  let eventsKey = "";
 
   // The month's events always load, for the dots and the day list. The
   // menu bar preview is the part the Upcoming setting turns on.
@@ -210,15 +161,26 @@ function startCalendar(api: DesktopApi): void {
       }
       if (request !== eventRequest) return;
       upcomingEvent = next;
-      calendarEvents = [...monthEvents, ...selectedEvents];
+      const fetched = [...monthEvents, ...selectedEvents];
+      const key = JSON.stringify(
+        fetched.map((event) => [event.id, event.startAt, event.endAt, event.title, event.joinUrl]),
+      );
+      const unchanged = key === eventsKey && eventError === null;
+      eventsKey = key;
+      calendarEvents = fetched;
       eventError = null;
+      if (unchanged) {
+        refreshTray();
+        paintDayEvents();
+        return;
+      }
     } catch (error) {
       if (request !== eventRequest) return;
       upcomingEvent = null;
       calendarEvents = [];
+      eventsKey = "";
       eventError = error instanceof Error ? error.message : String(error);
     }
-    paintEvent();
     refreshTray();
     render();
     paintDayEvents();
@@ -229,7 +191,8 @@ function startCalendar(api: DesktopApi): void {
   const syncHeight = (): void => {
     const popover = document.querySelector<HTMLElement>(".popover");
     if (!popover) return;
-    let height = 0;
+    const frame = getComputedStyle(popover);
+    let height = parseFloat(frame.paddingTop) + parseFloat(frame.paddingBottom);
     for (const child of Array.from(popover.children) as HTMLElement[]) {
       if (child.hidden || getComputedStyle(child).position === "absolute") continue;
       // The footer's top margin is auto: it soaks up whatever room is left,
@@ -287,7 +250,7 @@ function startCalendar(api: DesktopApi): void {
       join.className = "day-event-join";
       join.setAttribute("aria-label", `Join ${event.title}`);
       join.title = "Join meeting";
-      join.append(lucideIcon(Video, 14));
+      join.textContent = "Join";
       join.addEventListener("click", () => {
         void api.joinMeeting(url).then(() => api.hideCalendar());
       });
@@ -302,7 +265,7 @@ function startCalendar(api: DesktopApi): void {
     const selectedDate = fromIso(focusIso);
     dayEventsTitle.textContent = new Intl.DateTimeFormat(undefined, {
       weekday: "long",
-      month: "short",
+      month: "long",
       day: "numeric",
     }).format(selectedDate);
     const selectedEvents = eventsOnDay(calendarEvents, selectedDate);
@@ -312,14 +275,14 @@ function startCalendar(api: DesktopApi): void {
     if (eventError) {
       const allow = document.createElement("button");
       allow.type = "button";
-      allow.className = "day-events-access";
-      allow.textContent = "Allow Calendar Access";
+      allow.className = "menu-row";
+      allow.textContent = "Allow Calendar Access…";
       allow.addEventListener("click", () => void requestAccess(allow));
       dayEventsList.replaceChildren(allow);
     } else if (!selectedEvents.length) {
       const empty = document.createElement("p");
       empty.className = "day-events-empty";
-      empty.textContent = "No events";
+      empty.textContent = "No Events";
       dayEventsList.replaceChildren(empty);
     } else {
       const now = Date.now();
@@ -383,7 +346,16 @@ function startCalendar(api: DesktopApi): void {
     if (!settings) return;
     const today = new Date();
     const month = buildMonth(viewYear, viewMonth, settings.weekStartsOn, today);
-    monthLabel.textContent = month.label;
+    // As Calendar titles a month: the name in full, the year lighter.
+    const monthName = document.createElement("span");
+    monthName.className = "month-name";
+    monthName.textContent = new Intl.DateTimeFormat(undefined, { month: "long" }).format(
+      new Date(viewYear, viewMonth, 1),
+    );
+    const year = document.createElement("span");
+    year.className = "month-year";
+    year.textContent = String(viewYear);
+    monthLabel.replaceChildren(monthName, " ", year);
 
     const table = document.createElement("table");
     table.className = settings.showWeekNumbers ? "grid with-weeks" : "grid";
@@ -488,11 +460,7 @@ function startCalendar(api: DesktopApi): void {
     const bands = document.createElement("div");
     bands.className = "column-highlights";
     bands.setAttribute("aria-hidden", "true");
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "month-outline");
-    svg.setAttribute("aria-hidden", "true");
-    svg.append(document.createElementNS("http://www.w3.org/2000/svg", "path"));
-    wrap.append(bands, table, svg);
+    wrap.append(bands, table);
     if (slide) wrap.classList.add(slide > 0 ? "slide-next" : "slide-prev");
     slide = 0;
     grid.replaceChildren(wrap);
@@ -502,7 +470,8 @@ function startCalendar(api: DesktopApi): void {
       "is-hidden",
       viewYear === today.getFullYear() && viewMonth === today.getMonth() && focusIso === todayIso,
     );
-    paintMonthOutline(table, svg, month, settings);
+    paintColumnHighlights(table, wrap, settings);
+    renderedDay = todayIso;
 
     if (opts?.announceMonth) announce(month.label);
     if (opts?.focusGrid) {
@@ -563,23 +532,21 @@ function startCalendar(api: DesktopApi): void {
     if (!url) return;
     void api.joinMeeting(url).then(() => api.hideCalendar());
   };
-  joinMeeting.addEventListener("click", joinUpcoming);
   openSettings.addEventListener("click", () => {
     void api.openSettings();
   });
-  calendarAccess.addEventListener("click", async () => {
-    calendarAccess.disabled = true;
-    try {
-      await api.requestCalendarAccess();
-      await refreshUpcoming();
-    } catch {
-      eventMeta.textContent = "Could not request Calendar access. Try again.";
-    } finally {
-      calendarAccess.disabled = false;
-    }
-  });
 
+  // Focus rings follow the keyboard: on after a key, off after the mouse.
+  document.addEventListener("mousedown", () => {
+    delete document.documentElement.dataset.keyboard;
+  });
+  api.onCalendarHidden(() => {
+    delete document.documentElement.dataset.keyboard;
+  });
   document.addEventListener("keydown", (event) => {
+    if (!event.metaKey && event.key !== "Escape") {
+      document.documentElement.dataset.keyboard = "";
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       void api.hideCalendar();
@@ -646,7 +613,6 @@ function startCalendar(api: DesktopApi): void {
   const applySettings = (next: AppSettings): void => {
     settings = next;
     applyTheme(next.theme);
-    paintEvent();
     paintDayEvents();
     refreshTray();
     render();
@@ -674,9 +640,12 @@ function startCalendar(api: DesktopApi): void {
   // The global shortcut fires wherever focus is; the calendar window already
   // knows which event the menu bar item is previewing.
   api.onJoinUpcomingRequested(joinUpcoming);
+  // Opening shows what was drawn while hidden; only a new day redraws it.
+  // Nothing takes focus: the arrow keys work from the document, and a ring
+  // around today on every open is not how a menu looks.
   api.onCalendarShown(() => {
     refreshTray();
-    render({ focusGrid: true });
+    if (toIso(new Date()) !== renderedDay) render();
     void refreshUpcoming();
   });
 }
