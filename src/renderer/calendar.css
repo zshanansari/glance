@@ -12,7 +12,7 @@
   --separator: rgb(0 0 0 / 10%);
   --accent: #007aff;
   --on-accent: #fff;
-  --today: #ff3b30;
+  --select: #ff9500;
   --scrim: rgb(255 255 255 / 16%);
 
   color: var(--label);
@@ -31,7 +31,7 @@
     --quaternary: rgb(255 255 255 / 10%);
     --separator: rgb(255 255 255 / 12%);
     --accent: #0a84ff;
-    --today: #ff453a;
+    --select: #ff9f0a;
     --scrim: rgb(0 0 0 / 22%);
   }
 }
@@ -47,7 +47,7 @@
   --quaternary: rgb(255 255 255 / 10%);
   --separator: rgb(255 255 255 / 12%);
   --accent: #0a84ff;
-  --today: #ff453a;
+  --select: #ff9f0a;
   --scrim: rgb(0 0 0 / 22%);
   color-scheme: dark;
 }
@@ -64,7 +64,7 @@
     --separator: -apple-system-separator;
     --accent: -apple-system-control-accent;
     --on-accent: -apple-system-alternate-selected-text;
-    --today: -apple-system-red;
+    --select: -apple-system-orange;
   }
 }
 
@@ -317,12 +317,15 @@ button:focus {
   height: 28px;
 }
 
+/* A rounded square, not a circle: tall enough to hold the event mark inside
+   it, so a highlight never cuts across the dot. */
 .day-number {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+  width: 30px;
+  height: 26px;
+  padding-bottom: 4px;
+  border-radius: 7px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -332,18 +335,21 @@ button:focus {
   color: var(--tertiary);
 }
 
-.day:hover:not(.is-today):not(.is-selected) .day-number {
+.day:hover:not(.is-selected) .day-number {
   background: var(--quaternary);
 }
 
-.day.is-selected:not(.is-today) .day-number {
-  background: var(--quaternary);
+/* Today: an outline, so it reads at a glance without looking chosen. */
+.day.is-today .day-number {
+  box-shadow: inset 0 0 0 1.5px var(--select);
+  color: var(--select);
   font-weight: 600;
 }
 
-/* Today, as Calendar marks it. */
-.day.is-today .day-number {
-  background: var(--today);
+/* The chosen day: filled. */
+.day.is-selected .day-number {
+  background: var(--select);
+  box-shadow: none;
   color: #fff;
   font-weight: 600;
 }
@@ -352,10 +358,10 @@ button:focus {
   opacity: 0.6;
 }
 
-/* A day with events: one quiet mark under the number. */
+/* A day with events: one quiet mark, inside the highlight's lower edge. */
 .day-mark {
   position: absolute;
-  bottom: 1px;
+  bottom: 5px;
   left: 50%;
   width: 3px;
   height: 3px;
@@ -367,6 +373,14 @@ button:focus {
 
 .day.is-outside .day-mark {
   background: var(--tertiary);
+}
+
+.day.is-today .day-mark {
+  background: var(--select);
+}
+
+.day.is-selected .day-mark {
+  background: #fff;
 }
 
 /* The selected day's events, as menu rows. */
