@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-popover-material"
+description = "Enables the popover_material command without any pre-configured scope."
+commands.allow = ["popover_material"]
+
+[[permission]]
+identifier = "deny-popover-material"
+description = "Denies the popover_material command without any pre-configured scope."
+commands.deny = ["popover_material"]

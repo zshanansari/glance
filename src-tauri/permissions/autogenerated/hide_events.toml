@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hide-events"
+description = "Enables the hide_events command without any pre-configured scope."
+commands.allow = ["hide_events"]
+
+[[permission]]
+identifier = "deny-hide-events"
+description = "Denies the hide_events command without any pre-configured scope."
+commands.deny = ["hide_events"]

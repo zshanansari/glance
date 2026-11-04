@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hide-calendar"
+description = "Enables the hide_calendar command without any pre-configured scope."
+commands.allow = ["hide_calendar"]
+
+[[permission]]
+identifier = "deny-hide-calendar"
+description = "Denies the hide_calendar command without any pre-configured scope."
+commands.deny = ["hide_calendar"]

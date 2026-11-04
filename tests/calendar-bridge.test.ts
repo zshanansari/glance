@@ -1,11 +1,14 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+
+const invoke = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/core", () => ({ invoke, isTauri: () => true }));
+
 import { api } from "../src/renderer/host";
 
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => invoke.mockReset());
 
 it("passes calendar range arguments using Tauri's camelCase command convention", async () => {
-  const invoke = vi.fn().mockResolvedValue([]);
-  vi.stubGlobal("window", { __TAURI__: { core: { invoke } } });
+  invoke.mockResolvedValue([]);
   await expect(api.getCalendarEvents(1000, 2000)).resolves.toEqual([]);
   expect(invoke).toHaveBeenCalledWith("get_calendar_events", {
     startAt: 1000,
@@ -14,8 +17,7 @@ it("passes calendar range arguments using Tauri's camelCase command convention",
 });
 
 it("dismisses an upcoming occurrence with its end time", async () => {
-  const invoke = vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal("window", { __TAURI__: { core: { invoke } } });
+  invoke.mockResolvedValue(undefined);
   await expect(api.dismissUpcomingEvent("event-1", 2000)).resolves.toBeUndefined();
   expect(invoke).toHaveBeenCalledWith("dismiss_upcoming_event", {
     id: "event-1",
@@ -24,31 +26,27 @@ it("dismisses an upcoming occurrence with its end time", async () => {
 });
 
 it("lists calendars through the same command bridge", async () => {
-  const invoke = vi.fn().mockResolvedValue([]);
-  vi.stubGlobal("window", { __TAURI__: { core: { invoke } } });
+  invoke.mockResolvedValue([]);
   await expect(api.listCalendars()).resolves.toEqual([]);
-  expect(invoke).toHaveBeenCalledWith("list_calendars", undefined);
+  expect(invoke).toHaveBeenCalledWith("list_calendars");
 });
 
 it("waits for the native calendar permission result", async () => {
-  const invoke = vi.fn().mockResolvedValue(true);
-  vi.stubGlobal("window", { __TAURI__: { core: { invoke } } });
+  invoke.mockResolvedValue(true);
   await expect(api.requestCalendarAccess()).resolves.toBe(true);
-  expect(invoke).toHaveBeenCalledWith("request_calendar_access", undefined);
+  expect(invoke).toHaveBeenCalledWith("request_calendar_access");
 });
 
-it("opens an https address in the system browser", async () => {
-  const invoke = vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal("window", { __TAURI__: { core: { invoke } } });
-  await expect(api.openUrl("https://example.com")).resolves.toBeUndefined();
-  expect(invoke).toHaveBeenCalledWith("join_meeting", { url: "https://example.com" });
+it("opens About links through their own command, not the meeting one", async () => {
+  invoke.mockResolvedValue(undefined);
+  await expect(api.openUrl("https://github.com/zshanansari")).resolves.toBeUndefined();
+  expect(invoke).toHaveBeenCalledWith("open_link", { url: "https://github.com/zshanansari" });
 });
 
 it("opens the Calendar and Reminders privacy panes", async () => {
-  const invoke = vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal("window", { __TAURI__: { core: { invoke } } });
+  invoke.mockResolvedValue(undefined);
   await expect(api.openCalendarPrivacy()).resolves.toBeUndefined();
   await expect(api.openRemindersPrivacy()).resolves.toBeUndefined();
-  expect(invoke).toHaveBeenCalledWith("open_calendar_privacy", undefined);
-  expect(invoke).toHaveBeenCalledWith("open_reminders_privacy", undefined);
+  expect(invoke).toHaveBeenCalledWith("open_calendar_privacy");
+  expect(invoke).toHaveBeenCalledWith("open_reminders_privacy");
 });

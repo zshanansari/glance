@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "calendar",
+  "description": "The month popover: reads settings and events, draws the menu bar items, and joins a meeting.",
+  "windows": [
+    "calendar"
+  ],
+  "permissions": [
+    "core:event:default",
+    "allow-get-settings",
+    "allow-get-calendar-events",
+    "allow-get-dismissed-events",
+    "allow-popover-material",
+    "allow-hide-calendar",
+    "allow-open-settings",
+    "allow-beep",
+    "allow-join-meeting",
+    "allow-request-calendar-access",
+    "allow-get-calendar-access",
+    "allow-set-tray-label",
+    "allow-set-event-tray-label"
+  ]
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-calendar-access"
+description = "Enables the get_calendar_access command without any pre-configured scope."
+commands.allow = ["get_calendar_access"]
+
+[[permission]]
+identifier = "deny-get-calendar-access"
+description = "Denies the get_calendar_access command without any pre-configured scope."
+commands.deny = ["get_calendar_access"]

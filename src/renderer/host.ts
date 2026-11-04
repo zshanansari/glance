@@ -1,18 +1,10 @@
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { AppSettings, CalendarInfo } from "../shared/settings";
 import type { DismissedOccurrence, UpcomingEvent } from "../shared/events";
 
 /** An empty version means the running build is current. */
 export type UpdateOffer = { version: string; notes: string };
-
-interface TauriGlobal {
-  core: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> };
-  event: {
-    listen<T>(
-      event: string,
-      handler: (message: { payload: T }) => void,
-    ): Promise<() => void>;
-  };
-}
 
 export type DesktopApi = {
   getSettings: () => Promise<AppSettings>;
@@ -66,28 +58,11 @@ export type DesktopApi = {
   onJoinUpcomingRequested: (listener: () => void) => () => void;
 };
 
-function maybeTauri(): TauriGlobal | null {
-  return (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__ ?? null;
-}
-
-function tauri(): TauriGlobal {
-  const global = maybeTauri();
-  if (!global) {
-    throw new Error("Tauri bridge is unavailable.");
-  }
-  return global;
-}
-
-function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  return tauri().core.invoke<T>(command, args);
-}
-
 function subscribe<T>(event: string, handler: (payload: T) => void): () => void {
   let unlisten: (() => void) | null = null;
   let cancelled = false;
 
-  void tauri()
-    .event.listen<T>(event, (message) => handler(message.payload))
+  void listen<T>(event, (message) => handler(message.payload))
     .then((stop) => {
       if (cancelled) stop();
       else unlisten = stop;
@@ -128,7 +103,7 @@ export const api: DesktopApi = {
   onUpdateAvailable: (listener) => subscribe<string | null>("update-available", listener),
   onUpdateFailed: (listener) => subscribe<string>("update-failed", listener),
   openRepository: () => invoke<void>("open_repository"),
-  openUrl: (url) => invoke<void>("join_meeting", { url }),
+  openUrl: (url) => invoke<void>("open_link", { url }),
   onUpdateProgress: (listener) =>
     subscribe<{ downloaded: number; total: number | null }>(
       "update-progress",
@@ -151,8 +126,8 @@ export const api: DesktopApi = {
 };
 
 export function installTauriBridge(): DesktopApi {
-  if (!maybeTauri()) {
-    throw new Error("Tauri global is unavailable; the window cannot reach its host.");
+  if (!isTauri()) {
+    throw new Error("Tauri is unavailable; the window cannot reach its host.");
   }
   return api;
 }

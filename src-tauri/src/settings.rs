@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const MENU_BAR_ICONS: [&str; 4] = ["filled", "framed", "calendar", "none"];
 
@@ -208,13 +208,32 @@ impl SettingsStore {
     }
 
     fn write(&self) {
-        if let Some(parent) = self.path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
         if let Ok(body) = serde_json::to_string_pretty(&self.current) {
-            let _ = fs::write(&self.path, format!("{body}\n"));
+            let _ = write_atomically(&self.path, format!("{body}\n").as_bytes());
         }
     }
+}
+
+/// Writes beside the target and renames over it, so a crash mid-write leaves
+/// the old file rather than a torn one that would load as defaults. The file
+/// is readable only by its owner, since it names the calendars being read.
+fn write_atomically(path: &Path, body: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temp = path.with_extension("json.tmp");
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temp)?;
+    file.write_all(body)?;
+    file.sync_all()?;
+    fs::rename(&temp, path)
 }
 
 #[cfg(test)]
@@ -245,6 +264,27 @@ mod tests {
         let mut input = base.clone();
         input.menu_bar_icon = "rainbow".into();
         assert_eq!(input.normalize(&base).menu_bar_icon, base.menu_bar_icon);
+    }
+
+    #[test]
+    fn writes_replace_the_file_whole_and_keep_it_private() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!(
+            "glance-atomic-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let path = dir.join("settings.json");
+        write_atomically(&path, b"{\"theme\": \"dark\"}\n").expect("first write");
+        write_atomically(&path, b"{\"theme\": \"light\"}\n").expect("second write");
+        assert_eq!(fs::read_to_string(&path).expect("reads"), "{\"theme\": \"light\"}\n");
+        assert!(!path.with_extension("json.tmp").exists());
+        let mode = fs::metadata(&path).expect("metadata").permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

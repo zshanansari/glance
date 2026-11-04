@@ -237,7 +237,8 @@ fn serves_host(host: &str, domain: &str) -> bool {
 }
 
 fn is_meeting_url(url: &str) -> bool {
-    host_of(url).is_some_and(|host| {
+    url.starts_with("https://")
+        && host_of(url).is_some_and(|host| {
         MEETING_HOSTS
             .iter()
             .any(|domain| serves_host(&host, domain))
@@ -378,15 +379,15 @@ fn zoommtg_to_https(value: &str) -> Option<String> {
     Some(join)
 }
 
-/// Pull a joinable http(s) URL out of an event's URL, location, and notes.
-/// Meeting hosts win when several URLs are present, so a Google Calendar
-/// wrapper or a company website in `URL` does not hide a Zoom link in notes.
+/// Pull a joinable meeting URL out of an event's URL, location, and notes.
+/// Only https links on a known meeting host count: an invite is written by
+/// whoever sent it, so any other link would make "Join" and its global
+/// shortcut a one-press way to open a stranger's page.
 pub(crate) fn extract_join_url(
     event_url: Option<&str>,
     location: Option<&str>,
     notes: Option<&str>,
 ) -> Option<String> {
-    let mut first_any = None;
     let mut first_meeting = None;
     for blob in [event_url, location, notes].into_iter().flatten() {
         if first_meeting.is_none() {
@@ -395,15 +396,12 @@ pub(crate) fn extract_join_url(
             }
         }
         for url in urls_in(blob) {
-            if first_any.is_none() {
-                first_any = Some(url.clone());
-            }
             if first_meeting.is_none() && is_meeting_url(&url) {
                 first_meeting = Some(url);
             }
         }
     }
-    first_meeting.or(first_any)
+    first_meeting
 }
 
 #[cfg(target_os = "macos")]
@@ -1027,18 +1025,19 @@ mod macos {
         }
     }
 
-    pub fn open_meeting(url: &str) -> Result<(), String> {
-        if !(url.starts_with("https://") || url.starts_with("http://")) {
-            return Err("Meeting link must use http or https".into());
+    /// Callers vet the address first; this only hands it to the browser.
+    pub fn open_https(url: &str) -> Result<(), String> {
+        if !url.starts_with("https://") {
+            return Err("Link must use https".into());
         }
         let string = NSString::from_str(url);
         let Some(url) = NSURL::URLWithString(&string) else {
-            return Err("Invalid meeting link".into());
+            return Err("Invalid link".into());
         };
         if NSWorkspace::sharedWorkspace().openURL(&url) {
             Ok(())
         } else {
-            Err("Could not open meeting link".into())
+            Err("Could not open link".into())
         }
     }
 }
@@ -1193,15 +1192,25 @@ pub fn open_event(id: &str) -> Result<(), String> {
     }
 }
 
+/// Opens a meeting link, but only one `extract_join_url` would have chosen,
+/// so the webview cannot use this to open an arbitrary address.
 pub fn open_meeting(url: &str) -> Result<(), String> {
+    if !is_meeting_url(url) {
+        return Err("Not a meeting link".into());
+    }
+    open_https(url)
+}
+
+/// Opens a fixed https address the host itself chose, such as the repository.
+pub fn open_https(url: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        macos::open_meeting(url)
+        macos::open_https(url)
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = url;
-        Err("Meeting links are only supported on macOS".into())
+        Err("Links are only supported on macOS".into())
     }
 }
 
@@ -1418,6 +1427,26 @@ mod tests {
             extract_join_url(None, Some("https://company.zoom.com/j/55"), None),
             Some("https://company.zoom.com/j/55".into())
         );
+    }
+
+    #[test]
+    fn a_link_on_an_unknown_host_is_not_joinable() {
+        assert_eq!(
+            extract_join_url(None, None, Some("Agenda: https://evil.example/login")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_meeting_host_over_plain_http_is_not_joinable() {
+        assert_eq!(extract_join_url(None, None, Some("http://zoom.us/j/99")), None);
+    }
+
+    #[test]
+    fn open_meeting_refuses_anything_but_a_meeting_link() {
+        assert!(super::open_meeting("https://evil.example/zoom.us").is_err());
+        assert!(super::open_meeting("http://zoom.us/j/1").is_err());
+        assert!(super::open_meeting("file:///etc/passwd").is_err());
     }
 
     #[cfg(target_os = "macos")]

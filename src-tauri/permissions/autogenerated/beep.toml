@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-beep"
+description = "Enables the beep command without any pre-configured scope."
+commands.allow = ["beep"]
+
+[[permission]]
+identifier = "deny-beep"
+description = "Denies the beep command without any pre-configured scope."
+commands.deny = ["beep"]

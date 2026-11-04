@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-dismissed-events"
+description = "Enables the get_dismissed_events command without any pre-configured scope."
+commands.allow = ["get_dismissed_events"]
+
+[[permission]]
+identifier = "deny-get-dismissed-events"
+description = "Denies the get_dismissed_events command without any pre-configured scope."
+commands.deny = ["get_dismissed_events"]

@@ -1753,7 +1753,23 @@ const REPOSITORY_URL: &str = "https://github.com/zshanansari/glance";
 
 #[tauri::command]
 fn open_repository() -> Result<(), String> {
-    events::open_meeting(REPOSITORY_URL)
+    events::open_https(REPOSITORY_URL)
+}
+
+/// The only addresses About may open. Anything else is refused, so a script
+/// in the webview cannot use this to open a page of its choosing.
+const ABOUT_LINKS: &[&str] = &[
+    REPOSITORY_URL,
+    "https://github.com/vipinsight/calendo",
+    "https://github.com/zshanansari",
+];
+
+#[tauri::command]
+fn open_link(url: String) -> Result<(), String> {
+    if !ABOUT_LINKS.contains(&url.as_str()) {
+        return Err("Link is not one Glance opens".into());
+    }
+    events::open_https(&url)
 }
 
 #[tauri::command]
@@ -1839,6 +1855,7 @@ pub fn run() {
             update_available,
             install_update,
             open_repository,
+            open_link,
             get_upcoming_event,
             get_calendar_events,
             get_dismissed_events,
@@ -1884,19 +1901,43 @@ mod tests {
     /// A window missing from the capability cannot listen for events, and
     /// nothing fails loudly: its own commands keep working while every
     /// `listen` is refused, so the popover simply stops refreshing.
-    #[test]
-    fn every_window_is_granted_the_core_capability() {
-        let capability: serde_json::Value =
-            serde_json::from_str(include_str!("../capabilities/default.json"))
-                .expect("capability is valid JSON");
-        let windows = capability["windows"]
+    fn capability(json: &str) -> serde_json::Value {
+        serde_json::from_str(json).expect("capability is valid JSON")
+    }
+
+    fn grants(capability: &serde_json::Value, permission: &str) -> bool {
+        capability["permissions"]
             .as_array()
-            .expect("capability names its windows");
-        for label in [CALENDAR_LABEL, EVENTS_LABEL, SETTINGS_LABEL] {
-            assert!(
-                windows.iter().any(|window| window == label),
-                "window {label} is missing from capabilities/default.json"
-            );
+            .expect("capability lists permissions")
+            .iter()
+            .any(|granted| granted == permission)
+    }
+
+    #[test]
+    fn each_window_has_a_capability_of_its_own() {
+        for (label, json) in [
+            (CALENDAR_LABEL, include_str!("../capabilities/calendar.json")),
+            (EVENTS_LABEL, include_str!("../capabilities/events.json")),
+            (SETTINGS_LABEL, include_str!("../capabilities/settings.json")),
+        ] {
+            let capability = capability(json);
+            assert_eq!(capability["windows"], serde_json::json!([label]));
+            assert!(grants(&capability, "core:event:default"), "{label} cannot listen");
+        }
+    }
+
+    #[test]
+    fn only_settings_can_change_settings_or_install_updates() {
+        let settings = capability(include_str!("../capabilities/settings.json"));
+        for popover in [
+            include_str!("../capabilities/calendar.json"),
+            include_str!("../capabilities/events.json"),
+        ] {
+            let popover = capability(popover);
+            for command in ["allow-update-settings", "allow-install-update", "allow-open-link"] {
+                assert!(grants(&settings, command));
+                assert!(!grants(&popover, command), "a popover is granted {command}");
+            }
         }
     }
 
