@@ -257,6 +257,7 @@ fn cancel_fade(app: &AppHandle, label: &'static str) {
 }
 
 fn close_calendar(app: &AppHandle) {
+    hold_native_highlight(app, TRAY_ID, false);
     fade_out_and_hide(app, CALENDAR_LABEL);
     let _ = app.emit("calendar-hidden", ());
     if let Ok(mut closed) = closed_at(&app.state::<AppState>(), CALENDAR_LABEL).lock() {
@@ -265,11 +266,44 @@ fn close_calendar(app: &AppHandle) {
 }
 
 fn close_events(app: &AppHandle) {
+    hold_native_highlight(app, EVENT_TRAY_ID, false);
     fade_out_and_hide(app, EVENTS_LABEL);
     if let Ok(mut closed) = closed_at(&app.state::<AppState>(), EVENTS_LABEL).lock() {
         *closed = Some(Instant::now());
     }
 }
+
+/// Keeps the status item in AppKit's own pressed look while its popover is
+/// open, the way a status menu holds it.
+///
+/// `tray-icon` lights the button on mouse-down and clears it in `mouseUp:`,
+/// so this runs from the main queue after that, and again clears it when
+/// the popover closes.
+#[cfg(target_os = "macos")]
+fn hold_native_highlight(app: &AppHandle, id: &'static str, on: bool) {
+    use objc2_foundation::MainThreadMarker;
+
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Some(tray) = handle.tray_by_id(id) else {
+            return;
+        };
+        let _ = tray.with_inner_tray_icon(move |inner| {
+            let Some(item) = inner.ns_status_item() else {
+                return;
+            };
+            let Some(mtm) = MainThreadMarker::new() else {
+                return;
+            };
+            if let Some(button) = item.button(mtm) {
+                button.highlight(on);
+            }
+        });
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+fn hold_native_highlight(_app: &AppHandle, _id: &'static str, _on: bool) {}
 
 /// Lays the status item out for what it actually carries.
 ///
@@ -419,7 +453,25 @@ fn handle_tray_click(
                 }
             }
         }
-        TrayClickIntent::Ignore => {}
+        TrayClickIntent::Ignore => {
+            // The release that ends the opening click: put the pressed look
+            // back once `tray-icon` has cleared it, if the popover is up.
+            if (button, button_state) == (MouseButton::Left, MouseButtonState::Up) {
+                let app = tray.app_handle();
+                let (id, label) = if tray.id().as_ref() == EVENT_TRAY_ID {
+                    (EVENT_TRAY_ID, EVENTS_LABEL)
+                } else {
+                    (TRAY_ID, CALENDAR_LABEL)
+                };
+                let open = app
+                    .get_webview_window(label)
+                    .and_then(|window| window.is_visible().ok())
+                    .unwrap_or(false);
+                if open {
+                    hold_native_highlight(app, id, true);
+                }
+            }
+        }
     }
 }
 
