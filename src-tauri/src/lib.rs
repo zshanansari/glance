@@ -438,6 +438,35 @@ fn align_status_item_content(tray: &tauri::tray::TrayIcon) {
     });
 }
 
+/// Stops AppKit from drawing its pressed look on the status item.
+///
+/// `tray-icon` highlights the button on every mouse-down and clears it on
+/// mouse-up. Ours is drawn behind the button for as long as a popover or menu
+/// is open, so the two would trade places on each click: the item blinked off
+/// between press and release, and next to another app's highlighted item it
+/// read as that one being active. With the cell drawing nothing on highlight,
+/// ours is the only one, and it never leaves while something is open.
+#[cfg(target_os = "macos")]
+fn quiet_press_highlight(tray: &tauri::tray::TrayIcon) {
+    use objc2_app_kit::{NSButtonCell, NSCellStyleMask};
+    use objc2_foundation::MainThreadMarker;
+
+    let _ = tray.with_inner_tray_icon(|inner| {
+        let Some(item) = inner.ns_status_item() else {
+            return;
+        };
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
+        let Some(cell) = item.button(mtm).and_then(|button| button.cell()) else {
+            return;
+        };
+        if let Some(cell) = cell.downcast_ref::<NSButtonCell>() {
+            cell.setHighlightsBy(NSCellStyleMask::empty());
+        }
+    });
+}
+
 /// What a status-item click should do. Split out so the left/right split can
 /// be tested without standing up a menu bar extra.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -447,9 +476,11 @@ enum TrayClickIntent {
     Ignore,
 }
 
+/// Both open on mouse-down, as a status item's menu does: the popover is up by
+/// the time the button is released, with no beat in between.
 fn tray_click_intent(button: MouseButton, state: MouseButtonState) -> TrayClickIntent {
     match (button, state) {
-        (MouseButton::Left, MouseButtonState::Up) => TrayClickIntent::Toggle,
+        (MouseButton::Left, MouseButtonState::Down) => TrayClickIntent::Toggle,
         (MouseButton::Right, MouseButtonState::Down) => TrayClickIntent::Menu,
         _ => TrayClickIntent::Ignore,
     }
@@ -509,12 +540,12 @@ fn remember_status_item_menu(tray: &tauri::tray::TrayIcon, share: &TrayMenuShare
 
 #[cfg(target_os = "macos")]
 fn present_status_item_menu(tray: &tauri::tray::TrayIcon, menu: &TrayMenu) {
-    // AppKit backdrops the item itself while a menu is up, so ours would sit
-    // under a second, differently sized wash. Stand it down for the duration
-    // and put it back if the popover outlived the menu.
+    // AppKit's own press look is switched off (see `quiet_press_highlight`),
+    // so ours stands in while the menu is up, and stays if the popover
+    // outlived it.
     let app = tray.app_handle().clone();
     let id = tray.id().as_ref().to_string();
-    paint_status_item_highlight(&app, &id, false);
+    paint_status_item_highlight(&app, &id, true);
 
     // `NSMenu` is not Send, and `with_inner_tray_icon` requires a Send
     // closure, so the retained menu stays here and only a pointer crosses.
@@ -559,17 +590,6 @@ fn handle_tray_click(
     else {
         return;
     };
-    // Not an intent: whatever the click goes on to do, the press look is
-    // AppKit's for the duration. It paints its own wash on mouse-down, wider
-    // than anything we can fit inside the item's window, and two translucent
-    // washes stack into one too-bright blob. `tray-icon` sends this event
-    // before it highlights, so standing ours down here means the two are
-    // never on screen together. Mouse-up clears AppKit's before the toggle
-    // runs, which puts ours back if the popover stayed open.
-    #[cfg(target_os = "macos")]
-    if (button, button_state) == (MouseButton::Left, MouseButtonState::Down) {
-        paint_status_item_highlight(tray.app_handle(), tray.id().as_ref(), false);
-    }
     match tray_click_intent(button, button_state) {
         TrayClickIntent::Toggle => toggle(tray.app_handle(), clicked_rect(tray.app_handle(), rect)),
         TrayClickIntent::Menu => {
@@ -869,10 +889,14 @@ fn show_calendar(app: &AppHandle, tray_rect: tauri::Rect) {
     cancel_fade(app, CALENDAR_LABEL);
     position_calendar(app, tray_rect);
     if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
+        if !window.is_visible().unwrap_or(false) {
+            glass::prepare_fade_in(&window);
+        }
         let _ = window.show();
         // Showing can let AppKit park the window on the previous screen.
         position_calendar(app, tray_rect);
         let _ = window.set_focus();
+        glass::fade_in(&window);
     }
     let _ = app.emit("calendar-shown", ());
 }
@@ -908,8 +932,12 @@ fn show_events(app: &AppHandle, tray_rect: tauri::Rect) {
     let Some(window) = app.get_webview_window(EVENTS_LABEL) else {
         return;
     };
+    if !window.is_visible().unwrap_or(false) {
+        glass::prepare_fade_in(&window);
+    }
     let _ = window.show();
     let _ = window.set_focus();
+    glass::fade_in(&window);
     let _ = window.emit("events-shown", ());
 }
 
@@ -1116,6 +1144,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .build(app)?;
     #[cfg(target_os = "macos")]
     remember_status_item_menu(&calendar, &status_menu);
+    #[cfg(target_os = "macos")]
+    quiet_press_highlight(&calendar);
     let event_tray = TrayIconBuilder::with_id(EVENT_TRAY_ID)
         .tooltip("Upcoming event")
         .menu(&menu)
@@ -1137,6 +1167,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .build(app)?;
     #[cfg(target_os = "macos")]
     remember_status_item_menu(&event_tray, &status_menu);
+    #[cfg(target_os = "macos")]
+    quiet_press_highlight(&event_tray);
     let _ = event_tray.set_visible(false);
     Ok(())
 }
@@ -2227,11 +2259,11 @@ mod tests {
     #[test]
     fn left_click_opens_the_popover_not_the_menu() {
         assert_eq!(
-            tray_click_intent(MouseButton::Left, MouseButtonState::Up),
+            tray_click_intent(MouseButton::Left, MouseButtonState::Down),
             TrayClickIntent::Toggle
         );
         assert_eq!(
-            tray_click_intent(MouseButton::Left, MouseButtonState::Down),
+            tray_click_intent(MouseButton::Left, MouseButtonState::Up),
             TrayClickIntent::Ignore
         );
     }

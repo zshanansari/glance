@@ -27,7 +27,7 @@ import { eventGlyphPng, framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
 import { bandBox } from "./column-bands";
 import { installTauriBridge, type DesktopApi } from "./host";
-import { ChevronLeft, ChevronRight, Dot, Settings, Video } from "lucide";
+import { ChevronLeft, ChevronRight, Settings, Video } from "lucide";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -139,7 +139,6 @@ function startCalendar(api: DesktopApi): void {
   const dayEventsList = requireElement<HTMLElement>("day-events-list");
   const openSettings = requireElement<HTMLButtonElement>("open-settings");
   prev.append(lucideIcon(ChevronLeft, 18));
-  todayButton.append(lucideIcon(Dot, 20, { "stroke-width": 10 }));
   next.append(lucideIcon(ChevronRight, 18));
   openSettings.append(lucideIcon(Settings, 16));
   joinMeeting.append(lucideIcon(Video, 15), document.createTextNode("Join Meeting"));
@@ -158,6 +157,8 @@ function startCalendar(api: DesktopApi): void {
   let calendarEvents: UpcomingEvent[] = [];
   let eventError: string | null = null;
   let eventRequest = 0;
+  // Which way the month just moved, so the grid can slide in from that side.
+  let slide = 0;
 
   const paintEvent = (): void => {
     eventCard.hidden = true;
@@ -172,10 +173,27 @@ function startCalendar(api: DesktopApi): void {
     if (!current) return;
     try {
       const now = Date.now();
-      // Spill a week either side, so outside days get their dots too.
+      // Spill a week either side, so outside days get their dots too. The
+      // selected day stays selected when the month changes, so its list
+      // must not empty out: fetch it as well when it lies outside.
       const rangeStart = new Date(viewYear, viewMonth, -6).getTime();
       const rangeEnd = new Date(viewYear, viewMonth + 1, 14).getTime();
-      const monthEvents = await api.getCalendarEvents(rangeStart, rangeEnd);
+      const selected = fromIso(focusIso);
+      const selectedStart = new Date(
+        selected.getFullYear(),
+        selected.getMonth(),
+        selected.getDate(),
+      ).getTime();
+      const selectedEnd = new Date(
+        selected.getFullYear(),
+        selected.getMonth(),
+        selected.getDate() + 1,
+      ).getTime();
+      const outside = selectedEnd <= rangeStart || selectedStart >= rangeEnd;
+      const [monthEvents, selectedEvents] = await Promise.all([
+        api.getCalendarEvents(rangeStart, rangeEnd),
+        outside ? api.getCalendarEvents(selectedStart, selectedEnd) : Promise.resolve([]),
+      ]);
       let next: UpcomingEvent | null = null;
       if (current.showUpcomingEvent) {
         const nextEvents = await api.getCalendarEvents(
@@ -192,7 +210,7 @@ function startCalendar(api: DesktopApi): void {
       }
       if (request !== eventRequest) return;
       upcomingEvent = next;
-      calendarEvents = monthEvents;
+      calendarEvents = [...monthEvents, ...selectedEvents];
       eventError = null;
     } catch (error) {
       if (request !== eventRequest) return;
@@ -233,7 +251,7 @@ function startCalendar(api: DesktopApi): void {
     }
   };
 
-  const dayEventRow = (event: UpcomingEvent, now: number): HTMLElement => {
+  const dayEventRow = (event: UpcomingEvent, now: number, isNext: boolean): HTMLElement => {
     const row = document.createElement("div");
     row.className = "day-event";
     const open = document.createElement("button");
@@ -250,6 +268,13 @@ function startCalendar(api: DesktopApi): void {
     const time = document.createElement("span");
     time.className = "day-event-time";
     time.textContent = eventTimeRange(event);
+    if (isNext) {
+      const when = document.createElement("span");
+      when.className = "day-event-when";
+      when.textContent = eventStatus(event, now).label;
+      time.append(when);
+      row.classList.add("is-next");
+    }
     open.append(dot, title, time);
     open.addEventListener("click", () => {
       void api.openEvent(event.id).then(() => api.hideCalendar());
@@ -298,7 +323,14 @@ function startCalendar(api: DesktopApi): void {
       dayEventsList.replaceChildren(empty);
     } else {
       const now = Date.now();
-      dayEventsList.replaceChildren(...selectedEvents.map((event) => dayEventRow(event, now)));
+      // On today, the meeting that is on or comes next says how soon.
+      const next =
+        focusIso === toIso(new Date(now))
+          ? selectedEvents.find((event) => !event.allDay && event.endAt > now)
+          : undefined;
+      dayEventsList.replaceChildren(
+        ...selectedEvents.map((event) => dayEventRow(event, now, event === next)),
+      );
     }
     syncHeight();
   };
@@ -461,7 +493,15 @@ function startCalendar(api: DesktopApi): void {
     svg.setAttribute("aria-hidden", "true");
     svg.append(document.createElementNS("http://www.w3.org/2000/svg", "path"));
     wrap.append(bands, table, svg);
+    if (slide) wrap.classList.add(slide > 0 ? "slide-next" : "slide-prev");
+    slide = 0;
     grid.replaceChildren(wrap);
+    // Only offered once there is somewhere to go back from.
+    const todayIso = toIso(today);
+    todayButton.classList.toggle(
+      "is-hidden",
+      viewYear === today.getFullYear() && viewMonth === today.getMonth() && focusIso === todayIso,
+    );
     paintMonthOutline(table, svg, month, settings);
 
     if (opts?.announceMonth) announce(month.label);
@@ -475,6 +515,9 @@ function startCalendar(api: DesktopApi): void {
 
   const showToday = (): void => {
     const today = new Date();
+    slide = Math.sign(
+      today.getFullYear() * 12 + today.getMonth() - (viewYear * 12 + viewMonth),
+    );
     viewYear = today.getFullYear();
     viewMonth = today.getMonth();
     focusIso = toIso(today);
@@ -485,6 +528,7 @@ function startCalendar(api: DesktopApi): void {
   };
 
   const shiftMonth = (delta: number): void => {
+    slide = delta;
     const next = addMonths(viewYear, viewMonth, delta);
     viewYear = next.year;
     viewMonth = next.month;
@@ -499,6 +543,7 @@ function startCalendar(api: DesktopApi): void {
     focusIso = toIso(next);
     pinnedOutsideIso = null;
     if (next.getMonth() !== viewMonth || next.getFullYear() !== viewYear) {
+      slide = days;
       viewYear = next.getFullYear();
       viewMonth = next.getMonth();
       render({ announceMonth: true, focusGrid: true });

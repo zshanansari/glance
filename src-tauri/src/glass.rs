@@ -62,6 +62,40 @@ pub fn fade_out(window: &tauri::WebviewWindow) {
     }
 }
 
+/// Opening is quicker than closing, so the popover answers the click at once
+/// but still eases in rather than appearing in a single frame.
+pub const OPEN_FADE: std::time::Duration = std::time::Duration::from_millis(110);
+
+/// Clears the window to transparent before it is shown, for `fade_in`.
+pub fn prepare_fade_in(window: &tauri::WebviewWindow) {
+    let Some(ns_window) = window_object(window) else {
+        return;
+    };
+    unsafe {
+        let _: () = msg_send![ns_window, setAlphaValue: 0.0f64];
+    }
+}
+
+/// Animates the popover up to full opacity from wherever it is.
+pub fn fade_in(window: &tauri::WebviewWindow) {
+    let Some(ns_window) = window_object(window) else {
+        return;
+    };
+    unsafe {
+        let context = class!(NSAnimationContext);
+        let _: () = msg_send![context, beginGrouping];
+        let current: *mut AnyObject = msg_send![context, currentContext];
+        if !current.is_null() {
+            let _: () = msg_send![&*current, setDuration: OPEN_FADE.as_secs_f64()];
+        }
+        let animator: *mut AnyObject = msg_send![ns_window, animator];
+        if !animator.is_null() {
+            let _: () = msg_send![&*animator, setAlphaValue: 1.0f64];
+        }
+        let _: () = msg_send![context, endGrouping];
+    }
+}
+
 /// Back to full opacity, for the next time the popover opens.
 pub fn clear_fade(window: &tauri::WebviewWindow) {
     let Some(ns_window) = window_object(window) else {
@@ -120,6 +154,9 @@ fn wrap_in_liquid_glass(ns_window: &AnyObject, radius: f64) -> bool {
         true
     }
 }
+/// `NSPopUpMenuWindowLevel`, which is `kCGPopUpMenuWindowLevel`.
+const POP_UP_MENU_LEVEL: isize = 101;
+
 /// Must run on the main thread. Setup already does.
 pub fn apply_calendar_glass(window: &tauri::WebviewWindow) {
     let Ok(pointer) = window.ns_window() else {
@@ -130,6 +167,12 @@ pub fn apply_calendar_glass(window: &tauri::WebviewWindow) {
     }
     let ns_window = unsafe { &*(pointer as *mut AnyObject) };
     clear_window(ns_window);
+    // A status item's menu sits above every app window, alerts included.
+    // `always_on_top` only floats, so another app's dialog could cover the
+    // popover; the pop-up menu level is the one menus use.
+    unsafe {
+        let _: () = msg_send![ns_window, setLevel: POP_UP_MENU_LEVEL];
+    }
 
     if wrap_in_liquid_glass(ns_window, CORNER_RADIUS) {
         // Glass carries its own shading, so the pages drop their scrim. They
