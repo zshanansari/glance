@@ -29,9 +29,6 @@ import { bandBox } from "./column-bands";
 import { installTauriBridge, type DesktopApi } from "./host";
 import { ChevronLeft, ChevronRight, Dot, Settings, Video } from "lucide";
 
-/** Dots under a day before the rest are left to the list. */
-const MAX_DAY_DOTS = 3;
-
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Missing #${id}`);
@@ -415,18 +412,13 @@ function startCalendar(api: DesktopApi): void {
         number.className = "day-number";
         number.textContent = String(day.day);
         button.append(number);
+        // One quiet mark says "something here"; the list says what.
         const dayEventList = eventsOnDay(calendarEvents, fromIso(day.iso));
         if (dayEventList.length) {
-          const dots = document.createElement("span");
-          dots.className = "day-event-dots";
-          dots.setAttribute("aria-hidden", "true");
-          for (const event of dayEventList.slice(0, MAX_DAY_DOTS)) {
-            const dot = document.createElement("span");
-            dot.className = "day-event-dot";
-            if (event.color) dot.style.setProperty("--event-color", event.color);
-            dots.append(dot);
-          }
-          button.append(dots);
+          const mark = document.createElement("span");
+          mark.className = "day-mark";
+          mark.setAttribute("aria-hidden", "true");
+          button.append(mark);
         }
         const count = dayEventList.length;
         button.setAttribute(

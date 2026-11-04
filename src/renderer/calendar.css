@@ -572,23 +572,25 @@ thead .weeknum {
 }
 
 /* Under the number, inside its 30px box, so rows keep their height. */
-.day-event-dots {
+.day-mark {
   position: absolute;
   bottom: 3px;
   left: 50%;
-  display: flex;
-  gap: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  opacity: 0.8;
   transform: translateX(-50%);
   pointer-events: none;
 }
 
-.day-event-dots .day-event-dot {
-  width: 4px;
-  height: 4px;
+.day.is-outside .day-mark {
+  opacity: 0.45;
 }
 
-.day.is-today .day-event-dots .day-event-dot {
-  box-shadow: 0 0 0 1px var(--selection-fill);
+.day.is-today .day-mark {
+  background: var(--selection-ink);
 }
 
 .day.is-outside .day-number {

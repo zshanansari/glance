@@ -1306,6 +1306,43 @@ fn watch_for_wake(nudge: std::sync::mpsc::Sender<()>) {
 #[cfg(not(target_os = "macos"))]
 fn watch_for_wake(_nudge: std::sync::mpsc::Sender<()>) {}
 
+/// Closes an open popover when the mouse goes down anywhere outside Glance,
+/// the way a status item's menu does.
+///
+/// Blur alone misses clicks that move no focus: the empty menu bar, another
+/// app's status item, or anywhere at all when the popover opened while
+/// another app kept focus. A global monitor sees only events bound for other
+/// apps, so clicks on our own status items and popovers never reach it and
+/// the tray toggle keeps working. Mouse monitors need no Accessibility grant.
+#[cfg(target_os = "macos")]
+fn watch_outside_clicks(app: AppHandle) {
+    use block2::RcBlock;
+    use objc2_app_kit::{NSEvent, NSEventMask};
+    use std::ptr::NonNull;
+
+    let block = RcBlock::new(move |_: NonNull<NSEvent>| {
+        let visible = |label| {
+            app.get_webview_window(label)
+                .and_then(|window| window.is_visible().ok())
+                .unwrap_or(false)
+        };
+        let state = app.state::<AppState>();
+        if visible(CALENDAR_LABEL) && !state.calendar_pinned.load(Ordering::SeqCst) {
+            close_calendar(&app);
+        }
+        if visible(EVENTS_LABEL) {
+            close_events(&app);
+        }
+    });
+    let mask = NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown | NSEventMask::OtherMouseDown;
+    let monitor = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &block);
+    // The watch lasts as long as the app; nothing ever removes it.
+    std::mem::forget(monitor);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn watch_outside_clicks(_app: AppHandle) {}
+
 #[tauri::command]
 fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
     state
@@ -1945,6 +1982,7 @@ pub fn run() {
             build_tray(app.handle())?;
             apply_shortcuts(app.handle(), &initial);
             spawn_clock(app.handle().clone());
+            watch_outside_clicks(app.handle().clone());
             updates::spawn_checks(app.handle().clone());
             Ok(())
         })
