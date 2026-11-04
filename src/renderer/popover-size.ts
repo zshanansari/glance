@@ -3,7 +3,7 @@
  * around the list has to be counted or the list scrolls by exactly what was
  * missed. offsetHeight covers padding and border but never margins.
  */
-function boxHeight(element: HTMLElement | null): number {
+export function boxHeight(element: HTMLElement | null): number {
   if (!element) return 0;
   const style = getComputedStyle(element);
   return (

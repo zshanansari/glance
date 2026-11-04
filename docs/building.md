@@ -23,6 +23,18 @@ which would otherwise ask for the signing key on every local build. This include
 app identity and Calendar usage descriptions needed for macOS permission prompts.
 Look for Glance in the menu bar.
 
+macOS ties Calendar and Reminders access to the app's code signature. The
+default ad-hoc signature changes with every build, so each rebuild asks again.
+Sign local builds with a stable identity instead, such as a self-signed
+code-signing certificate in your login keychain:
+
+```bash
+APPLE_SIGNING_IDENTITY="Glance Development" pnpm app
+```
+
+Launch the bundle (with `open` or from Finder), not the executable inside it:
+started from a terminal, macOS checks the terminal's permissions instead.
+
 `pnpm dev` runs the unbundled executable with file watching for UI development.
 Use `pnpm app` when testing Calendar permissions.
 

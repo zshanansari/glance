@@ -16,6 +16,8 @@ export type UpcomingEvent = {
   startAt: number;
   endAt: number;
   calendar: string | null;
+  /** The calendar's color as `#rrggbb`. */
+  color: string | null;
   location: string | null;
   joinUrl: string | null;
   response: EventResponse;
@@ -24,6 +26,18 @@ export type UpcomingEvent = {
   /** Whether anyone else was invited. Reminders and solo blocks are false. */
   hasParticipants: boolean;
 };
+
+/**
+ * Everything that touches a local day, for the dots under it and the list
+ * below the month. All-day items lead, then the rest by start time.
+ */
+export function eventsOnDay(events: UpcomingEvent[], day: Date): UpcomingEvent[] {
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  const end = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
+  return events
+    .filter((event) => event.startAt < end && event.endAt > start)
+    .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.startAt - b.startAt);
+}
 
 /** Local midnight that closes the day `days - 1` days after today. */
 export function endOfDay(now: number, days: number): number {

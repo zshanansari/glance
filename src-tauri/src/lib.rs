@@ -113,6 +113,9 @@ struct AppState {
     /// The calendar status item's glyph before any update dot, so the dot can
     /// come and go without the renderer repainting. None is text only.
     tray_glyph: Mutex<Option<Vec<u8>>>,
+    /// The calendar popover's height as its page last measured it, since the
+    /// selected day's events make it taller or shorter.
+    calendar_height: Mutex<f64>,
 }
 
 /// "Update to X and Restart", kept so it can be put at the top of the
@@ -568,7 +571,7 @@ fn handle_tray_click(
         paint_status_item_highlight(tray.app_handle(), tray.id().as_ref(), false);
     }
     match tray_click_intent(button, button_state) {
-        TrayClickIntent::Toggle => toggle(tray.app_handle(), rect),
+        TrayClickIntent::Toggle => toggle(tray.app_handle(), clicked_rect(tray.app_handle(), rect)),
         TrayClickIntent::Menu => {
             #[cfg(target_os = "macos")]
             {
@@ -594,6 +597,79 @@ fn point_in_screen(x: f64, y: f64, screen: ScreenBounds) -> bool {
     x >= screen.x && y >= screen.y && x < screen.x + screen.width && y < screen.y + screen.height
 }
 
+/// The status item as it sits on the display that was clicked.
+///
+/// macOS draws the status item in every display's menu bar, but reports the
+/// frame of the one on the display that last had focus. Click the icon on the
+/// laptop after working on the external display and the rect points at the
+/// external one, so the popover opens where nobody is looking and the next
+/// click closes it. The pointer is on the icon that was clicked, so when the
+/// two disagree, keep the item's size and move it under the pointer.
+fn anchor_on_clicked_screen(
+    item: ScreenBounds,
+    pointer: (f64, f64),
+    screens: &[ScreenBounds],
+) -> ScreenBounds {
+    let (px, py) = pointer;
+    let Some(clicked) = screens.iter().copied().find(|screen| point_in_screen(px, py, *screen))
+    else {
+        return item;
+    };
+    let center = (item.x + item.width / 2.0, item.y + item.height / 2.0);
+    if point_in_screen(center.0, center.1, clicked) {
+        return item;
+    }
+    ScreenBounds {
+        x: px - item.width / 2.0,
+        y: clicked.y,
+        width: item.width,
+        height: item.height,
+    }
+}
+
+fn clicked_rect(app: &AppHandle, rect: tauri::Rect) -> tauri::Rect {
+    let Ok(pointer) = app.cursor_position() else {
+        return rect;
+    };
+    let Some(window) = app.get_webview_window(CALENDAR_LABEL) else {
+        return rect;
+    };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let position: PhysicalPosition<f64> = rect.position.to_physical(scale);
+    let size: PhysicalSize<f64> = rect.size.to_physical(scale);
+    let screens: Vec<ScreenBounds> = window
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|monitor| ScreenBounds {
+            x: monitor.position().x as f64,
+            y: monitor.position().y as f64,
+            width: monitor.size().width as f64,
+            height: monitor.size().height as f64,
+        })
+        .collect();
+    let anchored = anchor_on_clicked_screen(
+        ScreenBounds {
+            x: position.x,
+            y: position.y,
+            width: size.width,
+            height: size.height,
+        },
+        (pointer.x, pointer.y),
+        &screens,
+    );
+    tauri::Rect {
+        position: tauri::Position::Physical(PhysicalPosition::new(
+            anchored.x.round() as i32,
+            anchored.y.round() as i32,
+        )),
+        size: tauri::Size::Physical(PhysicalSize::new(
+            anchored.width.round() as u32,
+            anchored.height.round() as u32,
+        )),
+    }
+}
+
 #[cfg(test)]
 fn screen_containing(screens: &[ScreenBounds], x: f64, y: f64) -> Option<ScreenBounds> {
     screens
@@ -608,8 +684,25 @@ enum PopoverPlacement {
     Above,
 }
 
-fn calendar_window_size(show_week_numbers: bool, _show_upcoming_event: bool) -> (f64, f64) {
-    (calendar_width(show_week_numbers), CALENDAR_HEIGHT)
+fn calendar_window_size(app: &AppHandle, show_week_numbers: bool) -> (f64, f64) {
+    let height = app
+        .state::<AppState>()
+        .calendar_height
+        .lock()
+        .map(|height| *height)
+        .unwrap_or(CALENDAR_HEIGHT);
+    (calendar_width(show_week_numbers), height)
+}
+
+/// The tallest the popover may grow; past this the day's list scrolls.
+const CALENDAR_MAX_HEIGHT: f64 = 620.0;
+
+fn calendar_height(measured: f64) -> f64 {
+    if measured.is_finite() {
+        measured.clamp(CALENDAR_HEIGHT, CALENDAR_MAX_HEIGHT)
+    } else {
+        CALENDAR_HEIGHT
+    }
 }
 
 fn window_theme(theme: &str) -> Option<Theme> {
@@ -744,11 +837,9 @@ fn position_calendar(app: &AppHandle, tray_rect: tauri::Rect) {
         .state::<AppState>()
         .settings
         .lock()
-        .map(|store| {
-            let settings = store.value();
-            calendar_window_size(settings.show_week_numbers, settings.show_upcoming_event)
-        })
-        .unwrap_or_else(|_| calendar_window_size(false, false));
+        .map(|store| store.value().show_week_numbers)
+        .map(|weeks| calendar_window_size(app, weeks))
+        .unwrap_or_else(|_| calendar_window_size(app, false));
     let (x, y, _screen) = place_under_tray(&window, tray_rect, width, height);
     let _ = window.set_size(Size::Logical(LogicalSize::new(width, height)));
     // Logical points, not physical: set_position converts physical coords with
@@ -1057,8 +1148,7 @@ fn build_calendar_window(app: &AppHandle) -> tauri::Result<()> {
         .lock()
         .map(|store| store.value())
         .unwrap_or_default();
-    let (initial_width, initial_height) =
-        calendar_window_size(initial.show_week_numbers, initial.show_upcoming_event);
+    let (initial_width, initial_height) = calendar_window_size(app, initial.show_week_numbers);
     let window =
         WebviewWindowBuilder::new(app, CALENDAR_LABEL, WebviewUrl::App("calendar.html".into()))
             .title("Glance")
@@ -1239,13 +1329,10 @@ fn update_settings(
     if saved.launch_at_login != previous.launch_at_login {
         set_launch_at_login(&app, saved.launch_at_login);
     }
-    if saved.show_week_numbers != previous.show_week_numbers
-        || saved.show_upcoming_event != previous.show_upcoming_event
-    {
+    if saved.show_week_numbers != previous.show_week_numbers {
         if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
             if window.is_visible().unwrap_or(false) {
-                let (width, height) =
-                    calendar_window_size(saved.show_week_numbers, saved.show_upcoming_event);
+                let (width, height) = calendar_window_size(&app, saved.show_week_numbers);
                 let _ = window.set_size(Size::Logical(LogicalSize::new(width, height)));
             }
         }
@@ -1503,6 +1590,28 @@ fn set_events_height(app: AppHandle, height: f64) {
         EVENTS_WIDTH,
         events_height(height, ceiling),
     )));
+}
+
+/// The page measures itself after drawing the selected day, and the window
+/// follows. It grows downward from the menu bar, so the top edge stays put.
+#[tauri::command]
+fn set_calendar_height(app: AppHandle, height: f64) {
+    let height = calendar_height(height);
+    let state = app.state::<AppState>();
+    if let Ok(mut recorded) = state.calendar_height.lock() {
+        if (*recorded - height).abs() < 0.5 {
+            return;
+        }
+        *recorded = height;
+    }
+    let weeks = state
+        .settings
+        .lock()
+        .map(|store| store.value().show_week_numbers)
+        .unwrap_or(false);
+    if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
+        let _ = window.set_size(Size::Logical(LogicalSize::new(calendar_width(weeks), height)));
+    }
 }
 
 /// "glass" once the popovers are drawn on Liquid Glass, "vibrancy" when the
@@ -1826,6 +1935,7 @@ pub fn run() {
                 shortcuts: Mutex::new(RegisteredShortcuts::default()),
                 shortcut_rebind: Mutex::new(()),
                 tray_glyph: Mutex::new(Some(TRAY_ICON.to_vec())),
+                calendar_height: Mutex::new(CALENDAR_HEIGHT),
             });
             set_launch_at_login(app.handle(), initial.launch_at_login);
             build_calendar_window(app.handle())?;
@@ -1847,6 +1957,7 @@ pub fn run() {
             hide_calendar,
             hide_events,
             set_events_height,
+            set_calendar_height,
             popover_material,
             set_calendar_pinned,
             open_settings,
@@ -1901,6 +2012,19 @@ mod tests {
     /// A window missing from the capability cannot listen for events, and
     /// nothing fails loudly: its own commands keep working while every
     /// `listen` is refused, so the popover simply stops refreshing.
+    #[test]
+    fn a_click_on_the_other_display_moves_the_anchor_under_the_pointer() {
+        let laptop = ScreenBounds { x: 0.0, y: 0.0, width: 3024.0, height: 1964.0 };
+        let external = ScreenBounds { x: 1000.0, y: -2880.0, width: 5120.0, height: 2880.0 };
+        let screens = [laptop, external];
+        // Reported on the external display, clicked on the laptop.
+        let reported = ScreenBounds { x: 3000.0, y: -2880.0, width: 72.0, height: 48.0 };
+        let anchored = anchor_on_clicked_screen(reported, (2012.0, 30.0), &screens);
+        assert_eq!(anchored, ScreenBounds { x: 1976.0, y: 0.0, width: 72.0, height: 48.0 });
+        // Clicked where it was reported: left alone.
+        assert_eq!(anchor_on_clicked_screen(reported, (3030.0, -2860.0), &screens), reported);
+    }
+
     fn capability(json: &str) -> serde_json::Value {
         serde_json::from_str(json).expect("capability is valid JSON")
     }

@@ -15,6 +15,7 @@ import {
   visibleUpcomingEvents,
   type EventFilters,
   type UpcomingEvent,
+  eventsOnDay,
 } from "../src/shared/events";
 import { ICON_LEAD_ALWAYS, ICON_LEAD_AT_START } from "../src/shared/settings";
 
@@ -24,6 +25,7 @@ const event: UpcomingEvent = {
   startAt: Date.UTC(2026, 8, 9, 10, 30),
   endAt: Date.UTC(2026, 8, 9, 11, 0),
   calendar: "Work",
+  color: null,
   location: null,
   joinUrl: null,
   response: "accepted",
@@ -402,5 +404,33 @@ describe("menu bar preview text", () => {
     const text = trayEventText(long, before, { showTitle: true, showTime: false });
     expect(text).toBe("Quarterly planning and…");
     expect(text?.length).toBeLessThanOrEqual(24);
+  });
+});
+
+describe("eventsOnDay", () => {
+  const at = (day: number, hour: number) => new Date(2026, 8, day, hour).getTime();
+  const item = (id: string, startAt: number, endAt: number, allDay = false): UpcomingEvent => ({
+    ...event,
+    id,
+    startAt,
+    endAt,
+    allDay,
+  });
+
+  it("keeps what touches the day, all-day first, then by start", () => {
+    const events = [
+      item("late", at(9, 15), at(9, 16)),
+      item("early", at(9, 9), at(9, 10)),
+      item("allday", at(9, 0), at(10, 0), true),
+      item("overnight", at(8, 23), at(9, 1)),
+      item("yesterday", at(8, 9), at(8, 10)),
+      item("tomorrow", at(10, 0), at(10, 1)),
+    ];
+    expect(eventsOnDay(events, new Date(2026, 8, 9)).map(({ id }) => id)).toEqual([
+      "allday",
+      "overnight",
+      "early",
+      "late",
+    ]);
   });
 });

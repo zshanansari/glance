@@ -5,7 +5,6 @@ import {
   calendarIsVisible,
   calendarsOfKind,
   groupCalendarsBySource,
-  supportsDateParts,
   formatMenuBarDate,
   highlightedColumnRuns,
   menuBarLabel,
@@ -231,24 +230,28 @@ describe("menu bar label", () => {
     );
   });
 
-  it("ignores the weekday and month toggles for the filled glyph", () => {
+  it("puts the weekday and month beside the filled glyph, which shows the day", () => {
     expect(
       menuBarLabel({ menuBarIcon: "filled", showWeekday: true, showMonth: true }, date, "en-US"),
-    ).toEqual({ text: null, day: 8, style: "filled" });
+    ).toEqual({ text: "Tue Sep", day: 8, style: "filled" });
+    expect(
+      menuBarLabel({ menuBarIcon: "filled", showWeekday: false, showMonth: true }, date, "en-US"),
+    ).toEqual({ text: "Sep", day: 8, style: "filled" });
   });
 
-  it("keeps both calendar icons standalone and orders the picker", () => {
+  it("gives the dotted calendar the full date once a part is switched on", () => {
     expect(MENU_BAR_ICONS.map(({ id }) => id)).toEqual(["filled", "calendar", "framed", "none"]);
-    for (const style of ["filled", "calendar"] as const) {
-      expect(supportsDateParts(style)).toBe(false);
-      for (const showWeekday of [false, true]) {
-        for (const showMonth of [false, true]) {
-          expect(menuBarLabel({ menuBarIcon: style, showWeekday, showMonth }, date).text).toBeNull();
-        }
-      }
-    }
-    expect(supportsDateParts("framed")).toBe(true);
-    expect(supportsDateParts("none")).toBe(true);
+    expect(
+      menuBarLabel({ menuBarIcon: "calendar", showWeekday: false, showMonth: false }, date).text,
+    ).toBeNull();
+    expect(
+      menuBarLabel({ menuBarIcon: "calendar", showWeekday: true, showMonth: false }, date, "en-US")
+        .text,
+    ).toBe("Tue 8");
+    expect(
+      menuBarLabel({ menuBarIcon: "calendar", showWeekday: true, showMonth: true }, date, "en-US")
+        .text,
+    ).toBe("Tue 8 Sep");
   });
 
   it("spells the date out for the framed glyph", () => {

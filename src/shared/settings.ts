@@ -274,15 +274,12 @@ export function datedMenuBarIcon(style: MenuBarIconStyle): boolean {
   return style === "filled";
 }
 
-export function supportsDateParts(style: MenuBarIconStyle): boolean {
-  return style === "framed" || style === "none";
-}
-
 export type MenuBarLabel = {
   /**
-   * The date beside the clock. Null for the filled glyph, which carries the
-   * date on its own. The dotted calendar also has no text. The framed style
-   * cuts this text out of a filled background; the
+   * The date beside the clock, or null when there is nothing to add. The
+   * filled glyph carries the day itself, so its text is only the weekday and
+   * month. The dotted calendar adds the full date once either is switched on.
+   * The framed style cuts this text out of a filled background; the
    * date-only style shows it as plain text.
    */
   text: string | null;
@@ -296,17 +293,27 @@ function formatPart(part: MenuBarPart, date: Date, locale?: string): string {
 }
 
 /**
- * Calendar glyphs stand alone. Cutout and plain-text styles spell the date out.
+ * Every style takes the weekday and month toggles. The framed glyph cuts the
+ * text out of itself; the other styles show it beside the icon.
  */
 export function menuBarLabel(
   settings: Pick<AppSettings, "menuBarIcon" | "showWeekday" | "showMonth">,
   date: Date,
   locale?: string,
 ): MenuBarLabel {
+  const extras = settings.showWeekday || settings.showMonth;
   if (datedMenuBarIcon(settings.menuBarIcon)) {
-    return { text: null, day: date.getDate(), style: settings.menuBarIcon };
+    // The glyph already shows the day; only the parts around it are text.
+    const parts: string[] = [];
+    if (settings.showWeekday) parts.push(formatPart("weekday", date, locale));
+    if (settings.showMonth) parts.push(formatPart("month", date, locale));
+    return {
+      text: parts.length ? parts.join(" ") : null,
+      day: date.getDate(),
+      style: settings.menuBarIcon,
+    };
   }
-  if (!supportsDateParts(settings.menuBarIcon)) {
+  if (settings.menuBarIcon === "calendar" && !extras) {
     return { text: null, day: null, style: settings.menuBarIcon };
   }
   const parts: string[] = [];

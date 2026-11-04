@@ -42,6 +42,9 @@ pub struct UpcomingEvent {
     pub start_at: i64,
     pub end_at: i64,
     pub calendar: Option<String>,
+    /// The calendar's color as `#rrggbb`, for the dots under each day.
+    #[serde(default)]
+    pub color: Option<String>,
     pub location: Option<String>,
     pub join_url: Option<String>,
     pub response: Response,
@@ -850,6 +853,7 @@ mod macos {
                 if !super::calendar_is_visible(calendar_id.as_deref(), hidden) {
                     continue;
                 }
+                let color = raw_calendar.as_deref().and_then(calendar_hex);
                 let calendar: Option<String> = raw_calendar.map(|value| {
                     let title = unsafe { value.title() };
                     ns_string(&title)
@@ -867,6 +871,7 @@ mod macos {
                     start_at: (start * 1000.0) as i64,
                     end_at: (end * 1000.0) as i64,
                     calendar,
+                    color,
                     location: location.filter(|value| !value.is_empty()),
                     join_url,
                     response: own_response(&event),
@@ -942,6 +947,7 @@ mod macos {
                         let id_obj = unsafe { reminder.calendarItemIdentifier() };
                         let id = ns_string(&id_obj);
                         let (start_at, end_at) = super::reminder_span(due_ms, all_day);
+                        let color = raw_calendar.as_deref().and_then(calendar_hex);
                         found.push(UpcomingEvent {
                             id: format!("{}{id}", super::REMINDER_ID_PREFIX),
                             title: if title.is_empty() {
@@ -955,6 +961,7 @@ mod macos {
                                 let title = unsafe { value.title() };
                                 ns_string(&title)
                             }),
+                            color,
                             location: None,
                             join_url: None,
                             response: Response::Confirmed,

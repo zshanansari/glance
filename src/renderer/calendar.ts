@@ -14,6 +14,7 @@ import {
 } from "../shared/month-outline";
 import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } from "../shared/settings";
 import {
+  eventsOnDay,
   eventStatus,
   eventTimeRange,
   trayEventText,
@@ -23,10 +24,13 @@ import {
 } from "../shared/events";
 import { lucideIcon } from "./icons";
 import { eventGlyphPng, framedGlyphPng } from "./tray-frame";
-import { markPopoverMaterial } from "./popover-size";
+import { boxHeight, markPopoverMaterial } from "./popover-size";
 import { bandBox } from "./column-bands";
 import { installTauriBridge, type DesktopApi } from "./host";
 import { ChevronLeft, ChevronRight, Dot, Settings, Video } from "lucide";
+
+/** Dots under a day before the rest are left to the list. */
+const MAX_DAY_DOTS = 3;
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -163,43 +167,34 @@ function startCalendar(api: DesktopApi): void {
     calendarAccess.hidden = true;
   };
 
+  // The month's events always load, for the dots and the day list. The
+  // menu bar preview is the part the Upcoming setting turns on.
   const refreshUpcoming = async (): Promise<void> => {
     const request = ++eventRequest;
     const current = settings;
-    if (!current?.showUpcomingEvent) {
-      upcomingEvent = null;
-      calendarEvents = [];
-      eventError = null;
-      paintEvent();
-      paintDayEvents();
-      refreshTray();
-      return;
-    }
+    if (!current) return;
     try {
-      const monthStart = new Date(viewYear, viewMonth, 1);
-      const monthEnd = new Date(viewYear, viewMonth + 1, 1);
       const now = Date.now();
-      const rangeEnd = upcomingFetchEnd(
-        now,
-        current.upcomingHorizonDays,
-        current.upcomingIconLeadMinutes,
-      );
-      const nextEvents = await api.getCalendarEvents(now, rangeEnd);
-      let monthEvents: UpcomingEvent[] = [];
-      try {
-        monthEvents = await api.getCalendarEvents(monthStart.getTime(), monthEnd.getTime());
-      } catch {
-        // Calendar grid decorations belong to the events popover and are optional.
+      // Spill a week either side, so outside days get their dots too.
+      const rangeStart = new Date(viewYear, viewMonth, -6).getTime();
+      const rangeEnd = new Date(viewYear, viewMonth + 1, 14).getTime();
+      const monthEvents = await api.getCalendarEvents(rangeStart, rangeEnd);
+      let next: UpcomingEvent | null = null;
+      if (current.showUpcomingEvent) {
+        const nextEvents = await api.getCalendarEvents(
+          now,
+          upcomingFetchEnd(now, current.upcomingHorizonDays, current.upcomingIconLeadMinutes),
+        );
+        const dismissed = await api.getDismissedEvents().catch(() => []);
+        next = trayIconEvent(nextEvents, now, {
+          upcomingHorizonDays: current.upcomingHorizonDays,
+          upcomingIconLeadMinutes: current.upcomingIconLeadMinutes,
+          filters: current,
+          dismissed,
+        });
       }
       if (request !== eventRequest) return;
-      const dismissed = await api.getDismissedEvents().catch(() => []);
-      if (request !== eventRequest) return;
-      upcomingEvent = trayIconEvent(nextEvents, now, {
-        upcomingHorizonDays: current.upcomingHorizonDays,
-        upcomingIconLeadMinutes: current.upcomingIconLeadMinutes,
-        filters: current,
-        dismissed,
-      });
+      upcomingEvent = next;
       calendarEvents = monthEvents;
       eventError = null;
     } catch (error) {
@@ -209,50 +204,106 @@ function startCalendar(api: DesktopApi): void {
       eventError = error instanceof Error ? error.message : String(error);
     }
     paintEvent();
-    paintDayEvents();
     refreshTray();
     render();
+    paintDayEvents();
+  };
+
+  // The window is sized from its content, so it grows with the day's list
+  // and shrinks back for an empty day.
+  const syncHeight = (): void => {
+    const popover = document.querySelector<HTMLElement>(".popover");
+    if (!popover) return;
+    let height = 0;
+    for (const child of Array.from(popover.children) as HTMLElement[]) {
+      if (child.hidden || getComputedStyle(child).position === "absolute") continue;
+      // The footer's top margin is auto: it soaks up whatever room is left,
+      // so counting it would feed the last height into the next one.
+      height += child.classList.contains("calendar-footer")
+        ? child.offsetHeight
+        : boxHeight(child);
+    }
+    if (height) void api.setCalendarHeight(Math.ceil(height));
+  };
+
+  const requestAccess = async (button: HTMLButtonElement): Promise<void> => {
+    button.disabled = true;
+    try {
+      await api.requestCalendarAccess();
+      await refreshUpcoming();
+    } finally {
+      button.disabled = false;
+    }
+  };
+
+  const dayEventRow = (event: UpcomingEvent, now: number): HTMLElement => {
+    const row = document.createElement("div");
+    row.className = "day-event";
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "day-event-open";
+    open.title = "Open in Calendar";
+    const dot = document.createElement("span");
+    dot.className = "day-event-dot";
+    dot.setAttribute("aria-hidden", "true");
+    if (event.color) dot.style.setProperty("--event-color", event.color);
+    const title = document.createElement("span");
+    title.className = "day-event-title";
+    title.textContent = event.title;
+    const time = document.createElement("span");
+    time.className = "day-event-time";
+    time.textContent = eventTimeRange(event);
+    open.append(dot, title, time);
+    open.addEventListener("click", () => {
+      void api.openEvent(event.id).then(() => api.hideCalendar());
+    });
+    row.append(open);
+    if (event.joinUrl && event.endAt > now) {
+      const url = event.joinUrl;
+      const join = document.createElement("button");
+      join.type = "button";
+      join.className = "day-event-join";
+      join.setAttribute("aria-label", `Join ${event.title}`);
+      join.title = "Join meeting";
+      join.append(lucideIcon(Video, 14));
+      join.addEventListener("click", () => {
+        void api.joinMeeting(url).then(() => api.hideCalendar());
+      });
+      row.append(join);
+    }
+    if (event.endAt <= now) row.classList.add("is-past");
+    return row;
   };
 
   const paintDayEvents = (): void => {
-    dayEvents.hidden = true;
-    return;
+    dayEvents.hidden = false;
     const selectedDate = fromIso(focusIso);
     dayEventsTitle.textContent = new Intl.DateTimeFormat(undefined, {
       weekday: "long",
       month: "short",
       day: "numeric",
     }).format(selectedDate);
-    const selectedEvents = calendarEvents.filter(
-      (event) => toIso(new Date(event.startAt)) === focusIso,
-    );
+    const selectedEvents = eventsOnDay(calendarEvents, selectedDate);
     dayEventsCount.textContent = selectedEvents.length
       ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
       : "";
-    if (!selectedEvents.length) {
+    if (eventError) {
+      const allow = document.createElement("button");
+      allow.type = "button";
+      allow.className = "day-events-access";
+      allow.textContent = "Allow Calendar Access";
+      allow.addEventListener("click", () => void requestAccess(allow));
+      dayEventsList.replaceChildren(allow);
+    } else if (!selectedEvents.length) {
       const empty = document.createElement("p");
       empty.className = "day-events-empty";
-      empty.textContent = eventError ? "Allow Calendar access to see events." : "No events";
+      empty.textContent = "No events";
       dayEventsList.replaceChildren(empty);
-      return;
+    } else {
+      const now = Date.now();
+      dayEventsList.replaceChildren(...selectedEvents.map((event) => dayEventRow(event, now)));
     }
-    dayEventsList.replaceChildren(
-      ...selectedEvents.map((event) => {
-        const item = document.createElement("div");
-        item.className = "day-event";
-        const dot = document.createElement("span");
-        dot.className = "day-event-dot";
-        dot.setAttribute("aria-hidden", "true");
-        const title = document.createElement("span");
-        title.className = "day-event-title";
-        title.textContent = event.title;
-        const time = document.createElement("span");
-        time.className = "day-event-time";
-        time.textContent = eventTimeRange(event);
-        item.append(dot, title, time);
-        return item;
-      }),
-    );
+    syncHeight();
   };
 
   const refreshTray = (): void => {
@@ -264,7 +315,7 @@ function startCalendar(api: DesktopApi): void {
       : "";
     // The status item carries the real pressed highlight now, so the title
     // stays as it reads when the popover is closed.
-    const title = label.style === "none" ? label.text ?? "" : "";
+    const title = label.style === "framed" ? "" : label.text ?? "";
     const trayStyle = label.style;
     const signature = trayLabelKey(label);
     // A hair space keeps "2h 21m" from reading as one long number without
@@ -364,7 +415,26 @@ function startCalendar(api: DesktopApi): void {
         number.className = "day-number";
         number.textContent = String(day.day);
         button.append(number);
-        button.setAttribute("aria-label", dayName(fromIso(day.iso)));
+        const dayEventList = eventsOnDay(calendarEvents, fromIso(day.iso));
+        if (dayEventList.length) {
+          const dots = document.createElement("span");
+          dots.className = "day-event-dots";
+          dots.setAttribute("aria-hidden", "true");
+          for (const event of dayEventList.slice(0, MAX_DAY_DOTS)) {
+            const dot = document.createElement("span");
+            dot.className = "day-event-dot";
+            if (event.color) dot.style.setProperty("--event-color", event.color);
+            dots.append(dot);
+          }
+          button.append(dots);
+        }
+        const count = dayEventList.length;
+        button.setAttribute(
+          "aria-label",
+          count
+            ? `${dayName(fromIso(day.iso))}, ${count} event${count === 1 ? "" : "s"}`
+            : dayName(fromIso(day.iso)),
+        );
         if (day.inMonth) button.classList.add("is-in-month");
         else button.classList.add("is-outside");
         if (day.isToday && day.inMonth) {
@@ -445,6 +515,7 @@ function startCalendar(api: DesktopApi): void {
       return;
     }
     render({ focusGrid: true });
+    paintDayEvents();
   };
 
   prev.addEventListener("click", () => shiftMonth(-1));
@@ -503,6 +574,7 @@ function startCalendar(api: DesktopApi): void {
       focusIso = toIso(new Date(viewYear, viewMonth, 1));
       pinnedOutsideIso = null;
       render({ focusGrid: true });
+      paintDayEvents();
       return;
     }
     if (event.key === "End") {
@@ -510,6 +582,7 @@ function startCalendar(api: DesktopApi): void {
       focusIso = toIso(new Date(viewYear, viewMonth + 1, 0));
       pinnedOutsideIso = null;
       render({ focusGrid: true });
+      paintDayEvents();
       return;
     }
     if (event.key === "ArrowLeft") {

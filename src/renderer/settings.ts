@@ -1,5 +1,4 @@
 import {
-  supportsDateParts,
   calendarsOfKind,
   groupCalendarsBySource,
   HIGHLIGHT_DAYS,
@@ -210,15 +209,6 @@ function startSettings(api: DesktopApi): void {
     }
   };
 
-  // Calendar glyphs stand alone; date parts apply to cutout and text styles.
-  const paintDateParts = (style: MenuBarIconStyle): void => {
-    const off = !supportsDateParts(style);
-    for (const input of [showWeekday, showMonth]) {
-      input.disabled = off;
-      input.closest(".row")?.classList.toggle("is-off", off);
-    }
-  };
-
   const upcomingControls = (): (HTMLSelectElement | HTMLInputElement)[] => [
     upcomingHorizon,
     includeAllDay,
@@ -412,7 +402,6 @@ function startSettings(api: DesktopApi): void {
   const paint = (settings: AppSettings): void => {
     applyTheme(settings.theme);
     paintIconStyle(iconStyles, settings.menuBarIcon);
-    paintDateParts(settings.menuBarIcon);
     showWeekday.checked = settings.showWeekday;
     showMonth.checked = settings.showMonth;
     weekStart.value = String(settings.weekStartsOn);
@@ -541,7 +530,6 @@ function startSettings(api: DesktopApi): void {
     if (!button || !iconStyles.contains(button) || !button.dataset.style) return;
     const id = button.dataset.style as MenuBarIconStyle;
     paintIconStyle(iconStyles, id);
-    paintDateParts(id);
     void api.updateSettings({ menuBarIcon: id });
   });
 
