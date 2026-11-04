@@ -12,7 +12,6 @@
   --separator: rgb(0 0 0 / 10%);
   --accent: #007aff;
   --on-accent: #fff;
-  --select: #ff9500;
   --scrim: rgb(255 255 255 / 16%);
 
   color: var(--label);
@@ -31,7 +30,6 @@
     --quaternary: rgb(255 255 255 / 10%);
     --separator: rgb(255 255 255 / 12%);
     --accent: #0a84ff;
-    --select: #ff9f0a;
     --scrim: rgb(0 0 0 / 22%);
   }
 }
@@ -47,7 +45,6 @@
   --quaternary: rgb(255 255 255 / 10%);
   --separator: rgb(255 255 255 / 12%);
   --accent: #0a84ff;
-  --select: #ff9f0a;
   --scrim: rgb(0 0 0 / 22%);
   color-scheme: dark;
 }
@@ -64,7 +61,6 @@
     --separator: -apple-system-separator;
     --accent: -apple-system-control-accent;
     --on-accent: -apple-system-alternate-selected-text;
-    --select: -apple-system-orange;
   }
 }
 
@@ -341,16 +337,16 @@ button:focus {
 
 /* Today: an outline, so it reads at a glance without looking chosen. */
 .day.is-today .day-number {
-  box-shadow: inset 0 0 0 1.5px var(--select);
-  color: var(--select);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--accent);
   font-weight: 600;
 }
 
 /* The chosen day: filled. */
 .day.is-selected .day-number {
-  background: var(--select);
+  background: var(--accent);
   box-shadow: none;
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -376,11 +372,11 @@ button:focus {
 }
 
 .day.is-today .day-mark {
-  background: var(--select);
+  background: var(--accent);
 }
 
 .day.is-selected .day-mark {
-  background: #fff;
+  background: var(--on-accent);
 }
 
 /* The selected day's events, as menu rows. */
