@@ -613,6 +613,7 @@ function startCalendar(api: DesktopApi): void {
   const applySettings = (next: AppSettings): void => {
     settings = next;
     applyTheme(next.theme);
+    document.documentElement.dataset.dayHighlight = next.dayHighlight;
     paintDayEvents();
     refreshTray();
     render();

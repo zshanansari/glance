@@ -44,6 +44,7 @@ export type DesktopApi = {
   ) => () => void;
   hideCalendar: () => Promise<void>;
   hideEvents: () => Promise<void>;
+  hideSettings: () => Promise<void>;
   setEventsHeight: (height: number) => Promise<void>;
   setCalendarHeight: (height: number) => Promise<void>;
   getPopoverMaterial: () => Promise<string>;
@@ -112,6 +113,7 @@ export const api: DesktopApi = {
     ),
   hideCalendar: () => invoke<void>("hide_calendar"),
   hideEvents: () => invoke<void>("hide_events"),
+  hideSettings: () => invoke<void>("hide_settings"),
   setEventsHeight: (height) => invoke<void>("set_events_height", { height }),
   setCalendarHeight: (height) => invoke<void>("set_calendar_height", { height }),
   getPopoverMaterial: () => invoke<string>("popover_material"),

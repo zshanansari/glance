@@ -338,3 +338,21 @@ describe("highlighted columns", () => {
     ]);
   });
 });
+
+describe("dayHighlight and onboarded", () => {
+  it("default to Calendar's red and an unseen welcome", () => {
+    expect(DEFAULT_SETTINGS.dayHighlight).toBe("calendar");
+    expect(DEFAULT_SETTINGS.onboarded).toBe(false);
+  });
+
+  it("keep known values and drop anything else", () => {
+    expect(normalizeSettings({ dayHighlight: "accent", onboarded: true })).toMatchObject({
+      dayHighlight: "accent",
+      onboarded: true,
+    });
+    expect(normalizeSettings({ dayHighlight: "rainbow", onboarded: "yes" })).toMatchObject({
+      dayHighlight: "calendar",
+      onboarded: false,
+    });
+  });
+});

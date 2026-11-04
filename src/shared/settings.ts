@@ -77,7 +77,13 @@ export type AppSettings = {
   hiddenCalendarIds: string[];
   autoUpdate: boolean;
   theme: Theme;
+  /** What marks today and the chosen day: Calendar's red or the system accent. */
+  dayHighlight: DayHighlight;
+  /** Set once the first-run welcome has been seen. */
+  onboarded: boolean;
 };
+
+export type DayHighlight = "calendar" | "accent";
 
 export type CalendarKind = "event" | "reminder";
 
@@ -175,6 +181,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hiddenCalendarIds: [],
   autoUpdate: true,
   theme: "system",
+  dayHighlight: "calendar",
+  onboarded: false,
 };
 
 const ICON_IDS = new Set(MENU_BAR_ICONS.map((item) => item.id));
@@ -456,5 +464,10 @@ export function normalizeSettings(raw: unknown): AppSettings {
         : [...DEFAULT_SETTINGS.hiddenCalendarIds],
     autoUpdate: asBoolean(input.autoUpdate, DEFAULT_SETTINGS.autoUpdate),
     theme: THEMES.has(theme as Theme) ? (theme as Theme) : DEFAULT_SETTINGS.theme,
+    dayHighlight:
+      input.dayHighlight === "accent" || input.dayHighlight === "calendar"
+        ? input.dayHighlight
+        : DEFAULT_SETTINGS.dayHighlight,
+    onboarded: asBoolean(input.onboarded, DEFAULT_SETTINGS.onboarded),
   };
 }

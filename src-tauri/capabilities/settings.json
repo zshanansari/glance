@@ -7,6 +7,7 @@
   ],
   "permissions": [
     "core:event:default",
+    "core:window:allow-start-dragging",
     "allow-get-settings",
     "allow-update-settings",
     "allow-beep",
@@ -20,6 +21,7 @@
     "allow-update-available",
     "allow-install-update",
     "allow-open-repository",
-    "allow-open-link"
+    "allow-open-link",
+    "allow-hide-settings"
   ]
 }

@@ -17,6 +17,7 @@ import {
   type UpcomingIconLeadMinutes,
   type Weekday,
   type WeekStartsOn,
+  type DayHighlight,
 } from "../shared/settings";
 import { installTauriBridge, type DesktopApi } from "./host";
 import { lucideIcon } from "./icons";
@@ -102,6 +103,11 @@ function showTab(name: string): void {
   )) {
     const selected = button.dataset.tab === name;
     button.setAttribute("aria-selected", selected ? "true" : "false");
+    // The toolbar names the pane, as System Settings does.
+    if (selected) {
+      const title = document.getElementById("pane-title");
+      if (title) title.textContent = button.textContent?.trim() ?? "";
+    }
   }
   for (const panel of Array.from(document.querySelectorAll<HTMLElement>("[role='tabpanel']"))) {
     panel.hidden = panel.id !== `panel-${name}`;
@@ -160,6 +166,7 @@ function startSettings(api: DesktopApi): void {
   const remindersAccessRow = requireElement<HTMLElement>("reminders-access-row");
   const beepPreview = requireElement<HTMLButtonElement>("beep-preview");
   const theme = requireElement<HTMLSelectElement>("theme");
+  const dayHighlight = requireElement<HTMLSelectElement>("day-highlight");
   const version = requireElement<HTMLParagraphElement>("version");
   const checkUpdates = requireElement<HTMLButtonElement>("check-updates");
   const updatePill = requireElement<HTMLButtonElement>("update-pill");
@@ -442,6 +449,7 @@ function startSettings(api: DesktopApi): void {
     hiddenCalendarIds = settings.hiddenCalendarIds;
     paintCalendarSelection(settings.hiddenCalendarIds);
     theme.value = settings.theme;
+    dayHighlight.value = settings.dayHighlight;
   };
 
   const patchFromForm = (): Partial<AppSettings> => ({
@@ -462,6 +470,7 @@ function startSettings(api: DesktopApi): void {
     showEventTitleInMenuBar: showEventTitle.checked,
     showEventTimeInMenuBar: showEventTime.checked,
     theme: theme.value as Theme,
+    dayHighlight: dayHighlight.value as DayHighlight,
   });
 
   tabs.addEventListener("click", (event) => {
@@ -675,9 +684,47 @@ function startSettings(api: DesktopApi): void {
     setUpdatePill("working", percent === null ? "Downloading" : `Downloading ${percent}%`);
   });
 
+  // First-run welcome. Its own controls, kept apart from the panes', so the
+  // welcome never has to know how those are wired.
+  const page = document.querySelector<HTMLElement>(".page");
+  const welcome = requireElement<HTMLElement>("welcome");
+  const welcomeAccess = requireElement<HTMLButtonElement>("welcome-access");
+  const welcomeLogin = requireElement<HTMLInputElement>("welcome-login");
+  const welcomeShortcut = requireElement<HTMLElement>("welcome-shortcut");
+  const welcomeDone = requireElement<HTMLButtonElement>("welcome-done");
+  const paintWelcomeAccess = (granted: boolean): void => {
+    welcomeAccess.textContent = granted ? "Allowed" : "Allow Access…";
+    welcomeAccess.disabled = granted;
+  };
+  const showWelcome = (settings: AppSettings): void => {
+    welcome.hidden = false;
+    page?.classList.add("is-welcome");
+    welcomeLogin.checked = settings.launchAtLogin;
+    welcomeShortcut.textContent = chordLabel(settings.toggleCalendarShortcut) || "Not set";
+    void api.getCalendarAccess().then(paintWelcomeAccess, () => paintWelcomeAccess(false));
+  };
+  welcomeAccess.addEventListener("click", () => {
+    welcomeAccess.disabled = true;
+    void api
+      .requestCalendarAccess()
+      .then(paintWelcomeAccess, () => paintWelcomeAccess(false))
+      .then(() => refreshCalendarAccess());
+  });
+  welcomeLogin.addEventListener("change", () => {
+    void api.updateSettings({ launchAtLogin: welcomeLogin.checked });
+  });
+  welcomeDone.addEventListener("click", () => {
+    void api.updateSettings({ onboarded: true }).then(() => {
+      welcome.hidden = true;
+      page?.classList.remove("is-welcome");
+      void api.hideSettings();
+    });
+  });
+
   void api.getSettings().then((settings) => {
     paint(settings);
     void refreshCalendarAccess();
+    if (!settings.onboarded) showWelcome(settings);
   });
   void api.getAppVersion().then((value) => {
     version.textContent = value;

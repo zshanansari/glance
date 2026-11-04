@@ -9,7 +9,7 @@
   </head>
   <body>
     <main class="page">
-      <div class="tabs" id="tabs" role="tablist" aria-label="Settings">
+      <div class="tabs" id="tabs" role="tablist" aria-label="Settings" data-tauri-drag-region>
         <button
           type="button"
           role="tab"
@@ -73,6 +73,41 @@
         </button>
       </div>
 
+      <!-- First launch only: shown in place of the sidebar and panes. -->
+      <section class="welcome" id="welcome" hidden aria-labelledby="welcome-title" data-tauri-drag-region>
+        <img class="welcome-icon" src="icon.png" alt="" />
+        <h1 id="welcome-title">Welcome to Glance</h1>
+        <p class="welcome-lead">Your month and your next meeting, a glance away in the menu bar.</p>
+        <div class="card welcome-steps">
+          <div class="row">
+            <div class="copy">
+              <label>Calendar access</label>
+              <p>To show your events. Nothing leaves this Mac.</p>
+            </div>
+            <button type="button" class="action" id="welcome-access">Allow Access…</button>
+          </div>
+          <div class="row">
+            <div class="copy">
+              <label for="welcome-login">Launch at login</label>
+              <p>Keep Glance in the menu bar after a restart.</p>
+            </div>
+            <input id="welcome-login" type="checkbox" switch />
+          </div>
+          <div class="row">
+            <div class="copy">
+              <label>Show the calendar from anywhere</label>
+              <p>Change it any time in Settings.</p>
+            </div>
+            <kbd class="welcome-key" id="welcome-shortcut"></kbd>
+          </div>
+        </div>
+        <button type="button" class="action primary" id="welcome-done">Get Started</button>
+      </section>
+
+      <div class="content">
+        <header class="toolbar" data-tauri-drag-region>
+          <h1 id="pane-title" data-tauri-drag-region>General</h1>
+        </header>
       <form id="form" autocomplete="off">
         <section
           class="panel"
@@ -223,6 +258,16 @@
                   <p>ISO week numbers along the left edge of the month.</p>
                 </div>
                 <input id="week-numbers" name="showWeekNumbers" type="checkbox" switch />
+              </div>
+              <div class="row">
+                <div class="copy">
+                  <label for="day-highlight">Today and selection</label>
+                  <p>The color that marks today and the day you pick.</p>
+                </div>
+                <select id="day-highlight" name="dayHighlight">
+                  <option value="calendar">Calendar Red</option>
+                  <option value="accent">Accent Color</option>
+                </select>
               </div>
               <div class="row highlight-row">
                 <div class="copy">
@@ -420,6 +465,7 @@
           </div>
         </section>
       </form>
+      </div>
     </main>
     <script src="settings.js"></script>
   </body>

@@ -255,6 +255,15 @@ button:focus {
   height: 28px;
 }
 
+/* Today and the chosen day: Calendar's red, or the accent if so set. */
+:root {
+  --day: var(--calendar);
+}
+
+:root[data-day-highlight="accent"] {
+  --day: var(--accent);
+}
+
 /* A rounded square, not a circle: tall enough to hold the event mark inside
    it, so a highlight never cuts across the dot. */
 .day-number {
@@ -279,14 +288,14 @@ button:focus {
 
 /* Today: an outline, so it reads at a glance without looking chosen. */
 .day.is-today .day-number {
-  box-shadow: inset 0 0 0 1.5px var(--calendar);
-  color: var(--calendar);
+  box-shadow: inset 0 0 0 1.5px var(--day);
+  color: var(--day);
   font-weight: 600;
 }
 
 /* The chosen day: filled. */
 .day.is-selected .day-number {
-  background: var(--calendar);
+  background: var(--day);
   box-shadow: none;
   color: #fff;
   font-weight: 600;
@@ -314,7 +323,7 @@ button:focus {
 }
 
 .day.is-today .day-mark {
-  background: var(--calendar);
+  background: var(--day);
 }
 
 .day.is-selected .day-mark {

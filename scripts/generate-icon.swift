@@ -11,10 +11,13 @@ let canvas = 1024.0
 let tile = 824.0
 let origin = (canvas - tile) / 2
 let radius = tile * 0.223
-let header = NSColor(srgbRed: 0.25, green: 0.43, blue: 0.53, alpha: 1)
-let page = NSColor(srgbRed: 0.96, green: 0.97, blue: 0.98, alpha: 1)
-let ink = NSColor(srgbRed: 0.12, green: 0.14, blue: 0.16, alpha: 1)
-let cell = NSColor(srgbRed: 0.82, green: 0.86, blue: 0.89, alpha: 1)
+// Glance: a white calendar card on a deep blue glass tile, Calendar's red
+// across the top, and today ringed in that red the way the popover marks it.
+let tileTop = NSColor(srgbRed: 0.33, green: 0.56, blue: 1.0, alpha: 1)
+let tileBottom = NSColor(srgbRed: 0.16, green: 0.25, blue: 0.80, alpha: 1)
+let header = NSColor(srgbRed: 1.0, green: 0.23, blue: 0.19, alpha: 1)
+let page = NSColor(srgbRed: 0.99, green: 0.99, blue: 1.0, alpha: 1)
+let cell = NSColor(srgbRed: 0.87, green: 0.89, blue: 0.93, alpha: 1)
 
 func roundedRect(_ rect: NSRect, radius: CGFloat) -> NSBezierPath {
     NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
@@ -25,40 +28,60 @@ func drawAppIcon() -> NSImage {
         NSColor.clear.setFill()
         NSRect(x: 0, y: 0, width: canvas, height: canvas).fill()
 
-        ink.setFill()
-        roundedRect(NSRect(x: origin, y: origin, width: tile, height: tile), radius: radius).fill()
+        // pngData flips this drawing: maxY is the top of the exported icon.
+        let tileRect = NSRect(x: origin, y: origin, width: tile, height: tile)
+        let tilePath = roundedRect(tileRect, radius: radius)
+        NSGradient(starting: tileBottom, ending: tileTop)?.draw(in: tilePath, angle: 90)
 
-        let inset = tile * 0.14
+        // A soft sheen over the upper half, as Liquid Glass catches light.
+        NSGraphicsContext.saveGraphicsState()
+        tilePath.addClip()
+        NSGradient(
+            starting: NSColor.white.withAlphaComponent(0.0),
+            ending: NSColor.white.withAlphaComponent(0.22)
+        )?.draw(
+            in: NSRect(x: tileRect.minX, y: tileRect.midY, width: tile, height: tile / 2),
+            angle: 90
+        )
+        NSGraphicsContext.restoreGraphicsState()
+        // A hairline rim, lighter at the top edge.
+        NSColor.white.withAlphaComponent(0.28).setStroke()
+        let rim = roundedRect(tileRect.insetBy(dx: 3, dy: 3), radius: radius - 3)
+        rim.lineWidth = 6
+        rim.stroke()
+
+        // The card, lifted off the tile.
+        let inset = tile * 0.17
         let card = NSRect(
             x: origin + inset,
-            y: origin + inset,
+            y: origin + inset * 0.92,
             width: tile - inset * 2,
             height: tile - inset * 2
         )
+        let corner = tile * 0.085
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
+        shadow.shadowBlurRadius = 28
+        shadow.shadowOffset = NSSize(width: 0, height: 12)
+        shadow.set()
         page.setFill()
-        roundedRect(card, radius: radius * 0.42).fill()
+        roundedRect(card, radius: corner).fill()
+        NSGraphicsContext.restoreGraphicsState()
 
-        // pngData flips this drawing, so the header is painted on the card's
-        // maxY edge and lands at the top of the exported icon.
-        let bandHeight = card.height * 0.22
-        let corner = radius * 0.42
+        let bandHeight = card.height * 0.21
         NSGraphicsContext.saveGraphicsState()
         roundedRect(card, radius: corner).addClip()
         header.setFill()
-        NSRect(
-            x: card.minX,
-            y: card.maxY - bandHeight,
-            width: card.width,
-            height: bandHeight
-        ).fill()
+        NSRect(x: card.minX, y: card.maxY - bandHeight, width: card.width, height: bandHeight).fill()
         NSGraphicsContext.restoreGraphicsState()
 
-        let gridTop = card.minY + card.height * 0.1
+        let gridTop = card.minY + card.height * 0.11
         let grid = NSRect(
             x: card.minX + card.width * 0.12,
             y: gridTop,
             width: card.width * 0.76,
-            height: card.maxY - bandHeight - card.height * 0.08 - gridTop
+            height: card.maxY - bandHeight - card.height * 0.1 - gridTop
         )
         let cols = 4
         let rows = 3
@@ -73,13 +96,21 @@ func drawAppIcon() -> NSImage {
                     width: cellW,
                     height: cellH
                 )
-                let path = roundedRect(rect, radius: cellW * 0.28)
+                let path = roundedRect(rect, radius: cellW * 0.26)
                 if row == 1 && col == 2 {
-                    header.setFill()
+                    // Today: ringed, not filled.
+                    let stroke = cellW * 0.13
+                    let ring = roundedRect(
+                        rect.insetBy(dx: stroke / 2, dy: stroke / 2),
+                        radius: cellW * 0.26 - stroke / 2
+                    )
+                    ring.lineWidth = stroke
+                    header.setStroke()
+                    ring.stroke()
                 } else {
                     cell.setFill()
+                    path.fill()
                 }
-                path.fill()
             }
         }
         return true

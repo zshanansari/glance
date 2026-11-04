@@ -62,6 +62,11 @@ pub struct AppSettings {
     pub hidden_calendar_ids: Vec<String>,
     pub auto_update: bool,
     pub theme: String,
+    /// "calendar" marks today and the chosen day in Calendar's red,
+    /// "accent" in the system accent.
+    pub day_highlight: String,
+    /// Set once the first-run welcome has been seen.
+    pub onboarded: bool,
 }
 
 impl Default for AppSettings {
@@ -91,6 +96,8 @@ impl Default for AppSettings {
             hidden_calendar_ids: Vec::new(),
             auto_update: true,
             theme: "system".into(),
+            day_highlight: "calendar".into(),
+            onboarded: false,
         }
     }
 }
@@ -122,6 +129,9 @@ impl AppSettings {
         }
         if !matches!(self.theme.as_str(), "system" | "light" | "dark") {
             self.theme = base.theme.clone();
+        }
+        if !matches!(self.day_highlight.as_str(), "calendar" | "accent") {
+            self.day_highlight = base.day_highlight.clone();
         }
         if !matches!(self.upcoming_horizon_days, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 14 | 30) {
             self.upcoming_horizon_days = base.upcoming_horizon_days;
