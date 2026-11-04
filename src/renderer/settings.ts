@@ -21,7 +21,16 @@ import {
 import { installTauriBridge, type DesktopApi } from "./host";
 import { lucideIcon } from "./icons";
 import { framedGlyphMask } from "./tray-frame";
-import { Check, Volume2 } from "lucide";
+import { Calendar, CalendarClock, Check, Info, Palette, Settings, Volume2, type IconNode } from "lucide";
+
+/** Each pane's sidebar tile, as System Settings marks its panes. */
+const TAB_ICONS: Record<string, { icon: IconNode; color: string }> = {
+  general: { icon: Settings, color: "#8e8e93" },
+  appearance: { icon: Palette, color: "#0a84ff" },
+  calendar: { icon: Calendar, color: "#ff3b30" },
+  events: { icon: CalendarClock, color: "#ff9500" },
+  about: { icon: Info, color: "#8e8e93" },
+};
 import { bindCalendarAccess } from "./calendar-access";
 import { chordFromKeyboard, chordLabel } from "../shared/shortcuts";
 
@@ -102,6 +111,15 @@ function showTab(name: string): void {
 function startSettings(api: DesktopApi): void {
   const form = requireElement<HTMLFormElement>("form");
   const tabs = requireElement<HTMLDivElement>("tabs");
+  for (const tab of Array.from(tabs.querySelectorAll<HTMLButtonElement>("[role='tab']"))) {
+    const entry = TAB_ICONS[tab.dataset.tab ?? ""];
+    if (!entry) continue;
+    const tile = document.createElement("span");
+    tile.className = "tab-tile";
+    tile.style.setProperty("--tile", entry.color);
+    tile.append(lucideIcon(entry.icon, 13, { "stroke-width": 2.25 }));
+    tab.prepend(tile);
+  }
   const iconStyles = requireElement<HTMLDivElement>("icon-styles");
   const showWeekday = requireElement<HTMLInputElement>("show-weekday");
   const showMonth = requireElement<HTMLInputElement>("show-month");

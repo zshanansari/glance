@@ -15,6 +15,7 @@ await mkdir("dist/renderer", { recursive: true });
 await rm("dist/renderer/tray", { recursive: true, force: true });
 await rm("dist/renderer/brands", { recursive: true, force: true });
 await Promise.all([
+  cp("src/renderer/system.css", "dist/renderer/system.css"),
   cp("src/renderer/calendar.html", "dist/renderer/calendar.html"),
   cp("src/renderer/calendar.css", "dist/renderer/calendar.css"),
   cp("src/renderer/events.html", "dist/renderer/events.html"),

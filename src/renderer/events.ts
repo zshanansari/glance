@@ -29,7 +29,7 @@ function dayLabel(date: Date): string {
   const iso = (value: Date) => value.toDateString();
   if (iso(date) === iso(today)) return "Today";
   if (iso(date) === iso(tomorrow)) return "Tomorrow";
-  return new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(date);
 }
 
 const RESPONSE_LABEL: Record<EventResponse, string> = {
@@ -59,12 +59,17 @@ function eventRow(event: UpcomingEvent): HTMLElement {
   row.addEventListener("click", () => openEvent(event));
   const dot = document.createElement("span");
   dot.className = `dot ${event.response}`;
+  if (event.color) dot.style.setProperty("--event-color", event.color);
   const title = document.createElement("span");
   title.className = "title";
-  const when = event.allDay ? "All day" : timeFormat.format(new Date(event.startAt));
-  title.textContent = `${when} · ${event.title}`;
+  // The time leads in the lighter ink, the way a menu sets its detail.
+  const when = document.createElement("span");
+  when.className = "time";
+  when.textContent = event.allDay ? "All day" : timeFormat.format(new Date(event.startAt));
+  title.append(when, ` ${event.title}`);
   const response = RESPONSE_LABEL[event.response];
-  row.title = response ? `${title.textContent} — ${response}` : title.textContent;
+  const summary = `${when.textContent} · ${event.title}`;
+  row.title = response ? `${summary} — ${response}` : summary;
   row.append(dot, title);
   return row;
 }
