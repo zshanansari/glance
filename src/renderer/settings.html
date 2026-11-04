@@ -10,6 +10,15 @@
   <body>
     <main class="page">
       <div class="tabs" id="tabs" role="tablist" aria-label="Settings" data-tauri-drag-region>
+        <!-- Where System Settings shows the account: the app itself, which
+             opens About. -->
+        <button type="button" class="sidebar-identity" data-tab="about">
+          <img src="icon.png" alt="" />
+          <span>
+            <strong>Glance</strong>
+            <small id="sidebar-version"></small>
+          </span>
+        </button>
         <button
           type="button"
           role="tab"
@@ -435,9 +444,11 @@
               <img class="about-icon" src="icon.png" alt="Glance app icon" />
               <div class="about-intro">
                 <p class="about-name">Glance</p>
-                <p class="about-version" id="version">Glance</p>
+                <p class="about-version" id="version"></p>
                 <p class="about-copy">
-                  A month calendar in the macOS menu bar. Nothing leaves this Mac.
+                  Your month, today&rsquo;s agenda and your next meeting, a click away in the
+                  menu bar. Glance reads Calendar and Reminders on this Mac and never sends
+                  them anywhere.
                 </p>
               </div>
             </div>

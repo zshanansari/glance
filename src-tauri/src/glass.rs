@@ -82,6 +82,64 @@ pub fn present(window: &tauri::WebviewWindow) {
     }
 }
 
+/// Gives a window an empty unified toolbar, as System Settings has. macOS 26
+/// draws windows with a toolbar at its larger corner radius, which the
+/// floating sidebar's corners are cut to match; with no items, the toolbar
+/// only shapes the window and holds the traffic lights.
+pub fn use_unified_toolbar(window: &tauri::WebviewWindow) {
+    let Some(ns_window) = window_object(window) else {
+        return;
+    };
+    unsafe {
+        let ident = objc2_foundation::NSString::from_str("glance.settings");
+        let toolbar: *mut AnyObject = msg_send![class!(NSToolbar), alloc];
+        let toolbar: *mut AnyObject = msg_send![toolbar, initWithIdentifier: &*ident];
+        if toolbar.is_null() {
+            return;
+        }
+        let _: () = msg_send![ns_window, setToolbar: toolbar];
+        // NSWindowToolbarStyleUnified.
+        let _: () = msg_send![ns_window, setToolbarStyle: 1isize];
+        let _: () = msg_send![ns_window, setTitlebarAppearsTransparent: Bool::YES];
+        let _: () = msg_send![toolbar, release];
+    }
+}
+
+/// Puts the close, minimise and zoom buttons where System Settings has them:
+/// 18pt in from the window's left and top edges, 23pt apart, which lands them
+/// inside the floating sidebar's corner. AppKit lays them out for the
+/// toolbar's height instead, so this runs after the window is shown.
+pub fn place_window_buttons(window: &tauri::WebviewWindow) {
+    const INSET: f64 = 18.0;
+    const PITCH: f64 = 23.0;
+    let Some(ns_window) = window_object(window) else {
+        return;
+    };
+    unsafe {
+        for (index, kind) in [0usize, 1, 2].into_iter().enumerate() {
+            let button: *mut AnyObject = msg_send![ns_window, standardWindowButton: kind];
+            if button.is_null() {
+                continue;
+            }
+            let superview: *mut AnyObject = msg_send![button, superview];
+            if superview.is_null() {
+                continue;
+            }
+            let container: NSRect = msg_send![superview, frame];
+            let frame: NSRect = msg_send![button, frame];
+            let flipped: Bool = msg_send![superview, isFlipped];
+            // The container is the titlebar, which sits at the window's top.
+            let y = if flipped.as_bool() {
+                INSET
+            } else {
+                container.size.height - INSET - frame.size.height
+            };
+            let origin = objc2_foundation::NSPoint::new(INSET + PITCH * index as f64, y);
+            let _: () = msg_send![button, setFrameOrigin: origin];
+        }
+    }
+}
+
 /// Back to full opacity, for the next time the popover opens.
 pub fn clear_fade(window: &tauri::WebviewWindow) {
     let Some(ns_window) = window_object(window) else {

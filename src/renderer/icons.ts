@@ -16,12 +16,15 @@ export type SymbolName =
   | "eye.slash"
   | "video.fill";
 
-export function sfSymbol(name: SymbolName, size: number): HTMLElement {
+/** Without a size, the stylesheet sizes the glyph. */
+export function sfSymbol(name: SymbolName, size?: number): HTMLElement {
   const glyph = document.createElement("span");
   glyph.className = "sf-symbol";
   glyph.setAttribute("aria-hidden", "true");
   glyph.style.setProperty("--symbol", `url("symbols/${name}.png")`);
-  glyph.style.width = `${size}px`;
-  glyph.style.height = `${size}px`;
+  if (size !== undefined) {
+    glyph.style.width = `${size}px`;
+    glyph.style.height = `${size}px`;
+  }
   return glyph;
 }

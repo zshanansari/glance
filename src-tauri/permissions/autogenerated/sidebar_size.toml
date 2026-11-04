@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sidebar-size"
+description = "Enables the sidebar_size command without any pre-configured scope."
+commands.allow = ["sidebar_size"]
+
+[[permission]]
+identifier = "deny-sidebar-size"
+description = "Denies the sidebar_size command without any pre-configured scope."
+commands.deny = ["sidebar_size"]

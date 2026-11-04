@@ -10,6 +10,7 @@ const COMMANDS: &[&str] = &[
     "hide_calendar",
     "hide_events",
     "hide_settings",
+    "sidebar_size",
     "set_events_height",
     "set_calendar_height",
     "popover_material",

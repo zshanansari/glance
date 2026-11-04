@@ -5,6 +5,10 @@
  * palette is system.css; the surfaces are here.
  */
 :root {
+  /* Switch knobs as NSSwitch draws them: near-white, tinted by the accent
+     track when on. */
+  --knob-on: rgb(255 255 255 / 86%);
+  --knob-off: #fff;
   --window: #ececec;
   --group: #fff;
   /* The sidebar is glass over the window: a shade of it, with a lit rim. */
@@ -27,7 +31,8 @@
     --sidebar-selection: rgb(255 255 255 / 10%);
     --control-fill: rgb(255 255 255 / 10%);
     --control-fill-hover: rgb(255 255 255 / 15%);
-    --switch-off: rgb(255 255 255 / 14%);
+    --switch-off: rgb(255 255 255 / 9%);
+    --knob-off: #e2e2e3;
   }
 }
 
@@ -40,7 +45,8 @@
   --sidebar-selection: rgb(255 255 255 / 10%);
   --control-fill: rgb(255 255 255 / 10%);
   --control-fill-hover: rgb(255 255 255 / 15%);
-  --switch-off: rgb(255 255 255 / 14%);
+  --switch-off: rgb(255 255 255 / 9%);
+  --knob-off: #e2e2e3;
 }
 
 * {
@@ -85,15 +91,39 @@ input {
   height: 100%;
 }
 
-/* The floating sidebar, measured off System Settings: inset 9pt with 18pt
+/* The floating sidebar, measured off System Settings: inset 8pt with 18pt
    corners, a shade darker than the window, a hairline rim lit along its top
    edge the way Liquid Glass catches light. */
+/* Sidebar metrics follow System Settings › Appearance › Sidebar icon size. */
+:root,
+:root[data-sidebar-size="medium"] {
+  --sidebar-row: 28px;
+  --sidebar-tile: 20px;
+  --sidebar-glyph: 14px;
+  --sidebar-text: 13px;
+}
+
+:root[data-sidebar-size="small"] {
+  --sidebar-row: 24px;
+  --sidebar-tile: 16px;
+  --sidebar-glyph: 12px;
+  --sidebar-text: 11px;
+}
+
+:root[data-sidebar-size="large"] {
+  --sidebar-row: 32px;
+  --sidebar-tile: 24px;
+  --sidebar-glyph: 17px;
+  --sidebar-text: 15px;
+}
+
 .tabs {
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin: 9px 0 9px 9px;
-  padding: 52px 10px 10px;
+  margin: 8px 0 8px 8px;
+  padding: 46px 10px 10px;
+  /* Concentric with the window: its 26pt corner less the 8pt inset. */
   border-radius: 18px;
   background: var(--sidebar);
   box-shadow:
@@ -105,13 +135,53 @@ input {
   display: flex;
   gap: 7px;
   align-items: center;
-  height: 24px;
+  height: var(--sidebar-row);
   padding: 0 6px;
   border: 0;
   border-radius: 7px;
   background: transparent;
+  font-size: var(--sidebar-text);
   font-weight: 500;
   text-align: left;
+}
+
+/* The app, where System Settings shows the account: icon, name, version. */
+.sidebar-identity {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 6px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  text-align: left;
+}
+
+.sidebar-identity:hover {
+  background: var(--sidebar-selection);
+}
+
+.sidebar-identity img {
+  width: 36px;
+  height: 36px;
+}
+
+.sidebar-identity span {
+  display: grid;
+  min-width: 0;
+}
+
+.sidebar-identity strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.sidebar-identity small {
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 14px;
 }
 
 /* Selection is a grey wash, not the accent, as in System Settings. */
@@ -124,9 +194,9 @@ input {
   display: grid;
   flex: none;
   place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 4.5px;
+  width: var(--sidebar-tile);
+  height: var(--sidebar-tile);
+  border-radius: calc(var(--sidebar-tile) * 0.28);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--tile) 78%, white),
@@ -134,6 +204,11 @@ input {
   );
   box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 12%);
   color: #fff;
+}
+
+.tab-tile .sf-symbol {
+  width: var(--sidebar-glyph);
+  height: var(--sidebar-glyph);
 }
 
 .content {
@@ -355,7 +430,7 @@ input {
   width: 22px;
   height: 13px;
   border-radius: 6.5px;
-  background: #fff;
+  background: var(--knob-off);
   box-shadow:
     0 0.5px 1.5px rgb(0 0 0 / 30%),
     0 0 0 0.5px rgb(0 0 0 / 6%);
@@ -373,10 +448,12 @@ input {
 
 .switch:has(input:checked) .switch-knob {
   --knob-x: 10px;
+  background: var(--knob-on);
 }
 
-/* The lens: larger than the track, nearly clear, its edge catching light. */
-.switch.is-pressed .switch-knob {
+/* The lens: larger than the track, nearly clear, its edge catching light.
+   :has(input) lifts it past the on-knob rule above. */
+.switch.is-pressed:has(input) .switch-knob {
   top: -3px;
   left: -2px;
   width: 30px;

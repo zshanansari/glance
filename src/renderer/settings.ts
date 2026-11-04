@@ -115,6 +115,11 @@ function showTab(name: string): void {
 
 function startSettings(api: DesktopApi): void {
   enhanceSwitches(document);
+  // Rows, icons and text follow the user's sidebar size, as native ones do.
+  void api.getSidebarSize().then(
+    (size) => (document.documentElement.dataset.sidebarSize = size),
+    () => (document.documentElement.dataset.sidebarSize = "medium"),
+  );
   const form = requireElement<HTMLFormElement>("form");
   const tabs = requireElement<HTMLDivElement>("tabs");
   for (const tab of Array.from(tabs.querySelectorAll<HTMLButtonElement>("[role='tab']"))) {
@@ -123,7 +128,7 @@ function startSettings(api: DesktopApi): void {
     const tile = document.createElement("span");
     tile.className = "tab-tile";
     tile.style.setProperty("--tile", entry.color);
-    tile.append(sfSymbol(entry.symbol, 12.5));
+    tile.append(sfSymbol(entry.symbol));
     tab.prepend(tile);
   }
   const iconStyles = requireElement<HTMLDivElement>("icon-styles");
@@ -727,7 +732,9 @@ function startSettings(api: DesktopApi): void {
     if (!settings.onboarded) showWelcome(settings);
   });
   void api.getAppVersion().then((value) => {
-    version.textContent = value;
+    version.textContent = `Version ${value}`;
+    const sidebarVersion = document.getElementById("sidebar-version");
+    if (sidebarVersion) sidebarVersion.textContent = `Version ${value}`;
   });
   api.onSettingsChanged(paint);
 }
