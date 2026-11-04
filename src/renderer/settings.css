@@ -7,8 +7,11 @@
 :root {
   --window: #ececec;
   --group: #fff;
-  --sidebar-rim: rgb(0 0 0 / 10%);
-  --sidebar-selection: rgb(0 0 0 / 8%);
+  /* The sidebar is glass over the window: a shade of it, with a lit rim. */
+  --sidebar: rgb(0 0 0 / 3.5%);
+  --sidebar-rim: rgb(0 0 0 / 8%);
+  --sidebar-light: rgb(255 255 255 / 70%);
+  --sidebar-selection: rgb(0 0 0 / 7%);
   --control-fill: rgb(0 0 0 / 6%);
   --control-fill-hover: rgb(0 0 0 / 10%);
   --switch-off: rgb(0 0 0 / 10%);
@@ -16,9 +19,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --window: #232326;
-    --group: rgb(255 255 255 / 5%);
-    --sidebar-rim: rgb(255 255 255 / 12%);
+    --window: #222025;
+    --group: rgb(255 255 255 / 6%);
+    --sidebar: rgb(0 0 0 / 12%);
+    --sidebar-rim: rgb(255 255 255 / 9%);
+    --sidebar-light: rgb(255 255 255 / 6%);
     --sidebar-selection: rgb(255 255 255 / 10%);
     --control-fill: rgb(255 255 255 / 10%);
     --control-fill-hover: rgb(255 255 255 / 15%);
@@ -27,9 +32,11 @@
 }
 
 :root[data-theme="dark"] {
-  --window: #232326;
-  --group: rgb(255 255 255 / 5%);
-  --sidebar-rim: rgb(255 255 255 / 12%);
+  --window: #222025;
+  --group: rgb(255 255 255 / 6%);
+  --sidebar: rgb(0 0 0 / 12%);
+  --sidebar-rim: rgb(255 255 255 / 9%);
+  --sidebar-light: rgb(255 255 255 / 6%);
   --sidebar-selection: rgb(255 255 255 / 10%);
   --control-fill: rgb(255 255 255 / 10%);
   --control-fill-hover: rgb(255 255 255 / 15%);
@@ -44,13 +51,12 @@
   display: none !important;
 }
 
-/* Transparent, so the sidebar material shows where the sidebar is. */
 html,
 body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: transparent;
+  background: var(--window);
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
@@ -79,33 +85,32 @@ input {
   height: 100%;
 }
 
-/* The floating sidebar: inset from the window's edges with deep corners. Its
-   own background is clear, and a spread shadow paints the rest of the window
-   opaque, so only this panel shows the material. */
+/* The floating sidebar, measured off System Settings: inset 9pt with 18pt
+   corners, a shade darker than the window, a hairline rim lit along its top
+   edge the way Liquid Glass catches light. */
 .tabs {
-  position: relative;
-  z-index: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  margin: 8px 0 8px 8px;
-  padding: 52px 8px 10px;
+  gap: 0;
+  margin: 9px 0 9px 9px;
+  padding: 52px 10px 10px;
   border-radius: 18px;
-  background: transparent;
+  background: var(--sidebar);
   box-shadow:
     inset 0 0 0 0.5px var(--sidebar-rim),
-    0 0 0 999px var(--window);
+    inset 0 1px 0 var(--sidebar-light);
 }
 
 .tabs [role="tab"] {
   display: flex;
-  gap: 8px;
+  gap: 7px;
   align-items: center;
-  height: 30px;
-  padding: 0 8px;
+  height: 24px;
+  padding: 0 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
+  font-weight: 500;
   text-align: left;
 }
 
@@ -114,22 +119,24 @@ input {
   background: var(--sidebar-selection);
 }
 
-/* The pane's icon on a tinted rounded square. */
+/* The pane's symbol on a tinted rounded square, lit from above. */
 .tab-tile {
   display: grid;
   flex: none;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  background: var(--tile);
+  width: 16px;
+  height: 16px;
+  border-radius: 4.5px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--tile) 78%, white),
+    var(--tile)
+  );
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 12%);
   color: #fff;
 }
 
-/* Above the sidebar's spread shadow, which would otherwise cover it. */
 .content {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -298,30 +305,108 @@ input {
   align-items: center;
 }
 
-/* Liquid Glass switch: a 36×17 track and a pill knob, the accent when on. */
-input[type="checkbox"][switch] {
+/* Liquid Glass switch (switches.ts): a 36×17 track and a pill knob. Pressed,
+   the knob swells into a clear lens over the track; it can be dragged. */
+.switch {
+  position: relative;
+  display: inline-block;
   flex: none;
   width: 36px;
   height: 17px;
-  margin: 0;
   border-radius: 9px;
-  background: var(--switch-off)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='17'%3E%3Cdefs%3E%3Cfilter id='s' x='-20%25' y='-30%25' width='140%25' height='160%25'%3E%3CfeDropShadow dx='0' dy='0.5' stdDeviation='0.6' flood-opacity='0.3'/%3E%3C/filter%3E%3C/defs%3E%3Crect x='2' y='2' width='22' height='13' rx='6.5' fill='white' filter='url(%23s)'/%3E%3C/svg%3E")
-    left center / 26px 17px no-repeat;
-  transition:
-    background-color 160ms ease,
-    background-position 160ms cubic-bezier(0.3, 0.7, 0.3, 1);
+  background: var(--switch-off);
+  transition: background-color 160ms ease;
+  touch-action: none;
+}
+
+.switch:has(input:checked),
+.switch.is-on {
+  background: var(--accent);
+}
+
+.switch.is-dragging:not(.is-on) {
+  background: var(--switch-off);
+}
+
+.switch:has(input:disabled) {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* The input stays for focus, keyboard and labels; the wrapper takes the
+   pointer. */
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
   appearance: none;
   -webkit-appearance: none;
 }
 
-input[type="checkbox"][switch]:checked {
-  background-color: var(--accent);
-  background-position: right center;
+.switch-knob {
+  --knob-x: 0px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 13px;
+  border-radius: 6.5px;
+  background: #fff;
+  box-shadow:
+    0 0.5px 1.5px rgb(0 0 0 / 30%),
+    0 0 0 0.5px rgb(0 0 0 / 6%);
+  transform: translateX(var(--knob-x));
+  transition:
+    transform 220ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    width 180ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    height 180ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    top 180ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    left 180ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+  pointer-events: none;
 }
 
-input[type="checkbox"][switch]:disabled {
-  opacity: 0.5;
+.switch:has(input:checked) .switch-knob {
+  --knob-x: 10px;
+}
+
+/* The lens: larger than the track, nearly clear, its edge catching light. */
+.switch.is-pressed .switch-knob {
+  top: -3px;
+  left: -2px;
+  width: 30px;
+  height: 23px;
+  border-radius: 11.5px;
+  background: rgb(255 255 255 / 6%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 95%),
+    inset 0 1.5px 1px rgb(255 255 255 / 60%),
+    inset 0 -1.5px 2px rgb(0 0 0 / 8%),
+    0 2px 8px rgb(0 0 0 / 25%);
+  -webkit-backdrop-filter: blur(0.4px) saturate(190%) brightness(1.18);
+  backdrop-filter: blur(0.4px) saturate(190%) brightness(1.18);
+}
+
+.switch.is-pressed:has(input:checked) .switch-knob {
+  --knob-x: 10px;
+}
+
+.switch.is-dragging .switch-knob {
+  transition:
+    width 180ms ease,
+    height 180ms ease,
+    top 180ms ease,
+    left 180ms ease;
+}
+
+.switch:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 1px;
 }
 
 input[type="checkbox"]:not([switch]) {
@@ -405,10 +490,6 @@ select:hover {
 .preview:hover {
   background: var(--control-fill);
   color: var(--label);
-}
-
-.preview svg {
-  display: block;
 }
 
 /* Menu bar style picker: a segmented row of the four looks. */

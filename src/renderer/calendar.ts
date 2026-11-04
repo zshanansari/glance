@@ -16,12 +16,11 @@ import {
   upcomingFetchEnd,
   type UpcomingEvent,
 } from "../shared/events";
-import { lucideIcon } from "./icons";
+import { sfSymbol } from "./icons";
 import { eventGlyphPng, framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
 import { bandBox } from "./column-bands";
 import { installTauriBridge, type DesktopApi } from "./host";
-import { ChevronLeft, ChevronRight } from "lucide";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -92,8 +91,8 @@ function startCalendar(api: DesktopApi): void {
   const dayEventsCount = requireElement<HTMLElement>("day-events-count");
   const dayEventsList = requireElement<HTMLElement>("day-events-list");
   const openSettings = requireElement<HTMLButtonElement>("open-settings");
-  prev.append(lucideIcon(ChevronLeft, 14, { "stroke-width": 2.25 }));
-  next.append(lucideIcon(ChevronRight, 14, { "stroke-width": 2.25 }));
+  prev.append(sfSymbol("chevron.left", 12));
+  next.append(sfSymbol("chevron.right", 12));
 
   let settings: AppSettings | null = null;
   let viewYear = new Date().getFullYear();

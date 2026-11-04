@@ -92,11 +92,6 @@ body {
   opacity: 1;
 }
 
-.detail-row.interactive:hover .glyph svg {
-  fill: none;
-  stroke: currentColor;
-}
-
 /* The calendar's color, in the shape the invitation answer gives it: solid
    when accepted, hatched for maybe, a dashed outline while unanswered, and
    hollow when declined. */

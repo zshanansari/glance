@@ -14,6 +14,7 @@ const bundle = (entry, outfile) =>
 await mkdir("dist/renderer", { recursive: true });
 await rm("dist/renderer/tray", { recursive: true, force: true });
 await rm("dist/renderer/brands", { recursive: true, force: true });
+await rm("dist/renderer/symbols", { recursive: true, force: true });
 await Promise.all([
   cp("src/renderer/system.css", "dist/renderer/system.css"),
   cp("src/renderer/calendar.html", "dist/renderer/calendar.html"),
@@ -24,6 +25,7 @@ await Promise.all([
   cp("src/renderer/settings.css", "dist/renderer/settings.css"),
   cp("icons/tray", "dist/renderer/tray", { recursive: true }),
   cp("icons/brands", "dist/renderer/brands", { recursive: true }),
+  cp("icons/symbols", "dist/renderer/symbols", { recursive: true }),
   cp("icons/icon.png", "dist/renderer/icon.png"),
   bundle("src/renderer/calendar.ts", "dist/renderer/calendar.js"),
   bundle("src/renderer/events.ts", "dist/renderer/events.js"),

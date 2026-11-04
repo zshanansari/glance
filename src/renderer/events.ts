@@ -9,11 +9,10 @@ import {
   type UpcomingEvent,
 } from "../shared/events";
 import { installTauriBridge } from "./host";
-import { lucideIcon } from "./icons";
+import { sfSymbol } from "./icons";
 import { meetingBrand } from "../shared/meetings";
 import { meetingIcon } from "./brand-icons";
 import { markPopoverMaterial, popoverHeight } from "./popover-size";
-import { EyeOff, MapPin } from "lucide";
 import { DEFAULT_SETTINGS, type AppSettings } from "../shared/settings";
 
 const api = installTauriBridge();
@@ -101,7 +100,7 @@ function eventDetails(event: UpcomingEvent, includeLocation = false): HTMLElemen
     }));
   }
   if (includeLocation && event.location && !event.location.startsWith("http")) {
-    details.append(detailRow(lucideIcon(MapPin, 15), event.location));
+    details.append(detailRow(sfSymbol("mappin.and.ellipse", 14), event.location));
   }
   return details.childElementCount ? details : null;
 }
@@ -125,7 +124,7 @@ function featuredEvent(
   const details = eventDetails(event, true);
   if (details) nodes.push(details);
   if (onDismiss) {
-    nodes.push(detailRow(lucideIcon(EyeOff, 15), "Dismiss this event", onDismiss));
+    nodes.push(detailRow(sfSymbol("eye.slash", 14), "Dismiss this event", onDismiss));
   }
   return nodes;
 }

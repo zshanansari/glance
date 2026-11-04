@@ -118,10 +118,6 @@ button:focus {
   color: var(--secondary);
 }
 
-.icon-button svg {
-  display: block;
-}
-
 .icon-button:hover {
   background: var(--quaternary);
   color: var(--label);

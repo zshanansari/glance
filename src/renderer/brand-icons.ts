@@ -4,8 +4,7 @@
  * plain camera. Zoom and Webex publish wordmarks, so marks are sized by
  * height and left to take the width they need.
  */
-import { Video } from "lucide";
-import { lucideIcon } from "./icons";
+import { sfSymbol } from "./icons";
 import type { MeetingBrand } from "../shared/meetings";
 
 const FILES: Partial<Record<MeetingBrand, string>> = {
@@ -19,7 +18,7 @@ const FILES: Partial<Record<MeetingBrand, string>> = {
 
 export function meetingIcon(brand: MeetingBrand, size: number): Element {
   const file = FILES[brand];
-  if (!file) return lucideIcon(Video, size);
+  if (!file) return sfSymbol("video.fill", size);
   const mark = document.createElement("img");
   mark.src = file;
   mark.height = size;

@@ -20,19 +20,18 @@ import {
   type DayHighlight,
 } from "../shared/settings";
 import { installTauriBridge, type DesktopApi } from "./host";
-import { lucideIcon } from "./icons";
+import { sfSymbol, type SymbolName } from "./icons";
+import { enhanceSwitches } from "./switches";
 import { framedGlyphMask } from "./tray-frame";
-import { Calendar, CalendarClock, Check, Info, Palette, Settings, Volume2, type IconNode } from "lucide";
 
 /** Each pane's sidebar tile, as System Settings marks its panes. */
-const TAB_ICONS: Record<string, { icon: IconNode; color: string }> = {
-  general: { icon: Settings, color: "#8e8e93" },
-  appearance: { icon: Palette, color: "#0a84ff" },
-  calendar: { icon: Calendar, color: "#ff3b30" },
-  events: { icon: CalendarClock, color: "#ff9500" },
-  about: { icon: Info, color: "#8e8e93" },
-};
-import { bindCalendarAccess } from "./calendar-access";
+const TAB_ICONS: Record<string, { symbol: SymbolName; color: string }> = {
+  general: { symbol: "gearshape.fill", color: "#8e8e93" },
+  appearance: { symbol: "circle.lefthalf.filled", color: "#1c1c1e" },
+  calendar: { symbol: "calendar", color: "#ff3b30" },
+  events: { symbol: "calendar.badge.clock", color: "#ff9500" },
+  about: { symbol: "info.circle.fill", color: "#8e8e93" },
+};import { bindCalendarAccess } from "./calendar-access";
 import { chordFromKeyboard, chordLabel } from "../shared/shortcuts";
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -115,6 +114,7 @@ function showTab(name: string): void {
 }
 
 function startSettings(api: DesktopApi): void {
+  enhanceSwitches(document);
   const form = requireElement<HTMLFormElement>("form");
   const tabs = requireElement<HTMLDivElement>("tabs");
   for (const tab of Array.from(tabs.querySelectorAll<HTMLButtonElement>("[role='tab']"))) {
@@ -123,7 +123,7 @@ function startSettings(api: DesktopApi): void {
     const tile = document.createElement("span");
     tile.className = "tab-tile";
     tile.style.setProperty("--tile", entry.color);
-    tile.append(lucideIcon(entry.icon, 13, { "stroke-width": 2.25 }));
+    tile.append(sfSymbol(entry.symbol, 12.5));
     tab.prepend(tile);
   }
   const iconStyles = requireElement<HTMLDivElement>("icon-styles");
@@ -177,7 +177,7 @@ function startSettings(api: DesktopApi): void {
   const openSite = requireElement<HTMLButtonElement>("open-site");
 
   buildIconStyles(iconStyles);
-  beepPreview.append(lucideIcon(Volume2, 16));
+  beepPreview.append(sfSymbol("speaker.wave.2.fill", 14));
   fillSelect(
     weekStart,
     WEEK_STARTS.map((item) => ({
@@ -211,7 +211,7 @@ function startSettings(api: DesktopApi): void {
       button.dataset.weekday = String(day.id);
       button.setAttribute("aria-pressed", "false");
       button.setAttribute("aria-label", day.name);
-      button.append(lucideIcon(Check, 12));
+      button.append(sfSymbol("checkmark", 11));
       wrap.append(caption, button);
       return wrap;
     }),

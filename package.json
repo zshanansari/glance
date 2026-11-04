@@ -15,7 +15,8 @@
     "test": "pnpm test:ui && pnpm test:rust",
     "test:rust": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
     "test:ui": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "symbols": "swift scripts/generate-symbols.swift"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
@@ -25,7 +26,6 @@
     "vitest": "^5.0.0"
   },
   "dependencies": {
-    "@tauri-apps/api": "~2.11.0",
-    "lucide": "^1.43.0"
+    "@tauri-apps/api": "~2.11.0"
   }
 }

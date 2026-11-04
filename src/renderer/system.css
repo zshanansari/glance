@@ -68,3 +68,12 @@
     --calendar: -apple-system-red;
   }
 }
+
+/* SF Symbols (icons.ts): the glyph is a mask, so it takes the text color. */
+.sf-symbol {
+  display: inline-block;
+  flex: none;
+  background-color: currentColor;
+  -webkit-mask: var(--symbol) center / contain no-repeat;
+  mask: var(--symbol) center / contain no-repeat;
+}
