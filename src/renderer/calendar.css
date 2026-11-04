@@ -12,6 +12,8 @@
   --separator: rgb(0 0 0 / 10%);
   --accent: #007aff;
   --on-accent: #fff;
+  /* Calendar's own red, for today and the chosen day. */
+  --calendar: #ff3b30;
   --scrim: rgb(255 255 255 / 16%);
 
   color: var(--label);
@@ -30,6 +32,7 @@
     --quaternary: rgb(255 255 255 / 10%);
     --separator: rgb(255 255 255 / 12%);
     --accent: #0a84ff;
+    --calendar: #ff453a;
     --scrim: rgb(0 0 0 / 22%);
   }
 }
@@ -45,6 +48,7 @@
   --quaternary: rgb(255 255 255 / 10%);
   --separator: rgb(255 255 255 / 12%);
   --accent: #0a84ff;
+  --calendar: #ff453a;
   --scrim: rgb(0 0 0 / 22%);
   color-scheme: dark;
 }
@@ -61,6 +65,7 @@
     --separator: -apple-system-separator;
     --accent: -apple-system-control-accent;
     --on-accent: -apple-system-alternate-selected-text;
+    --calendar: -apple-system-red;
   }
 }
 
@@ -114,7 +119,10 @@ button:focus {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 5px 0;
+  /* A menu's insets: the bottom a little deeper, so the last item's
+     baseline sits as far from the edge as its cap height does from the
+     separator above it. */
+  padding: 5px 0 8px;
   border-radius: 12px;
   background: var(--scrim);
   box-shadow: inset 0 0 0 0.5px var(--separator);
@@ -337,16 +345,16 @@ button:focus {
 
 /* Today: an outline, so it reads at a glance without looking chosen. */
 .day.is-today .day-number {
-  box-shadow: inset 0 0 0 1.5px var(--accent);
-  color: var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--calendar);
+  color: var(--calendar);
   font-weight: 600;
 }
 
 /* The chosen day: filled. */
 .day.is-selected .day-number {
-  background: var(--accent);
+  background: var(--calendar);
   box-shadow: none;
-  color: var(--on-accent);
+  color: #fff;
   font-weight: 600;
 }
 
@@ -372,11 +380,11 @@ button:focus {
 }
 
 .day.is-today .day-mark {
-  background: var(--accent);
+  background: var(--calendar);
 }
 
 .day.is-selected .day-mark {
-  background: var(--on-accent);
+  background: #fff;
 }
 
 /* The selected day's events, as menu rows. */
@@ -520,7 +528,7 @@ button:focus {
   align-items: center;
   justify-content: space-between;
   width: calc(100% - 10px);
-  height: 22px;
+  height: 24px;
   margin: 0 5px;
   padding: 0 9px;
   border-radius: 6px;
