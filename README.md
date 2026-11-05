@@ -36,6 +36,18 @@ Right-click the menu bar item for Settings and Quit. **⌘,** opens Settings.
 record a chord for joining the next meeting. macOS may ask for Accessibility
 the first time a system-wide shortcut fires.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/countdown.png" alt="The menu bar item counting down to the next meeting: “• in 6m” after the calendar icon" width="110">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/events.png" alt="Settings → Events: the menu bar countdown, which events it counts, and the meeting reminder" width="420">
+  &nbsp;
+  <img src="docs/screenshots/about.png" alt="Settings → About: the app icon, name and version, Check for Updates, and links" width="420">
+</p>
+
 ## Install
 
 Download the disk image from
