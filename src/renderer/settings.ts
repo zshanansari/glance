@@ -172,7 +172,7 @@ function startSettings(api: DesktopApi): void {
   const beepPreview = requireElement<HTMLButtonElement>("beep-preview");
   const theme = requireElement<HTMLSelectElement>("theme");
   const dayHighlight = requireElement<HTMLSelectElement>("day-highlight");
-  const version = requireElement<HTMLParagraphElement>("version");
+  const version = requireElement<HTMLSpanElement>("version");
   const checkUpdates = requireElement<HTMLButtonElement>("check-updates");
   const updatePill = requireElement<HTMLButtonElement>("update-pill");
   const updatePillTitle = requireElement<HTMLElement>("update-pill-title");
@@ -731,9 +731,9 @@ function startSettings(api: DesktopApi): void {
     if (!settings.onboarded) showWelcome(settings);
   });
   void api.getAppVersion().then((value) => {
-    version.textContent = `Version ${value}`;
+    version.textContent = `v${value}`;
     const sidebarVersion = document.getElementById("sidebar-version");
-    if (sidebarVersion) sidebarVersion.textContent = `Version ${value}`;
+    if (sidebarVersion) sidebarVersion.textContent = `v${value}`;
   });
   api.onSettingsChanged(paint);
 }
