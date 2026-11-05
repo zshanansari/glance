@@ -14,23 +14,23 @@ function box(className: string, offsetHeight: number, children: Box[] = []): Box
   return { className, offsetHeight, scrollHeight: offsetHeight, children };
 }
 
-function measure(list: Box, frame = box("events-popover", 0)) {
+function measure(list: Box, frame = box("reminder", 0)) {
   vi.stubGlobal("getComputedStyle", (element: Box) => {
-    if (element.className.includes("events-popover")) {
+    if (element.className.includes("reminder")) {
       return { paddingTop: "8px", paddingBottom: "8px", marginTop: "0", marginBottom: "0" };
     }
     return { paddingTop: "0", paddingBottom: "0", marginTop: "0", marginBottom: "0" };
   });
   const root = {
     querySelector: (selector: string) => {
-      if (selector === ".events-popover") return frame;
+      if (selector === ".reminder") return frame;
       return null;
     },
   };
   return popoverHeight(list as unknown as HTMLElement, root as unknown as ParentNode);
 }
 
-describe("events popover height", () => {
+describe("reminder card height", () => {
   it("sizes from the rows, not the stretched list that already fills the window", () => {
     const rows = [box("section-label", 16), box("event", 24)];
     const list = box("list", 400, rows);

@@ -3,7 +3,7 @@
 A month calendar in the macOS menu bar. No account, no main window, and
 nothing leaves this Mac.
 
-Apple Silicon and Intel Macs on macOS 13 or newer.
+Apple Silicon Macs on macOS 13 or newer. Intel Macs can build it from source.
 
 <p align="center">
   <img src="docs/screenshots/menubar.png" alt="The month calendar open under its menu bar icon, with the selected day's events" width="300">
@@ -19,15 +19,17 @@ Apple Silicon and Intel Macs on macOS 13 or newer.
 - **Feels like part of macOS.** The popover opens and closes like a system
   menu, in the system font and colors, and follows light, dark and your
   accent. Settings is laid out like System Settings, with SF Symbols.
-- **What’s next.** An optional second menu bar item counts down to the next
-  calendar event or scheduled reminder, and opens a list of what’s coming.
+- **What’s next.** Optionally, the menu bar item counts down to the next
+  calendar event or scheduled reminder after the date, as in “• in 25m”.
+- **Never late to a call.** A minute before a meeting with a link starts, a
+  small card under the menu bar item offers Join, without taking focus.
 - **Your calendars, your lists.** Settings → Events chooses the look-ahead,
   which events qualify, when the countdown appears, and which calendars and
   reminder lists it reads.
 - **Stays on this Mac.** Calendar and Reminders are read locally. Nothing is
   uploaded, and Join only ever opens a link to a known meeting service.
 
-Right-click either menu bar item for Settings and Quit. **⌘,** opens Settings.
+Right-click the menu bar item for Settings and Quit. **⌘,** opens Settings.
 **⌃⌘K** shows or hides the calendar from any app, and Settings → General can
 record a chord for joining the next meeting. macOS may ask for Accessibility
 the first time a system-wide shortcut fires.

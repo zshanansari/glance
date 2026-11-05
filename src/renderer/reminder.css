@@ -1,7 +1,7 @@
 /*
- * Upcoming events popover, drawn as a status menu like the calendar: section
- * headers, 24pt rows inset from the edge, the accent highlight on hover, and
- * each event marked in its calendar's color. The palette is system.css.
+ * Meeting reminder card, drawn as a status menu like the calendar: a section
+ * header, 24pt rows inset from the edge, the accent highlight on hover, and
+ * the meeting marked in its calendar's color. The palette is system.css.
  */
 * {
   box-sizing: border-box;
@@ -18,7 +18,7 @@ body {
   cursor: default;
 }
 
-.events-popover {
+.reminder {
   display: flex;
   height: 100%;
   flex-direction: column;
@@ -29,13 +29,12 @@ body {
 }
 
 /* Liquid Glass shades and edges itself; a scrim only muddies it. */
-:root[data-material="glass"] .events-popover {
+:root[data-material="glass"] .reminder {
   background: transparent;
   box-shadow: none;
 }
 
-/* The list fills the window and scrolls only when a day is too long for the
-   screen; the window otherwise grows with its content. */
+/* The window takes the card's height, so the list never needs to scroll. */
 #list {
   min-height: 0;
   flex: 1 1 auto;
@@ -46,7 +45,7 @@ body {
   display: none;
 }
 
-/* A menu's section header; each after the first is set off by a separator. */
+/* A menu's section header. */
 .section-label {
   margin: 0;
   padding: 2px 14px 3px;
@@ -54,12 +53,6 @@ body {
   font-size: 11px;
   font-weight: 600;
   line-height: 14px;
-}
-
-.section-label:not(:first-child) {
-  margin: 5px 14px 0;
-  padding: 8px 0 3px;
-  border-top: 1px solid var(--separator);
 }
 
 .event,
@@ -159,7 +152,7 @@ body {
   flex-direction: column;
 }
 
-/* Join, location and dismiss sit under their event, indented past its mark. */
+/* Join and Dismiss sit under the meeting, indented past its mark. */
 .detail-row {
   padding-left: 21px;
 }
@@ -190,11 +183,4 @@ body {
 
 .detail-row.muted .label {
   color: var(--secondary);
-}
-
-.empty {
-  margin: 0;
-  padding: 3px 14px 4px;
-  color: var(--tertiary);
-  font-size: 13px;
 }

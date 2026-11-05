@@ -1,5 +1,5 @@
 /**
- * The events window is sized from its content, so every margin and padding
+ * The reminder window is sized from its content, so every margin and padding
  * around the list has to be counted or the list scrolls by exactly what was
  * missed. offsetHeight covers padding and border but never margins.
  */
@@ -28,7 +28,7 @@ function listContentHeight(list: HTMLElement): number {
 export function popoverHeight(list: HTMLElement, root: ParentNode = document): number {
   const content = listContentHeight(list);
   if (!content) return 0;
-  const frame = root.querySelector<HTMLElement>(".events-popover");
+  const frame = root.querySelector<HTMLElement>(".reminder");
   const style = frame ? getComputedStyle(frame) : null;
   const padding = style
     ? parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)

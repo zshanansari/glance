@@ -82,6 +82,20 @@ pub fn present(window: &tauri::WebviewWindow) {
     }
 }
 
+/// Puts a window on screen in front of the others without activating the
+/// app or making it key, for a card that should not take the keyboard from
+/// whatever the user is doing.
+pub fn present_inactive(window: &tauri::WebviewWindow) {
+    let Some(ns_window) = window_object(window) else {
+        let _ = window.show();
+        return;
+    };
+    unsafe {
+        let _: () = msg_send![ns_window, setAlphaValue: 1.0f64];
+        let _: () = msg_send![ns_window, orderFrontRegardless];
+    }
+}
+
 /// Gives a window an empty unified toolbar, as System Settings has. macOS 26
 /// draws windows with a toolbar at its larger corner radius, which the
 /// floating sidebar's corners are cut to match; with no items, the toolbar

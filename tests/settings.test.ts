@@ -148,11 +148,11 @@ describe("normalizeSettings", () => {
 
   it("shows every event and keeps the menu bar glyph-only by default", () => {
     const settings = normalizeSettings({});
-    expect(settings.includeAllDayEvents).toBe(true);
     expect(settings.includeEventsWithoutParticipants).toBe(true);
     expect(settings.includeEventsWithoutLocation).toBe(true);
     expect(settings.showEventTitleInMenuBar).toBe(false);
     expect(settings.showEventTimeInMenuBar).toBe(false);
+    expect(settings.remindBeforeMeetings).toBe(true);
   });
 
   it("binds the calendar to a chord and leaves join unset", () => {

@@ -12,10 +12,9 @@ export type DesktopApi = {
   setTrayLabel: (
     title: string | null,
     iconDay: number | null,
-    style: AppSettings["menuBarIcon"] | "timer",
+    style: AppSettings["menuBarIcon"],
     image: number[] | null,
   ) => Promise<void>;
-  setEventTrayLabel: (title: string | null, image: number[] | null, visible: boolean) => Promise<void>;
   beep: () => Promise<void>;
   getUpcomingEvent: () => Promise<UpcomingEvent | null>;
   getCalendarEvents: (startAt: number, endAt: number) => Promise<UpcomingEvent[]>;
@@ -43,10 +42,11 @@ export type DesktopApi = {
     listener: (progress: { downloaded: number; total: number | null }) => void,
   ) => () => void;
   hideCalendar: () => Promise<void>;
-  hideEvents: () => Promise<void>;
+  showReminder: () => Promise<boolean>;
+  hideReminder: () => Promise<void>;
   hideSettings: () => Promise<void>;
   getSidebarSize: () => Promise<"small" | "medium" | "large">;
-  setEventsHeight: (height: number) => Promise<void>;
+  setReminderHeight: (height: number) => Promise<void>;
   setCalendarHeight: (height: number) => Promise<void>;
   getPopoverMaterial: () => Promise<string>;
   setCalendarPinned: (pinned: boolean) => Promise<void>;
@@ -54,7 +54,6 @@ export type DesktopApi = {
   getAppVersion: () => Promise<string>;
   onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void;
   onCalendarShown: (listener: () => void) => () => void;
-  onEventsShown: (listener: () => void) => () => void;
   onCalendarHidden: (listener: () => void) => () => void;
   onClockTick: (listener: () => void) => () => void;
   onEventDismissed: (listener: () => void) => () => void;
@@ -82,8 +81,6 @@ export const api: DesktopApi = {
   updateSettings: (patch) => invoke<AppSettings>("update_settings", { patch }),
   setTrayLabel: (title, iconDay, style, image) =>
     invoke<void>("set_tray_label", { title, iconDay, style, image }),
-  setEventTrayLabel: (title, image, visible) =>
-    invoke<void>("set_event_tray_label", { title, image, visible }),
   beep: () => invoke<void>("beep"),
   getUpcomingEvent: () => invoke<UpcomingEvent | null>("get_upcoming_event"),
   getCalendarEvents: (startAt, endAt) =>
@@ -113,10 +110,11 @@ export const api: DesktopApi = {
       listener,
     ),
   hideCalendar: () => invoke<void>("hide_calendar"),
-  hideEvents: () => invoke<void>("hide_events"),
+  showReminder: () => invoke<boolean>("show_reminder"),
+  hideReminder: () => invoke<void>("hide_reminder"),
   hideSettings: () => invoke<void>("hide_settings"),
   getSidebarSize: () => invoke<"small" | "medium" | "large">("sidebar_size"),
-  setEventsHeight: (height) => invoke<void>("set_events_height", { height }),
+  setReminderHeight: (height) => invoke<void>("set_reminder_height", { height }),
   setCalendarHeight: (height) => invoke<void>("set_calendar_height", { height }),
   getPopoverMaterial: () => invoke<string>("popover_material"),
   setCalendarPinned: (pinned) => invoke<void>("set_calendar_pinned", { pinned }),
@@ -124,7 +122,6 @@ export const api: DesktopApi = {
   getAppVersion: () => invoke<string>("app_version"),
   onSettingsChanged: (listener) => subscribe<AppSettings>("settings-changed", listener),
   onCalendarShown: (listener) => subscribe<void>("calendar-shown", listener),
-  onEventsShown: (listener) => subscribe<void>("events-shown", listener),
   onCalendarHidden: (listener) => subscribe<void>("calendar-hidden", listener),
   onClockTick: (listener) => subscribe<void>("clock-tick", listener),
   onEventDismissed: (listener) => subscribe<void>("event-dismissed", listener),

@@ -10,9 +10,9 @@ import {
   trayEventText,
   trayIconEvent,
   upcomingFetchEnd,
-  upcomingHorizonEmpty,
   upcomingHorizonEnd,
-  visibleUpcomingEvents,
+  reminderEvent,
+  reminderStillDue,
   type EventFilters,
   type UpcomingEvent,
   eventsOnDay,
@@ -36,7 +36,6 @@ const event: UpcomingEvent = {
 
 /** Every include switch on, so a test says which one it is exercising. */
 const included: EventFilters = {
-  includeAllDayEvents: true,
   includeEventsWithoutParticipants: true,
   includeEventsWithoutLocation: true,
 };
@@ -129,15 +128,6 @@ describe("upcoming look-ahead", () => {
     ).toBe(false);
   });
 
-  it("names the empty list from the window", () => {
-    expect(upcomingHorizonEmpty(1)).toBe("Nothing in the rest of today.");
-    expect(upcomingHorizonEmpty(2)).toBe("Nothing in the next two days.");
-    expect(upcomingHorizonEmpty(4)).toBe("Nothing in the next 4 days.");
-    expect(upcomingHorizonEmpty(7)).toBe("Nothing in the next week.");
-    expect(upcomingHorizonEmpty(14)).toBe("Nothing in the next two weeks.");
-    expect(upcomingHorizonEmpty(30)).toBe("Nothing in the next month.");
-  });
-
   it("treats one day as through midnight tonight", () => {
     const late = new Date(2026, 8, 9, 22, 0).getTime();
     const boundary = new Date(upcomingHorizonEnd(late, 1));
@@ -200,16 +190,6 @@ describe("include filters", () => {
     expect(eventPassesFilters(declined, included)).toBe(false);
   });
 
-  it("hides all-day items unless they are included", () => {
-    expect(eventPassesFilters(birthday, included)).toBe(true);
-    expect(
-      eventPassesFilters(birthday, { ...included, includeAllDayEvents: false }),
-    ).toBe(false);
-    expect(
-      eventPassesFilters(event, { ...included, includeAllDayEvents: false }),
-    ).toBe(true);
-  });
-
   it("hides a solo block when participants are required", () => {
     const filters = { ...included, includeEventsWithoutParticipants: false };
     expect(eventPassesFilters(solo, filters)).toBe(false);
@@ -225,21 +205,8 @@ describe("include filters", () => {
     ).toBe(true);
   });
 
-  it("keeps the popover list to events inside the window and past the filters", () => {
-    const soon = {
-      ...solo,
-      startAt: new Date(2026, 8, 9, 11, 0).getTime(),
-      endAt: new Date(2026, 8, 9, 11, 30).getTime(),
-    };
-    const list = visibleUpcomingEvents([soon, zoom], now, 1, {
-      ...included,
-      includeEventsWithoutParticipants: false,
-    });
-    expect(list).toEqual([zoom]);
-  });
-
-  it("filters the menu bar candidate before the lead is considered", () => {
-    const filters = { ...included, includeAllDayEvents: false };
+  it("never counts down an all-day item, even one under way", () => {
+    const filters = included;
     const birthdayNow = {
       ...birthday,
       startAt: new Date(2026, 8, 9, 0, 0).getTime(),
@@ -324,10 +291,6 @@ describe("events icon lead", () => {
     };
     expect(trayIconEvent([reminder, event], now, options)).toBe(event);
     expect(trayIconEvent([reminder], now, options)).toBeNull();
-    expect(visibleUpcomingEvents([reminder, event], now, 1, included)).toEqual([
-      reminder,
-      event,
-    ]);
   });
 
   it("counts down the next qualifying event after one is dismissed", () => {
@@ -432,5 +395,44 @@ describe("eventsOnDay", () => {
       "early",
       "late",
     ]);
+  });
+});
+
+describe("meeting reminder", () => {
+  const start = Date.UTC(2026, 8, 9, 10, 0);
+  const call = {
+    ...event,
+    id: "call",
+    startAt: start,
+    endAt: start + 30 * 60_000,
+    joinUrl: "https://zoom.us/j/1",
+  };
+  // The clock ticks just past each minute.
+  const tickBefore = start - 60_000 + 40;
+
+  it("offers a meeting with a link on the tick a minute before it starts", () => {
+    expect(reminderEvent([call], tickBefore)).toBe(call);
+    expect(reminderEvent([call], start - 2 * 60_000 + 40)).toBeNull();
+    expect(reminderEvent([call], start)).toBeNull();
+  });
+
+  it("skips calls with no link, all-day items, declines and dismissals", () => {
+    expect(reminderEvent([{ ...call, joinUrl: null }], tickBefore)).toBeNull();
+    expect(reminderEvent([{ ...call, allDay: true }], tickBefore)).toBeNull();
+    expect(reminderEvent([{ ...call, response: "declined" as const }], tickBefore)).toBeNull();
+    expect(
+      reminderEvent([call], tickBefore, [{ id: call.id, endAt: call.endAt }]),
+    ).toBeNull();
+  });
+
+  it("picks the earliest of two calls starting together", () => {
+    const sooner = { ...call, id: "sooner", startAt: start - 30_000 };
+    expect(reminderEvent([call, sooner], tickBefore)).toBe(sooner);
+  });
+
+  it("stays for the first minutes of the meeting, never past its end", () => {
+    expect(reminderStillDue(call, start + 4 * 60_000)).toBe(true);
+    expect(reminderStillDue(call, start + 5 * 60_000)).toBe(false);
+    expect(reminderStillDue({ ...call, endAt: start + 2 * 60_000 }, start + 3 * 60_000)).toBe(false);
   });
 });

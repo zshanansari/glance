@@ -17,7 +17,7 @@ import {
   type UpcomingEvent,
 } from "../shared/events";
 import { sfSymbol } from "./icons";
-import { eventGlyphPng, framedGlyphPng } from "./tray-frame";
+import { framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
 import { bandBox } from "./column-bands";
 import { installTauriBridge, type DesktopApi } from "./host";
@@ -102,7 +102,6 @@ function startCalendar(api: DesktopApi): void {
   // chevrons must not reuse that ring on a spillover cell like "today, 10".
   let pinnedOutsideIso: string | null = null;
   let lastTrayLabel = "";
-  let lastEventTrayLabel = "";
   let lastHour = new Date().getHours();
   let upcomingEvent: UpcomingEvent | null = null;
   let calendarEvents: UpcomingEvent[] = [];
@@ -306,29 +305,24 @@ function startCalendar(api: DesktopApi): void {
       : "";
     // The status item carries the real pressed highlight now, so the title
     // stays as it reads when the popover is closed.
-    const title = label.style === "framed" ? "" : label.text ?? "";
-    const trayStyle = label.style;
-    const signature = trayLabelKey(label);
+    const dateTitle = label.style === "framed" ? "" : label.text ?? "";
     // A hair space keeps "2h 21m" from reading as one long number without
     // opening the full word space the menu bar font would otherwise give it.
-    const glyphText = status ? status.replace(/(\d+)([hm])/g, "$1\u200a$2") : null;
-    // Title and time ride beside the glyph as native text, never instead of it.
-    const previewText =
-      glyphText && upcomingEvent
+    const countdown = status ? status.replace(/(\d+)([hm])/g, "$1\u200a$2") : null;
+    // The countdown follows the date after a bullet, with the event's time
+    // and title after it when Settings asks for them.
+    const eventText =
+      countdown && upcomingEvent
         ? trayEventText(upcomingEvent, now.getTime(), {
             showTitle: settings.showEventTitleInMenuBar,
             showTime: settings.showEventTimeInMenuBar,
           })
         : null;
-    const eventSignature = `${glyphText ?? ""}|${previewText ?? ""}|${Boolean(glyphText)}`;
-    if (eventSignature !== lastEventTrayLabel) {
-      lastEventTrayLabel = eventSignature;
-      void api.setEventTrayLabel(
-        previewText,
-        glyphText ? eventGlyphPng(glyphText) : null,
-        Boolean(glyphText),
-      );
-    }
+    const title = [dateTitle, countdown && `\u2022 ${countdown}`, eventText]
+      .filter(Boolean)
+      .join(" ");
+    const trayStyle = label.style;
+    const signature = `${trayLabelKey(label)}|${title}`;
     if (signature === lastTrayLabel) return;
     lastTrayLabel = signature;
     // The cutout style draws its date into the glyph instead of the title.

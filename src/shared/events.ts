@@ -57,7 +57,7 @@ export function endOfTomorrow(now = new Date()): number {
   return endOfDay(now.getTime(), 2);
 }
 
-/** When the event-list look-ahead ends. */
+/** When the countdown's look-ahead ends. */
 export function upcomingHorizonEnd(now: number, days: number): number {
   return endOfDay(now, days);
 }
@@ -76,48 +76,33 @@ export function eventInUpcomingHorizon(
   return event.startAt <= upcomingHorizonEnd(now, days);
 }
 
-/** The include-events switches, as the popover and the tray picker read them. */
+/** The include-events switches the countdown reads. */
 export type EventFilters = Pick<
   AppSettings,
-  | "includeAllDayEvents"
   | "includeEventsWithoutParticipants"
   | "includeEventsWithoutLocation"
 >;
 
 export type FilterableEvent = Pick<
   UpcomingEvent,
-  "allDay" | "hasParticipants" | "location" | "joinUrl" | "response"
+  "hasParticipants" | "location" | "joinUrl" | "response"
 >;
 
 /**
  * Whether an event survives the include filters. Declined invitations are a
- * hard rule rather than a switch: they never reach the list or the menu bar.
+ * hard rule rather than a switch: they never reach the menu bar.
  */
 export function eventPassesFilters(
   event: FilterableEvent,
   filters: EventFilters,
 ): boolean {
   if (event.response === "declined") return false;
-  if (event.allDay && !filters.includeAllDayEvents) return false;
   if (!event.hasParticipants && !filters.includeEventsWithoutParticipants) {
     return false;
   }
   const placed = Boolean(event.joinUrl) || Boolean(event.location);
   if (!placed && !filters.includeEventsWithoutLocation) return false;
   return true;
-}
-
-/** The popover list: inside the window, past the filters, in start order. */
-export function visibleUpcomingEvents(
-  events: readonly UpcomingEvent[],
-  now: number,
-  days: number,
-  filters: EventFilters,
-): UpcomingEvent[] {
-  return events.filter(
-    (event) =>
-      eventInUpcomingHorizon(event, now, days) && eventPassesFilters(event, filters),
-  );
 }
 
 const MINUTE_MS = 60_000;
@@ -177,7 +162,7 @@ export function eventQualifiesForIcon(
 /**
  * The include filters decide the candidates; the lead decides when to show.
  * All-day items never count down, whatever the filters say: a birthday would
- * hold the icon at "now" all day. They stay in the popover list instead.
+ * hold the countdown at "now" all day.
  */
 export function trayIconEvent(
   events: readonly UpcomingEvent[],
@@ -206,15 +191,6 @@ export function trayIconEvent(
     }
   }
   return null;
-}
-
-export function upcomingHorizonEmpty(days: number): string {
-  if (days === 1) return "Nothing in the rest of today.";
-  if (days === 2) return "Nothing in the next two days.";
-  if (days === 7) return "Nothing in the next week.";
-  if (days === 14) return "Nothing in the next two weeks.";
-  if (days === 30) return "Nothing in the next month.";
-  return `Nothing in the next ${days} days.`;
 }
 
 export type EventTiming = "upcoming" | "ongoing";
@@ -311,4 +287,41 @@ export function eventTimeRange(
   return `${format.format(new Date(event.startAt))} – ${format.format(
     new Date(event.endAt),
   )}`;
+}
+
+/**
+ * How long before a meeting the reminder card appears. The clock ticks just
+ * past each minute, so one minute out lands on the tick before the start; the
+ * slack keeps a tick that runs a little late from missing it.
+ */
+export const REMINDER_LEAD_MS = 61_000;
+/** How long the card stays once the meeting has started, if left alone. */
+export const REMINDER_LINGER_MS = 5 * MINUTE_MS;
+
+/**
+ * The meeting to remind about now: timed, with a join link, not declined or
+ * dismissed, and starting within the lead. The earliest start wins.
+ */
+export function reminderEvent(
+  events: readonly UpcomingEvent[],
+  now: number,
+  dismissed: readonly DismissedOccurrence[] = [],
+): UpcomingEvent | null {
+  let best: UpcomingEvent | null = null;
+  for (const event of events) {
+    if (event.allDay || !event.joinUrl || event.response === "declined") continue;
+    if (occurrenceIsDismissed(event, dismissed, now)) continue;
+    const until = event.startAt - now;
+    if (until <= 0 || until > REMINDER_LEAD_MS) continue;
+    if (!best || event.startAt < best.startAt) best = event;
+  }
+  return best;
+}
+
+/** Whether a reminder shown for this meeting should still be on screen. */
+export function reminderStillDue(
+  event: Pick<UpcomingEvent, "startAt" | "endAt">,
+  now: number,
+): boolean {
+  return now < Math.min(event.startAt + REMINDER_LINGER_MS, event.endAt);
 }

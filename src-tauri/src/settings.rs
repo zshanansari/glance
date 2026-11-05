@@ -44,19 +44,20 @@ pub struct AppSettings {
     pub launch_at_login: bool,
     pub beep_on_the_hour: bool,
     pub show_upcoming_event: bool,
-    /// Days of look-ahead for the list, counted through local midnight.
+    /// Days the countdown looks ahead, counted through local midnight.
     pub upcoming_horizon_days: u16,
     /// Read only so files from before the day window can be migrated.
     #[allow(dead_code)]
     #[serde(default, skip_serializing)]
     pub upcoming_horizon_hours: u8,
-    /// 0 follows the list window; 1 holds the item back until the event starts.
+    /// 0 follows the look-ahead; 1 holds the countdown back until the event starts.
     pub upcoming_icon_lead_minutes: u16,
-    pub include_all_day_events: bool,
     pub include_events_without_participants: bool,
     pub include_events_without_location: bool,
     pub show_event_title_in_menu_bar: bool,
     pub show_event_time_in_menu_bar: bool,
+    /// A card with Join under the menu bar a minute before a meeting starts.
+    pub remind_before_meetings: bool,
     pub toggle_calendar_shortcut: String,
     pub join_meeting_shortcut: String,
     pub hidden_calendar_ids: Vec<String>,
@@ -86,11 +87,11 @@ impl Default for AppSettings {
             upcoming_horizon_days: 1,
             upcoming_horizon_hours: 0,
             upcoming_icon_lead_minutes: 0,
-            include_all_day_events: true,
             include_events_without_participants: true,
             include_events_without_location: true,
             show_event_title_in_menu_bar: false,
             show_event_time_in_menu_bar: false,
+            remind_before_meetings: true,
             toggle_calendar_shortcut: "Control+Command+K".into(),
             join_meeting_shortcut: String::new(),
             hidden_calendar_ids: Vec::new(),
@@ -426,7 +427,7 @@ mod tests {
     #[test]
     fn defaults_the_include_filters_and_the_menu_bar_preview() {
         let settings = AppSettings::default();
-        assert!(settings.include_all_day_events);
+        assert!(settings.remind_before_meetings);
         assert!(settings.include_events_without_participants);
         assert!(settings.include_events_without_location);
         assert!(!settings.show_event_title_in_menu_bar);
@@ -482,7 +483,7 @@ mod tests {
         assert!(body.contains("\"beepOnTheHour\""));
         assert!(body.contains("\"showUpcomingEvent\""));
         assert!(body.contains("\"upcomingHorizonDays\""));
-        assert!(body.contains("\"includeAllDayEvents\""));
+        assert!(body.contains("\"remindBeforeMeetings\""));
         assert!(body.contains("\"showEventTitleInMenuBar\""));
         assert!(body.contains("\"toggleCalendarShortcut\""));
         assert!(!body.contains("upcomingHorizonHours"));

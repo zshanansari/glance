@@ -1,9 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "events",
-  "description": "The upcoming events popover: reads events, sizes itself, opens or dismisses an event, and joins a meeting.",
+  "identifier": "reminder",
+  "description": "The meeting reminder card: reads settings and events, shows, sizes and hides itself, dismisses or opens the meeting, and joins it.",
   "windows": [
-    "events"
+    "reminder"
   ],
   "permissions": [
     "core:event:default",
@@ -12,8 +12,9 @@
     "allow-get-dismissed-events",
     "allow-dismiss-upcoming-event",
     "allow-popover-material",
-    "allow-hide-events",
-    "allow-set-events-height",
+    "allow-show-reminder",
+    "allow-hide-reminder",
+    "allow-set-reminder-height",
     "allow-open-event",
     "allow-join-meeting"
   ]

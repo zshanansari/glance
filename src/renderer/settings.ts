@@ -143,7 +143,7 @@ function startSettings(api: DesktopApi): void {
   const showUpcoming = requireElement<HTMLInputElement>("show-upcoming");
   const upcomingHorizon = requireElement<HTMLSelectElement>("upcoming-horizon");
   const upcomingIconLead = requireElement<HTMLSelectElement>("upcoming-icon-lead");
-  const includeAllDay = requireElement<HTMLInputElement>("include-all-day");
+  const remindBeforeMeetings = requireElement<HTMLInputElement>("remind-before-meetings");
   const includeWithoutParticipants = requireElement<HTMLInputElement>(
     "include-without-participants",
   );
@@ -241,7 +241,6 @@ function startSettings(api: DesktopApi): void {
 
   const upcomingControls = (): (HTMLSelectElement | HTMLInputElement)[] => [
     upcomingHorizon,
-    includeAllDay,
     includeWithoutParticipants,
     includeWithoutLocation,
     upcomingIconLead,
@@ -443,7 +442,7 @@ function startSettings(api: DesktopApi): void {
     showUpcoming.checked = settings.showUpcomingEvent;
     upcomingHorizon.value = String(settings.upcomingHorizonDays);
     upcomingIconLead.value = String(settings.upcomingIconLeadMinutes);
-    includeAllDay.checked = settings.includeAllDayEvents;
+    remindBeforeMeetings.checked = settings.remindBeforeMeetings;
     includeWithoutParticipants.checked = settings.includeEventsWithoutParticipants;
     includeWithoutLocation.checked = settings.includeEventsWithoutLocation;
     showEventTitle.checked = settings.showEventTitleInMenuBar;
@@ -469,7 +468,7 @@ function startSettings(api: DesktopApi): void {
     showUpcomingEvent: showUpcoming.checked,
     upcomingHorizonDays: Number(upcomingHorizon.value) as UpcomingHorizonDays,
     upcomingIconLeadMinutes: Number(upcomingIconLead.value) as UpcomingIconLeadMinutes,
-    includeAllDayEvents: includeAllDay.checked,
+    remindBeforeMeetings: remindBeforeMeetings.checked,
     includeEventsWithoutParticipants: includeWithoutParticipants.checked,
     includeEventsWithoutLocation: includeWithoutLocation.checked,
     showEventTitleInMenuBar: showEventTitle.checked,

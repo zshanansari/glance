@@ -306,28 +306,16 @@
               <div class="row">
                 <div class="copy">
                   <label for="show-upcoming">Show upcoming in menu bar</label>
-                  <p>Events and reminders share one list.</p>
+                  <p>Counts down to the next event or reminder, after the date.</p>
                 </div>
                 <input id="show-upcoming" name="showUpcomingEvent" type="checkbox" switch />
               </div>
               <div class="row" id="upcoming-horizon-row">
                 <div class="copy">
                   <label for="upcoming-horizon">Show events for</label>
-                  <p>How far ahead the list looks.</p>
+                  <p>How far ahead the countdown looks.</p>
                 </div>
                 <select id="upcoming-horizon" name="upcomingHorizonDays"></select>
-              </div>
-              <div class="row" id="include-all-day-row">
-                <div class="copy">
-                  <label for="include-all-day">All-day events</label>
-                  <p>Birthdays and other untimed items. Listed, never counted down.</p>
-                </div>
-                <input
-                  id="include-all-day"
-                  name="includeAllDayEvents"
-                  type="checkbox"
-                  switch
-                />
               </div>
               <div class="row" id="include-without-participants-row">
                 <div class="copy">
@@ -361,7 +349,7 @@
               <div class="row" id="upcoming-icon-lead-row">
                 <div class="copy">
                   <label for="upcoming-icon-lead">Show upcoming events</label>
-                  <p>When the events item joins the menu bar.</p>
+                  <p>When the countdown joins the date.</p>
                 </div>
                 <select id="upcoming-icon-lead" name="upcomingIconLeadMinutes"></select>
               </div>
@@ -385,6 +373,23 @@
                 <input
                   id="show-event-title"
                   name="showEventTitleInMenuBar"
+                  type="checkbox"
+                  switch
+                />
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            <h2 id="reminder-heading">Meeting reminder</h2>
+            <div class="card">
+              <div class="row">
+                <div class="copy">
+                  <label for="remind-before-meetings">Remind before meetings</label>
+                  <p>A card with Join under the menu bar a minute before a call starts.</p>
+                </div>
+                <input
+                  id="remind-before-meetings"
+                  name="remindBeforeMeetings"
                   type="checkbox"
                   switch
                 />

@@ -26,19 +26,17 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 const CALENDAR_LABEL: &str = "calendar";
-const EVENTS_LABEL: &str = "events";
-const EVENTS_WIDTH: f64 = 300.0;
-/// Only a floor against a degenerate window: the popover takes the height its
-/// content asks for, with no minimum of its own.
-const EVENTS_FLOOR: f64 = 40.0;
-/// Share of the screen the popover may fill before its list scrolls. Keeping
-/// this under 1.0 leaves the whole popover on the display.
-const EVENTS_SCREEN_SHARE: f64 = 0.9;
-/** Stands in when the monitor cannot be read. */
-const EVENTS_FALLBACK_SCREEN: f64 = 800.0;
+/// The meeting reminder: a small card under the status item, shown about a
+/// minute before a meeting with a join link starts.
+const REMINDER_LABEL: &str = "reminder";
+const REMINDER_WIDTH: f64 = 280.0;
+/// Only a floor against a degenerate window: the card takes the height its
+/// content asks for.
+const REMINDER_FLOOR: f64 = 40.0;
+/// The card holds one meeting, so it never needs more than this.
+const REMINDER_CEILING: f64 = 240.0;
 const SETTINGS_LABEL: &str = "settings";
 const TRAY_ID: &str = "glance";
-const EVENT_TRAY_ID: &str = "glance-event";
 const AUTOSTART_ARG: &str = "--autostart";
 const CALENDAR_WIDTH: f64 = 264.0;
 const CALENDAR_WIDTH_WEEKS: f64 = 288.0;
@@ -92,18 +90,14 @@ struct AppState {
     settings: Mutex<SettingsStore>,
     ignore_calendar_blur: AtomicBool,
     calendar_pinned: AtomicBool,
-    /// Height of the display the events popover was last placed on, since a
-    /// hidden window reports whichever screen it happens to rest on.
-    events_screen_height: Mutex<f64>,
     /// When blur last closed the calendar. A click on the tray icon arrives
     /// just after the blur it caused, and without this the toggle would read
     /// the popover as closed and open it straight back up.
     calendar_closed_at: Mutex<Option<Instant>>,
-    events_closed_at: Mutex<Option<Instant>>,
     /// Counts each fade, so the hide that follows one belongs to it. Reopening
     /// mid-fade bumps the count and the pending hide stands down.
     calendar_fade: AtomicU64,
-    events_fade: AtomicU64,
+    reminder_fade: AtomicU64,
     dismissed_events: Mutex<Vec<events::DismissedOccurrence>>,
     /// The chords currently registered with the system, so a failed rebind
     /// can leave the working one in place. Held only to read or write the
@@ -207,15 +201,7 @@ fn fade_counter<'a>(state: &'a AppState, label: &str) -> &'a AtomicU64 {
     if label == CALENDAR_LABEL {
         &state.calendar_fade
     } else {
-        &state.events_fade
-    }
-}
-
-fn closed_at<'a>(state: &'a AppState, label: &str) -> &'a Mutex<Option<Instant>> {
-    if label == CALENDAR_LABEL {
-        &state.calendar_closed_at
-    } else {
-        &state.events_closed_at
+        &state.reminder_fade
     }
 }
 
@@ -261,17 +247,13 @@ fn close_calendar(app: &AppHandle) {
     hold_native_highlight(app, TRAY_ID, false);
     fade_out_and_hide(app, CALENDAR_LABEL);
     let _ = app.emit("calendar-hidden", ());
-    if let Ok(mut closed) = closed_at(&app.state::<AppState>(), CALENDAR_LABEL).lock() {
+    if let Ok(mut closed) = app.state::<AppState>().calendar_closed_at.lock() {
         *closed = Some(Instant::now());
     }
 }
 
-fn close_events(app: &AppHandle) {
-    hold_native_highlight(app, EVENT_TRAY_ID, false);
-    fade_out_and_hide(app, EVENTS_LABEL);
-    if let Ok(mut closed) = closed_at(&app.state::<AppState>(), EVENTS_LABEL).lock() {
-        *closed = Some(Instant::now());
-    }
+fn close_reminder(app: &AppHandle) {
+    fade_out_and_hide(app, REMINDER_LABEL);
 }
 
 /// Clears AppKit's pressed look on the status item when its popover closes.
@@ -373,16 +355,6 @@ type TrayMenuShare = Arc<Mutex<Option<TrayMenu>>>;
 /// so the overlay never sees the click and the Settings/Quit menu opens
 /// instead of the popover. Keep the menu off the item except while a
 /// right-click presents it. See tauri-apps/tray-icon#355.
-#[cfg(target_os = "macos")]
-fn unbind_status_item_menu(tray: &tauri::tray::TrayIcon) {
-    let _ = tray.with_inner_tray_icon(|inner| {
-        inner.set_show_menu_on_right_click(false);
-        if let Some(item) = inner.ns_status_item() {
-            item.setMenu(None);
-        }
-    });
-}
-
 #[cfg(target_os = "macos")]
 fn remember_status_item_menu(tray: &tauri::tray::TrayIcon, share: &TrayMenuShare) {
     use objc2_foundation::MainThreadMarker;
@@ -720,24 +692,22 @@ fn position_calendar(app: &AppHandle, tray_rect: tauri::Rect) {
     let _ = window.set_position(Position::Logical(LogicalPosition::new(x, y)));
 }
 
-fn position_events(app: &AppHandle, tray_rect: tauri::Rect) {
-    let Some(window) = app.get_webview_window(EVENTS_LABEL) else {
+fn position_reminder(app: &AppHandle, tray_rect: tauri::Rect) {
+    let Some(window) = app.get_webview_window(REMINDER_LABEL) else {
         return;
     };
     let scale = window.scale_factor().unwrap_or(1.0);
     let height = window
         .inner_size()
         .map(|size| size.to_logical::<f64>(scale).height)
-        .unwrap_or(EVENTS_FLOOR);
-    let (x, y, screen) = place_under_tray(&window, tray_rect, EVENTS_WIDTH, height);
-    if let Ok(mut recorded) = app.state::<AppState>().events_screen_height.lock() {
-        *recorded = screen.height;
-    }
+        .unwrap_or(REMINDER_FLOOR);
+    let (x, y, _screen) = place_under_tray(&window, tray_rect, REMINDER_WIDTH, height);
     let _ = window.set_position(Position::Logical(LogicalPosition::new(x, y)));
 }
 
 fn show_calendar(app: &AppHandle, tray_rect: tauri::Rect) {
-    close_events(app);
+    // The month lists the same meeting with its Join, so the card steps aside.
+    close_reminder(app);
     cancel_fade(app, CALENDAR_LABEL);
     position_calendar(app, tray_rect);
     if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
@@ -769,33 +739,6 @@ fn toggle_calendar(app: &AppHandle, tray_rect: tauri::Rect) {
         return;
     }
     show_calendar(app, tray_rect);
-}
-
-fn show_events(app: &AppHandle, tray_rect: tauri::Rect) {
-    close_calendar(app);
-    cancel_fade(app, EVENTS_LABEL);
-    position_events(app, tray_rect);
-    let Some(window) = app.get_webview_window(EVENTS_LABEL) else {
-        return;
-    };
-    glass::present(&window);
-    let _ = window.emit("events-shown", ());
-}
-
-fn toggle_events(app: &AppHandle, tray_rect: tauri::Rect) {
-    let visible = app
-        .get_webview_window(EVENTS_LABEL)
-        .and_then(|window| window.is_visible().ok())
-        .unwrap_or(false);
-    let just_closed = closed_at(&app.state::<AppState>(), EVENTS_LABEL)
-        .lock()
-        .map(|closed| closed.is_some_and(|at| at.elapsed() < REOPEN_GUARD))
-        .unwrap_or(false);
-    if visible {
-        close_events(app);
-    } else if !just_closed {
-        show_events(app, tray_rect);
-    }
 }
 
 /// The status item's frame, which a shortcut has no click to carry.
@@ -959,7 +902,6 @@ fn apply_shortcuts(app: &AppHandle, settings: &AppSettings) {
 
 fn present_settings(app: &AppHandle) {
     close_calendar(app);
-    close_events(app);
     let _ = app.set_activation_policy(ActivationPolicy::Regular);
     if let Some(window) = app.get_webview_window(SETTINGS_LABEL) {
         let _ = window.unminimize();
@@ -1049,28 +991,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .build(app)?;
     #[cfg(target_os = "macos")]
     remember_status_item_menu(&calendar, &status_menu);
-    let event_tray = TrayIconBuilder::with_id(EVENT_TRAY_ID)
-        .tooltip("Upcoming event")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| handle_menu_action(app, event.id().as_ref()))
-        .on_tray_icon_event({
-            #[cfg(target_os = "macos")]
-            let status_menu = status_menu.clone();
-            move |tray, event| {
-                handle_tray_click(
-                    tray,
-                    event,
-                    #[cfg(target_os = "macos")]
-                    &status_menu,
-                    toggle_events,
-                );
-            }
-        })
-        .build(app)?;
-    #[cfg(target_os = "macos")]
-    remember_status_item_menu(&event_tray, &status_menu);
-    let _ = event_tray.set_visible(false);
     Ok(())
 }
 
@@ -1124,11 +1044,14 @@ fn build_calendar_window(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn build_events_window(app: &AppHandle) -> tauri::Result<()> {
+/// The reminder card never takes focus when it appears, so whatever the user
+/// is typing keeps going; it leaves on Join, Dismiss, or once the meeting
+/// is under way, not on the next click elsewhere.
+fn build_reminder_window(app: &AppHandle) -> tauri::Result<()> {
     let window =
-        WebviewWindowBuilder::new(app, EVENTS_LABEL, WebviewUrl::App("events.html".into()))
-            .title("Upcoming Events")
-            .inner_size(EVENTS_WIDTH, EVENTS_FLOOR)
+        WebviewWindowBuilder::new(app, REMINDER_LABEL, WebviewUrl::App("reminder.html".into()))
+            .title("Meeting Reminder")
+            .inner_size(REMINDER_WIDTH, REMINDER_FLOOR)
             .decorations(false)
             .transparent(true)
             .shadow(true)
@@ -1142,13 +1065,11 @@ fn build_events_window(app: &AppHandle) -> tauri::Result<()> {
             .build()?;
     glass::apply_calendar_glass(&window);
     let handle = app.clone();
-    window.on_window_event(move |event| match event {
-        WindowEvent::Focused(false) => close_events(&handle),
-        WindowEvent::CloseRequested { api, .. } => {
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
             api.prevent_close();
-            close_events(&handle);
+            close_reminder(&handle);
         }
-        _ => {}
     });
     Ok(())
 }
@@ -1269,9 +1190,6 @@ fn watch_outside_clicks(app: AppHandle) {
         if visible(CALENDAR_LABEL) && !state.calendar_pinned.load(Ordering::SeqCst) {
             close_calendar(&app);
         }
-        if visible(EVENTS_LABEL) {
-            close_events(&app);
-        }
     });
     let mask = NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown | NSEventMask::OtherMouseDown;
     let monitor = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &block);
@@ -1300,7 +1218,7 @@ fn keep_highlight_while_open(app: AppHandle) {
     let block = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
         let passthrough = event.as_ptr();
         let number = unsafe { event.as_ref() }.windowNumber();
-        for (id, label) in [(TRAY_ID, CALENDAR_LABEL), (EVENT_TRAY_ID, EVENTS_LABEL)] {
+        for (id, label) in [(TRAY_ID, CALENDAR_LABEL)] {
             let open = app
                 .get_webview_window(label)
                 .and_then(|window| window.is_visible().ok())
@@ -1414,7 +1332,6 @@ fn set_tray_label(
         let bytes: Option<&[u8]> = match style.as_str() {
             "none" => None,
             "framed" => image.as_deref(),
-            "timer" => image.as_deref(),
             "calendar" => Some(TRAY_CALENDAR),
             _ => icon_day
                 .filter(|day| (1..=31).contains(day))
@@ -1544,37 +1461,6 @@ fn install_update_from_menu(app: &AppHandle) {
     });
 }
 
-#[tauri::command]
-fn set_event_tray_label(
-    app: AppHandle,
-    title: Option<String>,
-    image: Option<Vec<u8>>,
-    visible: bool,
-) {
-    let _ = app.clone().run_on_main_thread(move || {
-        let Some(tray) = app.tray_by_id(EVENT_TRAY_ID) else {
-            return;
-        };
-        if !visible {
-            let _ = tray.set_visible(false);
-            return;
-        }
-        let _ = tray.set_visible(true);
-        #[cfg(target_os = "macos")]
-        unbind_status_item_menu(&tray);
-        if let Some(data) = image.as_deref() {
-            if let Ok(icon) = tauri::image::Image::from_bytes(data) {
-                let _ = tray.set_icon_with_as_template(Some(icon), true);
-            }
-        }
-        // set_title(None) leaves the previous native title in place on macOS,
-        // so turning the title or time off writes an explicit empty string.
-        let _ = tray.set_title(Some(title.as_deref().unwrap_or("")));
-        #[cfg(target_os = "macos")]
-        align_status_item_content(&tray);
-    });
-}
-
 /// Plays the bundled hourly chime for both the clock and Settings preview.
 #[tauri::command]
 fn beep(app: AppHandle) -> Result<(), String> {
@@ -1595,8 +1481,32 @@ fn hide_calendar(app: AppHandle) {
 }
 
 #[tauri::command]
-fn hide_events(app: AppHandle) {
-    close_events(&app);
+fn hide_reminder(app: AppHandle) {
+    close_reminder(&app);
+}
+
+/// Puts the reminder card under the status item without activating the app.
+/// It stays away while the month is open, which already shows the meeting;
+/// false tells the page it was not shown.
+#[tauri::command]
+fn show_reminder(app: AppHandle) -> bool {
+    let calendar_open = app
+        .get_webview_window(CALENDAR_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+    if calendar_open {
+        return false;
+    }
+    let Some(anchor) = tray_anchor(&app) else {
+        return false;
+    };
+    cancel_fade(&app, REMINDER_LABEL);
+    position_reminder(&app, anchor);
+    let Some(window) = app.get_webview_window(REMINDER_LABEL) else {
+        return false;
+    };
+    glass::present_inactive(&window);
+    true
 }
 
 /// The user's sidebar icon size from System Settings › Appearance: "small",
@@ -1626,32 +1536,29 @@ fn hide_settings(app: AppHandle) {
     dismiss_settings(&app);
 }
 
-/// The popover takes its content's height, capped by the screen it sits on.
-fn events_height(content: f64, screen: f64) -> f64 {
+/// The card takes its content's height, between a floor and a ceiling.
+fn reminder_height(content: f64) -> f64 {
     if !content.is_finite() || content <= 0.0 {
-        return EVENTS_FLOOR;
+        return REMINDER_FLOOR;
     }
-    let ceiling = (screen * EVENTS_SCREEN_SHARE).max(EVENTS_FLOOR);
-    content.min(ceiling).max(EVENTS_FLOOR)
+    content.clamp(REMINDER_FLOOR, REMINDER_CEILING)
 }
 
 #[tauri::command]
-fn set_events_height(app: AppHandle, height: f64) {
-    let Some(window) = app.get_webview_window(EVENTS_LABEL) else {
+fn set_reminder_height(app: AppHandle, height: f64) {
+    let Some(window) = app.get_webview_window(REMINDER_LABEL) else {
         return;
     };
-    // The screen recorded when the popover was placed, not the one the hidden
-    // window happens to sit on.
-    let ceiling = app
-        .state::<AppState>()
-        .events_screen_height
-        .lock()
-        .map(|height| *height)
-        .unwrap_or(EVENTS_FALLBACK_SCREEN);
     let _ = window.set_size(Size::Logical(LogicalSize::new(
-        EVENTS_WIDTH,
-        events_height(height, ceiling),
+        REMINDER_WIDTH,
+        reminder_height(height),
     )));
+    // Growing keeps the top edge, so the card stays under the menu bar.
+    if window.is_visible().unwrap_or(false) {
+        if let Some(anchor) = tray_anchor(&app) {
+            position_reminder(&app, anchor);
+        }
+    }
 }
 
 /// The page measures itself after drawing the selected day, and the window
@@ -1988,11 +1895,9 @@ pub fn run() {
                 settings: Mutex::new(store),
                 ignore_calendar_blur: AtomicBool::new(false),
                 calendar_pinned: AtomicBool::new(false),
-                events_screen_height: Mutex::new(EVENTS_FALLBACK_SCREEN),
                 calendar_closed_at: Mutex::new(None),
-                events_closed_at: Mutex::new(None),
                 calendar_fade: AtomicU64::new(0),
-                events_fade: AtomicU64::new(0),
+                reminder_fade: AtomicU64::new(0),
                 dismissed_events: Mutex::new(Vec::new()),
                 shortcuts: Mutex::new(RegisteredShortcuts::default()),
                 shortcut_rebind: Mutex::new(()),
@@ -2001,7 +1906,7 @@ pub fn run() {
             });
             set_launch_at_login(app.handle(), initial.launch_at_login);
             build_calendar_window(app.handle())?;
-            build_events_window(app.handle())?;
+            build_reminder_window(app.handle())?;
             build_settings_window(app.handle())?;
             apply_app_theme(app.handle(), &initial.theme);
             build_tray(app.handle())?;
@@ -2027,13 +1932,13 @@ pub fn run() {
             get_settings,
             update_settings,
             set_tray_label,
-            set_event_tray_label,
             beep,
             hide_calendar,
-            hide_events,
+            hide_reminder,
+            show_reminder,
             hide_settings,
             sidebar_size,
-            set_events_height,
+            set_reminder_height,
             set_calendar_height,
             popover_material,
             set_calendar_pinned,
@@ -2118,7 +2023,7 @@ mod tests {
     fn each_window_has_a_capability_of_its_own() {
         for (label, json) in [
             (CALENDAR_LABEL, include_str!("../capabilities/calendar.json")),
-            (EVENTS_LABEL, include_str!("../capabilities/events.json")),
+            (REMINDER_LABEL, include_str!("../capabilities/reminder.json")),
             (SETTINGS_LABEL, include_str!("../capabilities/settings.json")),
         ] {
             let capability = capability(json);
@@ -2132,7 +2037,7 @@ mod tests {
         let settings = capability(include_str!("../capabilities/settings.json"));
         for popover in [
             include_str!("../capabilities/calendar.json"),
-            include_str!("../capabilities/events.json"),
+            include_str!("../capabilities/reminder.json"),
         ] {
             let popover = capability(popover);
             for command in ["allow-update-settings", "allow-install-update", "allow-open-link"] {
@@ -2173,17 +2078,12 @@ mod tests {
     }
 
     #[test]
-    fn events_popover_takes_its_content_height_under_a_ceiling() {
-        // No minimum of its own: a short list gets a short window.
-        assert_eq!(events_height(120.0, 982.0), 120.0);
-        assert_eq!(events_height(300.0, 982.0), 300.0);
-        // The ceiling keeps the whole popover on the display.
-        assert_eq!(events_height(3000.0, 982.0), 982.0 * EVENTS_SCREEN_SHARE);
-        assert_eq!(events_height(700.0, 600.0), 600.0 * EVENTS_SCREEN_SHARE);
-        assert_eq!(events_height(f64::NAN, 982.0), EVENTS_FLOOR);
-        assert_eq!(events_height(0.0, 982.0), EVENTS_FLOOR);
-        // A screen too short for the floor still yields a usable window.
-        assert_eq!(events_height(400.0, 20.0), EVENTS_FLOOR);
+    fn reminder_card_takes_its_content_height_between_floor_and_ceiling() {
+        assert_eq!(reminder_height(120.0), 120.0);
+        assert_eq!(reminder_height(3000.0), REMINDER_CEILING);
+        assert_eq!(reminder_height(f64::NAN), REMINDER_FLOOR);
+        assert_eq!(reminder_height(0.0), REMINDER_FLOOR);
+        assert_eq!(reminder_height(10.0), REMINDER_FLOOR);
     }
 
     // Retina laptop below a 1× external, matching a typical arrangement:

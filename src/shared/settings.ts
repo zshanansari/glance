@@ -52,23 +52,23 @@ export type AppSettings = {
   launchAtLogin: boolean;
   beepOnTheHour: boolean;
   showUpcomingEvent: boolean;
-  /** Days of look-ahead for the popover list, counted through local midnight. */
+  /** Days the countdown looks ahead, counted through local midnight. */
   upcomingHorizonDays: UpcomingHorizonDays;
   /**
-   * Minutes before start to show the events item. 0 follows the list window,
+   * Minutes before start to show the countdown. 0 follows the look-ahead,
    * 1 holds it back until the event starts.
    */
   upcomingIconLeadMinutes: UpcomingIconLeadMinutes;
-  /** All-day events and reminders in the list and on the events item. */
-  includeAllDayEvents: boolean;
   /** Solo blocks: events nobody else was invited to. */
   includeEventsWithoutParticipants: boolean;
   /** Events with neither a meeting link nor a place. */
   includeEventsWithoutLocation: boolean;
-  /** Event name beside the countdown glyph. */
+  /** Event name after the countdown. */
   showEventTitleInMenuBar: boolean;
-  /** Start time, or the time left, beside the countdown glyph. */
+  /** Start time, or the time left, after the countdown. */
   showEventTimeInMenuBar: boolean;
+  /** A card with Join under the menu bar a minute before a meeting starts. */
+  remindBeforeMeetings: boolean;
   /** System-wide chord that toggles the month popover. Empty is unset. */
   toggleCalendarShortcut: string;
   /** System-wide chord that opens the previewed meeting link. Empty is unset. */
@@ -171,11 +171,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showUpcomingEvent: false,
   upcomingHorizonDays: 1,
   upcomingIconLeadMinutes: ICON_LEAD_ALWAYS,
-  includeAllDayEvents: true,
   includeEventsWithoutParticipants: true,
   includeEventsWithoutLocation: true,
   showEventTitleInMenuBar: false,
   showEventTimeInMenuBar: false,
+  remindBeforeMeetings: true,
   toggleCalendarShortcut: "Control+Command+K",
   joinMeetingShortcut: "",
   hiddenCalendarIds: [],
@@ -430,10 +430,6 @@ export function normalizeSettings(raw: unknown): AppSettings {
     ),
     upcomingHorizonDays: normalizeHorizonDays(input),
     upcomingIconLeadMinutes: normalizeIconLead(input.upcomingIconLeadMinutes),
-    includeAllDayEvents: asBoolean(
-      input.includeAllDayEvents,
-      DEFAULT_SETTINGS.includeAllDayEvents,
-    ),
     includeEventsWithoutParticipants: asBoolean(
       input.includeEventsWithoutParticipants,
       DEFAULT_SETTINGS.includeEventsWithoutParticipants,
@@ -449,6 +445,10 @@ export function normalizeSettings(raw: unknown): AppSettings {
     showEventTimeInMenuBar: asBoolean(
       input.showEventTimeInMenuBar,
       DEFAULT_SETTINGS.showEventTimeInMenuBar,
+    ),
+    remindBeforeMeetings: asBoolean(
+      input.remindBeforeMeetings,
+      DEFAULT_SETTINGS.remindBeforeMeetings,
     ),
     toggleCalendarShortcut: normalizeShortcut(
       input.toggleCalendarShortcut,
