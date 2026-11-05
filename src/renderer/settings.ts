@@ -1,7 +1,7 @@
 import {
   calendarsOfKind,
   groupCalendarsBySource,
-  HIGHLIGHT_DAYS,
+  highlightDaysFrom,
   MENU_BAR_ICONS,
   UPCOMING_HORIZON_DAYS,
   UPCOMING_ICON_LEAD_MINUTES,
@@ -210,8 +210,15 @@ function startSettings(api: DesktopApi): void {
     })),
   );
 
-  highlightDays.replaceChildren(
-    ...HIGHLIGHT_DAYS.map((day) => {
+  // The days run in the month's column order, so they follow the first day
+  // of the week.
+  let highlightOrder = -1;
+  const buildHighlightDays = (weekStartsOn: number): void => {
+    if (weekStartsOn === highlightOrder) return;
+    highlightOrder = weekStartsOn;
+    const selected = selectedWeekdays();
+    highlightDays.replaceChildren(
+    ...highlightDaysFrom(weekStartsOn).map((day) => {
       const wrap = document.createElement("label");
       wrap.className = "weekday-toggle";
       const caption = document.createElement("span");
@@ -225,7 +232,9 @@ function startSettings(api: DesktopApi): void {
       wrap.append(caption, button);
       return wrap;
     }),
-  );
+    );
+    paintHighlights(selected);
+  };
 
   const selectedWeekdays = (): Weekday[] =>
     Array.from(
@@ -440,6 +449,7 @@ function startSettings(api: DesktopApi): void {
     showMonth.checked = settings.showMonth;
     weekStart.value = String(settings.weekStartsOn);
     weekNumbers.checked = settings.showWeekNumbers;
+    buildHighlightDays(settings.weekStartsOn);
     paintHighlights(settings.highlightWeekdays);
     login.checked = settings.launchAtLogin;
     beep.checked = settings.beepOnTheHour;

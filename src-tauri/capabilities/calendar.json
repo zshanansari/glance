@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "calendar",
-  "description": "The month popover: reads settings and events, draws the menu bar item, sizes itself, and opens or joins an event.",
+  "description": "The month popover: reads settings and events, draws the menu bar item, sizes itself, opens or joins an event, and stops counting down to one.",
   "windows": [
     "calendar"
   ],
@@ -10,6 +10,7 @@
     "allow-get-settings",
     "allow-get-calendar-events",
     "allow-get-dismissed-events",
+    "allow-dismiss-upcoming-event",
     "allow-popover-material",
     "allow-hide-calendar",
     "allow-open-settings",

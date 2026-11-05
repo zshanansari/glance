@@ -13,6 +13,7 @@ import {
   normalizeSettings,
   upcomingHorizonLabel,
   upcomingIconLeadLabel,
+  highlightDaysFrom,
 } from "../src/shared/settings";
 
 describe("normalizeSettings", () => {
@@ -175,7 +176,7 @@ describe("normalizeSettings", () => {
     expect(upcomingHorizonLabel(7)).toBe("1 week");
     expect(upcomingHorizonLabel(14)).toBe("2 weeks");
     expect(upcomingHorizonLabel(30)).toBe("1 month");
-    expect(upcomingIconLeadLabel(0)).toBe("Always show");
+    expect(upcomingIconLeadLabel(0)).toBe("Always");
     expect(upcomingIconLeadLabel(1)).toBe("At start of event");
     expect(upcomingIconLeadLabel(15)).toBe("15 minutes before");
     expect(upcomingIconLeadLabel(60)).toBe("1 hour before");
@@ -354,5 +355,13 @@ describe("dayHighlight and onboarded", () => {
       dayHighlight: "calendar",
       onboarded: false,
     });
+  });
+});
+
+describe("highlight days", () => {
+  it("run in the month's column order", () => {
+    expect(highlightDaysFrom(0).map((day) => day.id)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(highlightDaysFrom(1).map((day) => day.id)).toEqual([1, 2, 3, 4, 5, 6, 0]);
+    expect(highlightDaysFrom(6).map((day) => day.id)).toEqual([6, 0, 1, 2, 3, 4, 5]);
   });
 });

@@ -8,8 +8,10 @@ import {
 } from "../shared/calendar";
 import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } from "../shared/settings";
 import {
+  endOfToday,
   eventsOnDay,
   eventStatus,
+  meetingToJoin,
   eventTimeRange,
   trayEventText,
   trayIconEvent,
@@ -253,6 +255,26 @@ function startCalendar(api: DesktopApi): void {
         void api.joinMeeting(url).then(() => api.hideCalendar());
       });
       row.append(join);
+    }
+    // The meeting the menu bar is counting down to can be let go of here,
+    // so a skipped meeting stops sitting beside the date.
+    if (
+      upcomingEvent &&
+      upcomingEvent.id === event.id &&
+      upcomingEvent.endAt === event.endAt &&
+      event.endAt > now
+    ) {
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "day-event-dismiss";
+      dismiss.setAttribute("aria-label", `Stop counting down to ${event.title}`);
+      dismiss.title = "Stop counting down";
+      dismiss.append(sfSymbol("eye.slash", 13));
+      dismiss.addEventListener("click", () => {
+        void api.dismissUpcomingEvent(event.id, event.endAt);
+      });
+      // Join stays at the edge, where it sits on every other row.
+      row.insertBefore(dismiss, row.querySelector(".day-event-join"));
     }
     if (event.endAt <= now) row.classList.add("is-past");
     return row;
@@ -520,10 +542,15 @@ function startCalendar(api: DesktopApi): void {
   prev.addEventListener("click", () => shiftMonth(-1));
   todayButton.addEventListener("click", () => showToday());
   next.addEventListener("click", () => shiftMonth(1));
-  const joinUpcoming = (): void => {
-    const url = upcomingEvent?.joinUrl;
+  // The shortcut looks the meeting up itself, so it works whether or not
+  // the menu bar is counting down.
+  const joinUpcoming = async (): Promise<void> => {
+    const now = Date.now();
+    const events = await api.getCalendarEvents(now, endOfToday(new Date(now))).catch(() => []);
+    const url = meetingToJoin(events, now)?.joinUrl;
     if (!url) return;
-    void api.joinMeeting(url).then(() => api.hideCalendar());
+    await api.joinMeeting(url);
+    await api.hideCalendar();
   };
   openSettings.addEventListener("click", () => {
     void api.openSettings();
@@ -637,7 +664,7 @@ function startCalendar(api: DesktopApi): void {
   });
   // The global shortcut fires wherever focus is; the calendar window already
   // knows which event the menu bar item is previewing.
-  api.onJoinUpcomingRequested(joinUpcoming);
+  api.onJoinUpcomingRequested(() => void joinUpcoming());
   // Opening shows what was drawn while hidden; only a new day redraws it.
   // Nothing takes focus: the arrow keys work from the document, and a ring
   // around today on every open is not how a menu looks.

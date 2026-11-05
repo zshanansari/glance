@@ -435,6 +435,36 @@ button:focus {
   font-weight: 500;
 }
 
+/* Lets go of the meeting the menu bar counts down to: a quiet glyph beside
+   Join, or at the edge when there is none. */
+.day-event-dismiss {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  border-radius: 10px;
+  color: var(--secondary);
+}
+
+.day-event-dismiss:last-child {
+  margin-right: 9px;
+}
+
+:root:not([data-pointer-away]) .day-event-dismiss:hover {
+  background: color-mix(in srgb, var(--on-accent) 20%, transparent);
+}
+
+:root:not([data-pointer-away]) .day-event:hover .day-event-dismiss {
+  color: var(--on-accent);
+}
+
+:root[data-keyboard] .day-event-dismiss:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* The menu highlight: the row takes the accent, its text turns white. */
 :root:not([data-pointer-away]) .day-event:hover {
   background: var(--accent);

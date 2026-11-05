@@ -181,7 +181,7 @@
               <div class="row">
                 <div class="copy">
                   <label id="join-meeting-shortcut-label">Join upcoming meeting</label>
-                  <p>Opens the link on the event the menu bar is previewing.</p>
+                  <p>Joins the meeting under way, or your next one today, from any app.</p>
                 </div>
                 <div class="row-controls">
                   <button
@@ -280,6 +280,7 @@
               <div class="row highlight-row">
                 <div class="copy">
                   <label id="highlight-label">Highlight</label>
+                  <p>Shade these days&rsquo; columns in the month.</p>
                 </div>
                 <div
                   class="weekday-picker"
@@ -300,57 +301,28 @@
           hidden
         >
           <div class="group">
-            <h2 id="upcoming-heading">Upcoming</h2>
+            <h2 id="countdown-heading">Menu bar countdown</h2>
             <div class="card">
               <div class="row">
                 <div class="copy">
-                  <label for="show-upcoming">Show upcoming in menu bar</label>
-                  <p>Counts down to the next event or reminder, after the date.</p>
+                  <label for="show-upcoming">Count down to the next event</label>
+                  <p>Shows &ldquo;&bull; in 25m&rdquo; after the date, for events and reminders.</p>
                 </div>
                 <input id="show-upcoming" name="showUpcomingEvent" type="checkbox" switch />
               </div>
-              <div class="row" id="upcoming-horizon-row">
-                <div class="copy">
-                  <label for="upcoming-horizon">Show events for</label>
-                  <p>How far ahead the countdown looks.</p>
-                </div>
-                <select id="upcoming-horizon" name="upcomingHorizonDays"></select>
-              </div>
-              <div class="row" id="include-without-participants-row">
-                <div class="copy">
-                  <label for="include-without-participants">Events without participants</label>
-                  <p>Blocks nobody else was invited to.</p>
-                </div>
-                <input
-                  id="include-without-participants"
-                  name="includeEventsWithoutParticipants"
-                  type="checkbox"
-                  switch
-                />
-              </div>
-              <div class="row" id="include-without-location-row">
-                <div class="copy">
-                  <label for="include-without-location">Events without conferencing or location</label>
-                  <p>Items with no meeting link or place.</p>
-                </div>
-                <input
-                  id="include-without-location"
-                  name="includeEventsWithoutLocation"
-                  type="checkbox"
-                  switch
-                />
-              </div>
-            </div>
-          </div>
-          <div class="group">
-            <h2 id="preview-heading">Preview in menu bar</h2>
-            <div class="card">
               <div class="row" id="upcoming-icon-lead-row">
                 <div class="copy">
-                  <label for="upcoming-icon-lead">Show upcoming events</label>
-                  <p>When the countdown joins the date.</p>
+                  <label for="upcoming-icon-lead">When it appears</label>
+                  <p>How long before an event the countdown joins the date.</p>
                 </div>
                 <select id="upcoming-icon-lead" name="upcomingIconLeadMinutes"></select>
+              </div>
+              <div class="row" id="upcoming-horizon-row">
+                <div class="copy">
+                  <label for="upcoming-horizon">Look ahead</label>
+                  <p>How far ahead it looks for the next event.</p>
+                </div>
+                <select id="upcoming-horizon" name="upcomingHorizonDays"></select>
               </div>
               <div class="row" id="show-event-time-row">
                 <div class="copy">
@@ -372,6 +344,35 @@
                 <input
                   id="show-event-title"
                   name="showEventTitleInMenuBar"
+                  type="checkbox"
+                  switch
+                />
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            <h2 id="count-heading">Count these events</h2>
+            <div class="card">
+              <div class="row" id="include-without-participants-row">
+                <div class="copy">
+                  <label for="include-without-participants">Events without participants</label>
+                  <p>Blocks nobody else was invited to.</p>
+                </div>
+                <input
+                  id="include-without-participants"
+                  name="includeEventsWithoutParticipants"
+                  type="checkbox"
+                  switch
+                />
+              </div>
+              <div class="row" id="include-without-location-row">
+                <div class="copy">
+                  <label for="include-without-location">Events without conferencing or location</label>
+                  <p>Items with no meeting link or place.</p>
+                </div>
+                <input
+                  id="include-without-location"
+                  name="includeEventsWithoutLocation"
                   type="checkbox"
                   switch
                 />

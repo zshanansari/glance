@@ -35,7 +35,7 @@ export function upcomingHorizonLabel(days: UpcomingHorizonDays): string {
 }
 
 export function upcomingIconLeadLabel(minutes: UpcomingIconLeadMinutes): string {
-  if (minutes === ICON_LEAD_ALWAYS) return "Always show";
+  if (minutes === ICON_LEAD_ALWAYS) return "Always";
   if (minutes === ICON_LEAD_AT_START) return "At start of event";
   if (minutes < 60) return `${minutes} minutes before`;
   const hours = minutes / 60;
@@ -71,7 +71,7 @@ export type AppSettings = {
   remindBeforeMeetings: boolean;
   /** System-wide chord that toggles the month popover. Empty is unset. */
   toggleCalendarShortcut: string;
-  /** System-wide chord that opens the previewed meeting link. Empty is unset. */
+  /** System-wide chord that joins the meeting under way or next today. Empty is unset. */
   joinMeetingShortcut: string;
   /** EventKit identifiers the upcoming-event list should ignore. Empty shows every calendar. */
   hiddenCalendarIds: string[];
@@ -156,6 +156,13 @@ export const HIGHLIGHT_DAYS: { id: Weekday; name: string }[] = [
   { id: 6, name: "Saturday" },
   { id: 0, name: "Sunday" },
 ];
+
+/** The highlight days in the order the month shows its columns. */
+export function highlightDaysFrom(weekStartsOn: number): { id: Weekday; name: string }[] {
+  return [...HIGHLIGHT_DAYS].sort(
+    (left, right) => ((left.id - weekStartsOn + 7) % 7) - ((right.id - weekStartsOn + 7) % 7),
+  );
+}
 
 export const DEFAULT_HIGHLIGHT_WEEKDAYS: Weekday[] = [0, 6];
 

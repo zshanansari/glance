@@ -11,6 +11,7 @@ import {
   trayIconEvent,
   upcomingFetchEnd,
   upcomingHorizonEnd,
+  meetingToJoin,
   reminderEvent,
   reminderStillDue,
   type EventFilters,
@@ -434,5 +435,37 @@ describe("meeting reminder", () => {
     expect(reminderStillDue(call, start + 4 * 60_000)).toBe(true);
     expect(reminderStillDue(call, start + 5 * 60_000)).toBe(false);
     expect(reminderStillDue({ ...call, endAt: start + 2 * 60_000 }, start + 3 * 60_000)).toBe(false);
+  });
+});
+
+describe("join shortcut", () => {
+  const now = new Date(2026, 8, 9, 10, 0).getTime();
+  const at = (hour: number, minute = 0) => new Date(2026, 8, 9, hour, minute).getTime();
+  const call = (id: string, start: number, end: number) => ({
+    ...event,
+    id,
+    startAt: start,
+    endAt: end,
+    joinUrl: "https://meet.google.com/abc-defg-hij",
+  });
+
+  it("joins the meeting under way before a later one", () => {
+    const now_ = call("now", at(9, 45), at(10, 15));
+    const later = call("later", at(11), at(11, 30));
+    expect(meetingToJoin([later, now_], now)).toBe(now_);
+  });
+
+  it("joins the next meeting today when none is under way", () => {
+    const later = call("later", at(11), at(11, 30));
+    expect(meetingToJoin([later], now)).toBe(later);
+  });
+
+  it("skips links that are over, declined, all-day, or tomorrow", () => {
+    const over = call("over", at(8), at(9));
+    const declined = { ...call("declined", at(11), at(12)), response: "declined" as const };
+    const allDay = { ...call("all-day", at(0), at(23, 59)), allDay: true };
+    const tomorrow = call("tomorrow", at(10) + 86_400_000, at(11) + 86_400_000);
+    const noLink = { ...call("no-link", at(11), at(12)), joinUrl: null };
+    expect(meetingToJoin([over, declined, allDay, tomorrow, noLink], now)).toBeNull();
   });
 });

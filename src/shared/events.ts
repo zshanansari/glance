@@ -325,3 +325,22 @@ export function reminderStillDue(
 ): boolean {
   return now < Math.min(event.startAt + REMINDER_LINGER_MS, event.endAt);
 }
+
+/**
+ * The meeting the Join shortcut opens: one under way with a link, or else
+ * the next one today. Declined invitations are skipped; the countdown's
+ * switches and dismissals are not consulted, so the shortcut works with the
+ * countdown off.
+ */
+export function meetingToJoin(
+  events: readonly UpcomingEvent[],
+  now: number,
+): UpcomingEvent | null {
+  let best: UpcomingEvent | null = null;
+  for (const event of events) {
+    if (event.allDay || !event.joinUrl || event.response === "declined") continue;
+    if (event.endAt <= now || event.startAt > endOfToday(new Date(now))) continue;
+    if (!best || event.startAt < best.startAt) best = event;
+  }
+  return best;
+}
