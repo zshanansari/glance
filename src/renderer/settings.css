@@ -158,9 +158,9 @@ input {
    each side; pulling it out by that much lines the artwork up with the pane
    tiles below. */
 .sidebar-identity img {
-  width: 36px;
-  height: 36px;
-  margin-left: calc(36px * -100 / 1024);
+  width: 44px;
+  height: 44px;
+  margin-left: calc(44px * -100 / 1024);
 }
 
 .sidebar-identity span {
@@ -169,15 +169,15 @@ input {
 }
 
 .sidebar-identity strong {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 16px;
+  line-height: 19px;
 }
 
 .sidebar-identity small {
   color: var(--secondary);
-  font-size: 10px;
-  line-height: 13px;
+  font-size: 11px;
+  line-height: 14px;
 }
 
 /* Selection is a grey wash, not the accent, as in System Settings. */
@@ -814,6 +814,77 @@ select:hover {
 
 .link:hover {
   text-decoration: underline;
+}
+
+/* Today and selection: a row of color dots, as System Settings offers the
+   accent colors, with the chosen one's name beneath. */
+.color-picker {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.color-swatches {
+  display: flex;
+  gap: 7px;
+}
+
+.swatch {
+  position: relative;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+}
+
+.swatch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+.swatch span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 18%);
+}
+
+/* The chosen color carries a white dot, as the accent picker marks it. */
+.swatch input:checked + span {
+  background:
+    radial-gradient(circle, #fff 0 3px, transparent 3.5px),
+    var(--swatch);
+}
+
+:root[data-keyboard] .swatch input:focus-visible + span,
+.swatch input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.swatch-red { --swatch: var(--calendar); }
+.swatch-blue { --swatch: var(--blue); }
+.swatch-purple { --swatch: var(--purple); }
+.swatch-pink { --swatch: var(--pink); }
+.swatch-orange { --swatch: var(--orange); }
+.swatch-yellow { --swatch: var(--yellow); }
+.swatch-green { --swatch: var(--green); }
+.swatch-graphite { --swatch: var(--graphite); }
+/* Follows the system accent, so it is drawn as macOS draws Multicolor. */
+.swatch-accent {
+  --swatch: conic-gradient(
+    #ff3b30, #ff9500, #ffcc00, #34c759, #007aff, #af52de, #ff2d55, #ff3b30
+  );
+}
+
+.color-name {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 14px;
 }
 
 /* An update waiting, at the foot of the sidebar: accent, not red, because

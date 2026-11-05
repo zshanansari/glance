@@ -254,13 +254,25 @@ button:focus {
   height: 28px;
 }
 
-/* Today and the chosen day: Calendar's red, or the accent if so set. */
+/* Today and the chosen day: red by default, as Calendar marks today, or the
+   accent or another system color. Yellow is too light for white, so its chosen day is set in
+   dark ink, as macOS sets text on yellow. */
 :root {
   --day: var(--calendar);
+  --on-day: #fff;
 }
 
-:root[data-day-highlight="accent"] {
-  --day: var(--accent);
+:root[data-day-highlight="accent"] { --day: var(--accent); }
+:root[data-day-highlight="blue"] { --day: var(--blue); }
+:root[data-day-highlight="purple"] { --day: var(--purple); }
+:root[data-day-highlight="pink"] { --day: var(--pink); }
+:root[data-day-highlight="orange"] { --day: var(--orange); }
+:root[data-day-highlight="green"] { --day: var(--green); }
+:root[data-day-highlight="graphite"] { --day: var(--graphite); }
+
+:root[data-day-highlight="yellow"] {
+  --day: var(--yellow);
+  --on-day: rgb(0 0 0 / 85%);
 }
 
 /* A rounded square, not a circle: tall enough to hold the event mark inside
@@ -296,7 +308,7 @@ button:focus {
 .day.is-selected .day-number {
   background: var(--day);
   box-shadow: none;
-  color: #fff;
+  color: var(--on-day);
   font-weight: 600;
 }
 
@@ -326,7 +338,7 @@ button:focus {
 }
 
 .day.is-selected .day-mark {
-  background: #fff;
+  background: var(--on-day);
 }
 
 /* The selected day's events, as menu rows. */

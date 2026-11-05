@@ -15,6 +15,14 @@
   --on-accent: #fff;
   /* Calendar's own red, for today and the chosen day. */
   --calendar: #ff3b30;
+  /* The system colors, offered for today and the chosen day. */
+  --blue: #007aff;
+  --purple: #af52de;
+  --pink: #ff2d55;
+  --orange: #ff9500;
+  --yellow: #ffcc00;
+  --green: #34c759;
+  --graphite: #8e8e93;
   /* Tints a popover's menu material rather than replacing it. */
   --scrim: rgb(255 255 255 / 16%);
 
@@ -35,6 +43,13 @@
     --separator: rgb(255 255 255 / 12%);
     --accent: #0a84ff;
     --calendar: #ff453a;
+    --blue: #0a84ff;
+    --purple: #bf5af2;
+    --pink: #ff375f;
+    --orange: #ff9f0a;
+    --yellow: #ffd60a;
+    --green: #30d158;
+    --graphite: #98989d;
     --scrim: rgb(0 0 0 / 22%);
   }
 }
@@ -51,6 +66,13 @@
   --separator: rgb(255 255 255 / 12%);
   --accent: #0a84ff;
   --calendar: #ff453a;
+  --blue: #0a84ff;
+  --purple: #bf5af2;
+  --pink: #ff375f;
+  --orange: #ff9f0a;
+  --yellow: #ffd60a;
+  --green: #30d158;
+  --graphite: #98989d;
   --scrim: rgb(0 0 0 / 22%);
   color-scheme: dark;
 }
@@ -66,6 +88,13 @@
     --accent: -apple-system-control-accent;
     --on-accent: -apple-system-alternate-selected-text;
     --calendar: -apple-system-red;
+    --blue: -apple-system-blue;
+    --purple: -apple-system-purple;
+    --pink: -apple-system-pink;
+    --orange: -apple-system-orange;
+    --yellow: -apple-system-yellow;
+    --green: -apple-system-green;
+    --graphite: -apple-system-gray;
   }
 }
 

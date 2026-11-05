@@ -25,18 +25,17 @@ func roundedRect(_ rect: NSRect, radius: CGFloat) -> NSBezierPath {
     NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
 }
 
-/// A light behind the card: solid in the middle, softening at its rim.
+/// A light behind the card: a crisp disc, a touch brighter at its centre.
 func orb(center: NSPoint, radius: CGFloat, color: NSColor) {
-    let gradient = NSGradient(colorsAndLocations:
-        (color, 0.0),
-        (color, 0.78),
-        (color.withAlphaComponent(0.0), 1.0)
+    let disc = NSBezierPath(ovalIn: NSRect(
+        x: center.x - radius, y: center.y - radius,
+        width: radius * 2, height: radius * 2
+    ))
+    let gradient = NSGradient(
+        starting: color.blended(withFraction: 0.18, of: .white) ?? color,
+        ending: color
     )
-    gradient?.draw(
-        fromCenter: center, radius: 0,
-        toCenter: center, radius: radius,
-        options: []
-    )
+    gradient?.draw(in: disc, relativeCenterPosition: NSPoint(x: -0.2, y: 0.2))
 }
 
 func drawAppIcon() -> NSImage {
@@ -53,13 +52,13 @@ func drawAppIcon() -> NSImage {
         NSGraphicsContext.saveGraphicsState()
         tilePath.addClip()
         orb(
-            center: NSPoint(x: tileRect.minX + tile * 0.80, y: tileRect.maxY - tile * 0.20),
-            radius: tile * 0.22,
+            center: NSPoint(x: tileRect.minX + tile * 0.77, y: tileRect.maxY - tile * 0.24),
+            radius: tile * 0.19,
             color: lightOrb
         )
         orb(
-            center: NSPoint(x: tileRect.minX + tile * 0.18, y: tileRect.maxY - tile * 0.84),
-            radius: tile * 0.17,
+            center: NSPoint(x: tileRect.minX + tile * 0.22, y: tileRect.maxY - tile * 0.78),
+            radius: tile * 0.15,
             color: deepOrb
         )
         // A soft sheen over the upper half, as Liquid Glass catches light.

@@ -24,6 +24,11 @@ const LEGACY_FORMATS: [(&str, &str, bool, bool); 11] = [
     ("full", "filled", true, true),
 ];
 
+/// Today and the chosen day: the accent or a system color, red by default.
+const DAY_HIGHLIGHTS: &[&str] = &[
+    "accent", "blue", "purple", "pink", "red", "orange", "yellow", "green", "graphite",
+];
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AppSettings {
@@ -63,8 +68,8 @@ pub struct AppSettings {
     pub hidden_calendar_ids: Vec<String>,
     pub auto_update: bool,
     pub theme: String,
-    /// "calendar" marks today and the chosen day in Calendar's red,
-    /// "accent" in the system accent.
+    /// The color of today and the chosen day: "accent", or a system color
+    /// such as "red", the default.
     pub day_highlight: String,
     /// Set once the first-run welcome has been seen.
     pub onboarded: bool,
@@ -97,7 +102,7 @@ impl Default for AppSettings {
             hidden_calendar_ids: Vec::new(),
             auto_update: true,
             theme: "system".into(),
-            day_highlight: "calendar".into(),
+            day_highlight: "red".into(),
             onboarded: false,
         }
     }
@@ -131,7 +136,11 @@ impl AppSettings {
         if !matches!(self.theme.as_str(), "system" | "light" | "dark") {
             self.theme = base.theme.clone();
         }
-        if !matches!(self.day_highlight.as_str(), "calendar" | "accent") {
+        // "calendar" was Calendar Red before the system colors joined it.
+        if self.day_highlight == "calendar" {
+            self.day_highlight = "red".into();
+        }
+        if !DAY_HIGHLIGHTS.contains(&self.day_highlight.as_str()) {
             self.day_highlight = base.day_highlight.clone();
         }
         if !matches!(self.upcoming_horizon_days, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 14 | 30) {
@@ -521,6 +530,26 @@ mod tests {
         assert!(settings.launch_at_login);
         assert!(settings.beep_on_the_hour);
         assert_eq!(settings.theme, "dark");
+    }
+
+    #[test]
+    fn keeps_a_system_color_for_today_and_drops_an_unknown_one() {
+        let base = AppSettings::default();
+        let green = AppSettings {
+            day_highlight: "green".into(),
+            ..AppSettings::default()
+        };
+        assert_eq!(green.normalize(&base).day_highlight, "green");
+        let unknown = AppSettings {
+            day_highlight: "rainbow".into(),
+            ..AppSettings::default()
+        };
+        assert_eq!(unknown.normalize(&base).day_highlight, "red");
+        let older = AppSettings {
+            day_highlight: "calendar".into(),
+            ..AppSettings::default()
+        };
+        assert_eq!(older.normalize(&base).day_highlight, "red");
     }
 
     #[test]

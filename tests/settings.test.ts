@@ -341,8 +341,8 @@ describe("highlighted columns", () => {
 });
 
 describe("dayHighlight and onboarded", () => {
-  it("default to Calendar's red and an unseen welcome", () => {
-    expect(DEFAULT_SETTINGS.dayHighlight).toBe("calendar");
+  it("default to red and an unseen welcome", () => {
+    expect(DEFAULT_SETTINGS.dayHighlight).toBe("red");
     expect(DEFAULT_SETTINGS.onboarded).toBe(false);
   });
 
@@ -351,8 +351,12 @@ describe("dayHighlight and onboarded", () => {
       dayHighlight: "accent",
       onboarded: true,
     });
+    for (const color of ["blue", "purple", "pink", "orange", "yellow", "green", "graphite"]) {
+      expect(normalizeSettings({ dayHighlight: color }).dayHighlight).toBe(color);
+    }
+    expect(normalizeSettings({ dayHighlight: "calendar" }).dayHighlight).toBe("red");
     expect(normalizeSettings({ dayHighlight: "rainbow", onboarded: "yes" })).toMatchObject({
-      dayHighlight: "calendar",
+      dayHighlight: "red",
       onboarded: false,
     });
   });

@@ -1278,12 +1278,12 @@ fn update_settings(
     if saved.launch_at_login != previous.launch_at_login {
         set_launch_at_login(&app, saved.launch_at_login);
     }
+    // Resized at once, hidden or not, so the month is redrawn at the width it
+    // will open at rather than at the old one.
     if saved.show_week_numbers != previous.show_week_numbers {
         if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
-            if window.is_visible().unwrap_or(false) {
-                let (width, height) = calendar_window_size(&app, saved.show_week_numbers);
-                let _ = window.set_size(Size::Logical(LogicalSize::new(width, height)));
-            }
+            let (width, height) = calendar_window_size(&app, saved.show_week_numbers);
+            let _ = window.set_size(Size::Logical(LogicalSize::new(width, height)));
         }
     }
     if saved.theme != previous.theme {

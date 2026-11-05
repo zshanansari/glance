@@ -2,6 +2,8 @@ import {
   calendarsOfKind,
   groupCalendarsBySource,
   highlightDaysFrom,
+  DAY_HIGHLIGHTS,
+  DEFAULT_SETTINGS,
   MENU_BAR_ICONS,
   UPCOMING_HORIZON_DAYS,
   UPCOMING_ICON_LEAD_MINUTES,
@@ -171,7 +173,33 @@ function startSettings(api: DesktopApi): void {
   const remindersAccessRow = requireElement<HTMLElement>("reminders-access-row");
   const beepPreview = requireElement<HTMLButtonElement>("beep-preview");
   const theme = requireElement<HTMLSelectElement>("theme");
-  const dayHighlight = requireElement<HTMLSelectElement>("day-highlight");
+  const dayHighlight = requireElement<HTMLElement>("day-highlight");
+  const dayHighlightName = requireElement<HTMLElement>("day-highlight-name");
+  // A swatch per color, as System Settings sets out the accent colors. Each
+  // is a radio, so the arrow keys move between them and a choice is a form
+  // change like any other.
+  dayHighlight.replaceChildren(
+    ...DAY_HIGHLIGHTS.map((option) => {
+      const swatch = document.createElement("label");
+      swatch.className = `swatch swatch-${option.id}`;
+      swatch.title = option.name;
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "dayHighlight";
+      input.value = option.id;
+      input.setAttribute("aria-label", option.name);
+      swatch.append(input, document.createElement("span"));
+      return swatch;
+    }),
+  );
+  const chosenHighlight = (): DayHighlight =>
+    (dayHighlight.querySelector<HTMLInputElement>("input:checked")?.value ??
+      DEFAULT_SETTINGS.dayHighlight) as DayHighlight;
+  const paintHighlightName = (): void => {
+    const id = chosenHighlight();
+    dayHighlightName.textContent =
+      DAY_HIGHLIGHTS.find((option) => option.id === id)?.name ?? "";
+  };
   const version = requireElement<HTMLSpanElement>("version");
   const checkUpdates = requireElement<HTMLButtonElement>("check-updates");
   const updatePill = requireElement<HTMLButtonElement>("update-pill");
@@ -468,7 +496,10 @@ function startSettings(api: DesktopApi): void {
     hiddenCalendarIds = settings.hiddenCalendarIds;
     paintCalendarSelection(settings.hiddenCalendarIds);
     theme.value = settings.theme;
-    dayHighlight.value = settings.dayHighlight;
+    for (const input of Array.from(dayHighlight.querySelectorAll<HTMLInputElement>("input"))) {
+      input.checked = input.value === settings.dayHighlight;
+    }
+    paintHighlightName();
   };
 
   const patchFromForm = (): Partial<AppSettings> => ({
@@ -489,7 +520,7 @@ function startSettings(api: DesktopApi): void {
     showEventTitleInMenuBar: showEventTitle.checked,
     showEventTimeInMenuBar: showEventTime.checked,
     theme: theme.value as Theme,
-    dayHighlight: dayHighlight.value as DayHighlight,
+    dayHighlight: chosenHighlight(),
   });
 
   tabs.addEventListener("click", (event) => {
@@ -513,6 +544,7 @@ function startSettings(api: DesktopApi): void {
   form.addEventListener("change", () => {
     const patch = patchFromForm();
     applyTheme(patch.theme ?? "system");
+    paintHighlightName();
     paintUpcomingOptions(patch.showUpcomingEvent ?? false);
     void api.updateSettings(patch);
   });

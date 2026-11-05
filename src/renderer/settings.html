@@ -269,13 +269,18 @@
               </div>
               <div class="row">
                 <div class="copy">
-                  <label for="day-highlight">Today and selection</label>
+                  <label id="day-highlight-label">Today and selection</label>
                   <p>The color that marks today and the day you pick.</p>
                 </div>
-                <select id="day-highlight" name="dayHighlight">
-                  <option value="calendar">Calendar Red</option>
-                  <option value="accent">Accent Color</option>
-                </select>
+                <div class="color-picker">
+                  <div
+                    class="color-swatches"
+                    id="day-highlight"
+                    role="radiogroup"
+                    aria-labelledby="day-highlight-label"
+                  ></div>
+                  <p class="color-name" id="day-highlight-name" aria-hidden="true"></p>
+                </div>
               </div>
               <div class="row highlight-row">
                 <div class="copy">

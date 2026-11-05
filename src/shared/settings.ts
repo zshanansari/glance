@@ -83,7 +83,24 @@ export type AppSettings = {
   onboarded: boolean;
 };
 
-export type DayHighlight = "calendar" | "accent";
+/**
+ * Today and the chosen day: the accent or a system color, in the order
+ * System Settings lists the accent colors. Red is the default, as Calendar
+ * marks today.
+ */
+export const DAY_HIGHLIGHTS = [
+  { id: "accent", name: "Accent Color" },
+  { id: "blue", name: "Blue" },
+  { id: "purple", name: "Purple" },
+  { id: "pink", name: "Pink" },
+  { id: "red", name: "Red" },
+  { id: "orange", name: "Orange" },
+  { id: "yellow", name: "Yellow" },
+  { id: "green", name: "Green" },
+  { id: "graphite", name: "Graphite" },
+] as const;
+
+export type DayHighlight = (typeof DAY_HIGHLIGHTS)[number]["id"];
 
 export type CalendarKind = "event" | "reminder";
 
@@ -188,7 +205,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hiddenCalendarIds: [],
   autoUpdate: true,
   theme: "system",
-  dayHighlight: "calendar",
+  dayHighlight: "red",
   onboarded: false,
 };
 
@@ -471,10 +488,13 @@ export function normalizeSettings(raw: unknown): AppSettings {
         : [...DEFAULT_SETTINGS.hiddenCalendarIds],
     autoUpdate: asBoolean(input.autoUpdate, DEFAULT_SETTINGS.autoUpdate),
     theme: THEMES.has(theme as Theme) ? (theme as Theme) : DEFAULT_SETTINGS.theme,
+    // "calendar" was Calendar Red before the system colors joined it.
     dayHighlight:
-      input.dayHighlight === "accent" || input.dayHighlight === "calendar"
-        ? input.dayHighlight
-        : DEFAULT_SETTINGS.dayHighlight,
+      input.dayHighlight === "calendar"
+        ? "red"
+        : DAY_HIGHLIGHTS.some((option) => option.id === input.dayHighlight)
+          ? (input.dayHighlight as DayHighlight)
+          : DEFAULT_SETTINGS.dayHighlight,
     onboarded: asBoolean(input.onboarded, DEFAULT_SETTINGS.onboarded),
   };
 }

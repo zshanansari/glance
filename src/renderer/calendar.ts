@@ -539,6 +539,15 @@ function startCalendar(api: DesktopApi): void {
     paintDayEvents();
   };
 
+  // The bands are placed in pixels, so they follow the grid whenever its
+  // width changes: the window resizes after the month was drawn hidden, as
+  // when week numbers are switched on or off from Settings.
+  new ResizeObserver(() => {
+    const table = grid.querySelector<HTMLTableElement>("table");
+    const wrap = grid.querySelector<HTMLElement>(".month");
+    if (settings && table && wrap) paintColumnHighlights(table, wrap, settings);
+  }).observe(grid);
+
   prev.addEventListener("click", () => shiftMonth(-1));
   todayButton.addEventListener("click", () => showToday());
   next.addEventListener("click", () => shiftMonth(1));
