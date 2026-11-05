@@ -176,8 +176,8 @@ input {
 
 .sidebar-identity small {
   color: var(--secondary);
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 10px;
+  line-height: 13px;
 }
 
 /* Selection is a grey wash, not the accent, as in System Settings. */
