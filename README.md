@@ -8,7 +8,7 @@ Apple Silicon Macs on macOS 13 or newer. Intel Macs can build it from source.
 <p align="center">
   <img src="docs/screenshots/menubar.png" alt="The month calendar open under its menu bar icon, with the selected day's events" width="300">
   &nbsp;&nbsp;
-  <img src="docs/screenshots/settings.png" alt="Settings, laid out like System Settings" width="560">
+  <img src="docs/screenshots/settings.png" alt="Settings, laid out like System Settings, with a row of colors for today" width="560">
 </p>
 
 ## Features
@@ -17,10 +17,12 @@ Apple Silicon Macs on macOS 13 or newer. Intel Macs can build it from source.
   under every day that has events. Pick a day to see its events, open one in
   Calendar, or join a meeting from it.
 - **Feels like part of macOS.** The popover opens and closes like a system
-  menu, in the system font and colors, and follows light, dark and your
-  accent. Settings is laid out like System Settings, with SF Symbols.
+  menu, in the system font and colors, and follows light and dark. Today and
+  the day you pick take red, your accent, or any of the system colors.
+  Settings is laid out like System Settings, with SF Symbols.
 - **What’s next.** Optionally, the menu bar item counts down to the next
   calendar event or scheduled reminder after the date, as in “• in 25m”.
+  Done with a meeting early? Stop its countdown from the day’s list.
 - **Never late to a call.** A minute before a meeting with a link starts, a
   small card under the menu bar item offers Join, without taking focus.
 - **Your calendars, your lists.** Settings → Events chooses the look-ahead,
