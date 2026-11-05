@@ -1337,6 +1337,30 @@ fn set_tray_label(
             *glyph = bytes.map(<[u8]>::to_vec);
         }
         paint_tray_glyph(&tray, bytes);
+        follow_status_item(&app);
+    });
+}
+
+/// Status items keep their right edge, so a new title moves the left one,
+/// and a reminder card on screen has to follow it. The item's frame is only
+/// current once AppKit has laid the new title out, a moment after it is set.
+fn follow_status_item(app: &AppHandle) {
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(120));
+        let app = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            let open = app
+                .get_webview_window(REMINDER_LABEL)
+                .and_then(|window| window.is_visible().ok())
+                .unwrap_or(false);
+            if !open {
+                return;
+            }
+            if let Some(anchor) = tray_anchor(&app) {
+                position_reminder(&app, anchor);
+            }
+        });
     });
 }
 
@@ -1502,6 +1526,7 @@ fn show_reminder(app: AppHandle) -> bool {
         return false;
     };
     glass::present_inactive(&window);
+    follow_status_item(&app);
     true
 }
 
@@ -1828,6 +1853,8 @@ fn open_repository() -> Result<(), String> {
 /// in the webview cannot use this to open a page of its choosing.
 const ABOUT_LINKS: &[&str] = &[
     REPOSITORY_URL,
+    "https://github.com/zshanansari/glance/releases",
+    "https://github.com/zshanansari/glance/issues",
     "https://github.com/vipinsight/calendo",
     "https://github.com/zshanansari",
 ];

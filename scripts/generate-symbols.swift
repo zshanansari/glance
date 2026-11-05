@@ -27,6 +27,7 @@ let symbols: [(String, NSFont.Weight)] = [
     ("mappin.and.ellipse", .regular),
     ("eye.slash", .regular),
     ("video.fill", .regular),
+    ("arrow.up.right", .semibold),
 ]
 
 /// Every glyph shares one square canvas, so they line up at any size.

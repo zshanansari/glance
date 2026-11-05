@@ -444,38 +444,41 @@
           hidden
         >
           <div class="about">
-            <div class="about-identity">
+            <div class="about-hero">
               <img class="about-icon" src="icon.png" alt="Glance app icon" />
-              <div class="about-intro">
-                <p class="about-name">Glance <span class="about-version" id="version"></span></p>
-                <p class="about-copy">
-                  Your month, today&rsquo;s agenda and your next meeting, a click away in the
-                  menu bar. Glance reads Calendar and Reminders on this Mac and never sends
-                  them anywhere.
-                </p>
-              </div>
+              <p class="about-name">Glance <span class="about-version" id="version"></span></p>
+              <p class="about-copy">
+                Your month, today&rsquo;s agenda and your next meeting, a click away in the
+                menu bar. Glance reads Calendar and Reminders on this Mac and never sends
+                them anywhere.
+              </p>
+              <button type="button" class="action" id="check-updates" aria-live="polite">
+                Check for Updates
+              </button>
             </div>
             <div class="about-links" role="group" aria-label="Glance online">
+              <button type="button" id="open-release-notes">
+                <span>Release Notes</span>
+                <span class="about-dest" data-external></span>
+              </button>
+              <button type="button" id="open-issues">
+                <span>Report a Problem</span>
+                <span class="about-dest" data-external></span>
+              </button>
               <button type="button" id="open-repository">
-                <span>Contribute</span>
-                <span class="about-dest">github.com/zshanansari/glance</span>
+                <span>Source Code</span>
+                <span class="about-dest" data-external>github.com/zshanansari/glance</span>
               </button>
               <button type="button" id="open-original">
                 <span>Based on Calendo</span>
-                <span class="about-dest">github.com/vipinsight/calendo</span>
+                <span class="about-dest" data-external>github.com/vipinsight/calendo</span>
               </button>
             </div>
-            <div class="about-foot">
-              <div class="about-updates">
-                <button type="button" class="action" id="check-updates" aria-live="polite">
-                  Check for Updates
-                </button>
-              </div>
-              <p class="about-legal">
-                © 2026 Glance
-                <button type="button" class="link" id="open-site">Zishan Ansari</button>
-              </p>
-            </div>
+            <p class="about-legal">
+              &copy; 2026
+              <button type="button" class="link" id="open-site">Zishan Ansari</button>
+              &middot; MIT License
+            </p>
           </div>
         </section>
       </form>

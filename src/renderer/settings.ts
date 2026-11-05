@@ -179,6 +179,11 @@ function startSettings(api: DesktopApi): void {
   const updatePillAction = requireElement<HTMLElement>("update-pill-action");
   const openRepository = requireElement<HTMLButtonElement>("open-repository");
   const openOriginal = requireElement<HTMLButtonElement>("open-original");
+  const openReleaseNotes = requireElement<HTMLButtonElement>("open-release-notes");
+  const openIssues = requireElement<HTMLButtonElement>("open-issues");
+  for (const destination of Array.from(document.querySelectorAll<HTMLElement>("[data-external]"))) {
+    destination.append(sfSymbol("arrow.up.right", 10));
+  }
   const openSite = requireElement<HTMLButtonElement>("open-site");
 
   buildIconStyles(iconStyles);
@@ -676,6 +681,12 @@ function startSettings(api: DesktopApi): void {
     void api.openUrl("https://github.com/vipinsight/calendo"),
   );
   openSite.addEventListener("click", () => void api.openUrl("https://github.com/zshanansari"));
+  openReleaseNotes.addEventListener("click", () =>
+    void api.openUrl("https://github.com/zshanansari/glance/releases"),
+  );
+  openIssues.addEventListener("click", () =>
+    void api.openUrl("https://github.com/zshanansari/glance/issues"),
+  );
   // Also arrives for an install started from the menu bar.
   api.onUpdateProgress(({ downloaded, total }) => {
     installing = true;

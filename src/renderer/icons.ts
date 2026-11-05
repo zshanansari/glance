@@ -14,7 +14,8 @@ export type SymbolName =
   | "chevron.right"
   | "mappin.and.ellipse"
   | "eye.slash"
-  | "video.fill";
+  | "video.fill"
+  | "arrow.up.right";
 
 /** Without a size, the stylesheet sizes the glyph. */
 export function sfSymbol(name: SymbolName, size?: number): HTMLElement {

@@ -691,44 +691,34 @@ select:hover {
   color: var(--secondary);
 }
 
-/* About. */
+/* About: the app's own header, centered as an About window sets it, then
+   its links as a grouped list, and the credit at the foot. */
 .about {
   display: flex;
   flex: 1;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 18px;
+  gap: 28px;
   width: 100%;
 }
 
-/* Icon over name and version over the description, centered, as an app's
-   About window sets them. */
-.about-identity {
+.about-hero {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   align-items: center;
+  padding-top: 12px;
   text-align: center;
 }
 
 .about-icon {
-  flex: none;
-  width: 80px;
-  height: 80px;
-}
-
-.about-intro {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  min-width: 0;
+  width: 96px;
+  height: 96px;
 }
 
 .about-name {
-  margin: 0;
-  font-size: 20px;
+  margin: 10px 0 0;
+  font-size: 22px;
   font-weight: 700;
-  line-height: 24px;
+  line-height: 28px;
 }
 
 /* The version rides on the name's line, smaller and lighter, so the name
@@ -740,15 +730,19 @@ select:hover {
 }
 
 .about-copy {
-  max-width: 400px;
-}
-
-.about-copy,
-.about-legal {
-  margin: 0;
+  max-width: 380px;
+  margin: 6px 0 0;
   color: var(--secondary);
   font-size: 12px;
-  line-height: 16px;
+  line-height: 17px;
+}
+
+.about-hero .action {
+  margin-top: 16px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .about-links {
@@ -769,41 +763,40 @@ select:hover {
   padding: 0;
   border: 0;
   background: transparent;
+  text-align: left;
 }
 
 .about-links button + button {
   border-top: 0.5px solid var(--separator);
 }
 
+/* Where the row goes, in the lighter ink, with the arrow that says it
+   leaves for the browser. */
 .about-dest {
-  color: var(--accent);
-}
-
-.about-foot {
-  display: flex;
-  gap: 16px;
+  display: inline-flex;
+  gap: 6px;
   align-items: center;
-  justify-content: space-between;
+  color: var(--secondary);
 }
 
-.about-updates {
-  display: flex;
-  min-width: 0;
-}
-
-.about-updates .action {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.about-links button:hover .about-dest {
+  color: var(--label);
 }
 
 .about-legal {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 0;
+  gap: 4px;
+  align-items: baseline;
+  justify-content: center;
+  margin: auto 0 0;
+  color: var(--tertiary);
+  font-size: 11px;
+  line-height: 14px;
   white-space: nowrap;
+}
+
+.about-legal .link {
+  font-size: 11px;
 }
 
 /* A button, not an anchor: the webview must not navigate away, so the click
