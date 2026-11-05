@@ -508,12 +508,14 @@ select:hover {
   background-color: var(--control-fill);
 }
 
-/* Push buttons: a capsule of fill, no border. */
+/* Push buttons: a capsule of fill, no border. Centring the line box sets
+   the label on its capitals, and mostly-lowercase text then reads low; the
+   extra point underneath lifts it half a point, where AppKit sets it. */
 .action,
 .row .shortcut {
   flex-shrink: 0;
   height: 24px;
-  padding: 0 12px;
+  padding: 0 12px 1px;
   border: 0;
   border-radius: 12px;
   background: var(--control-fill);
