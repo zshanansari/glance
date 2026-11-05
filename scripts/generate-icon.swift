@@ -12,8 +12,7 @@ let tile = 824.0
 let origin = (canvas - tile) / 2
 let radius = tile * 0.223
 // Glance: a white calendar card, Calendar's red across the top and today
-// ringed in that red, tilted a little to the right on a black tile with two
-// blue lights behind it.
+// ringed in that red, on a black tile with two blue lights behind it.
 let tileTop = NSColor(srgbRed: 0.07, green: 0.08, blue: 0.11, alpha: 1)
 let tileBottom = NSColor(srgbRed: 0.02, green: 0.02, blue: 0.04, alpha: 1)
 let lightOrb = NSColor(srgbRed: 0.56, green: 0.70, blue: 1.0, alpha: 1)
@@ -21,8 +20,6 @@ let deepOrb = NSColor(srgbRed: 0.23, green: 0.43, blue: 0.96, alpha: 1)
 let header = NSColor(srgbRed: 1.0, green: 0.23, blue: 0.19, alpha: 1)
 let page = NSColor(srgbRed: 0.96, green: 0.97, blue: 1.0, alpha: 1)
 let cell = NSColor(srgbRed: 0.83, green: 0.86, blue: 0.94, alpha: 1)
-/// Degrees the card leans to the right.
-let tilt = 8.0
 
 func roundedRect(_ rect: NSRect, radius: CGFloat) -> NSBezierPath {
     NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
@@ -80,15 +77,7 @@ func drawAppIcon() -> NSImage {
         rim.lineWidth = 6
         rim.stroke()
 
-        // The card, tilted about the tile's centre. A negative angle turns
-        // it clockwise once the drawing is flipped for export.
-        NSGraphicsContext.saveGraphicsState()
-        let turn = NSAffineTransform()
-        turn.translateX(by: canvas / 2, yBy: canvas / 2)
-        turn.rotate(byDegrees: -tilt)
-        turn.translateX(by: -canvas / 2, yBy: -canvas / 2)
-        turn.concat()
-
+        // The card, centred on the tile.
         let side = tile * 0.64
         let card = NSRect(
             x: (canvas - side) / 2,
@@ -149,7 +138,6 @@ func drawAppIcon() -> NSImage {
                 }
             }
         }
-        NSGraphicsContext.restoreGraphicsState()
         return true
     }
     return image
