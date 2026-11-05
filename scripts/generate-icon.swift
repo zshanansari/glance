@@ -11,16 +11,35 @@ let canvas = 1024.0
 let tile = 824.0
 let origin = (canvas - tile) / 2
 let radius = tile * 0.223
-// Glance: a white calendar card on a deep blue glass tile, Calendar's red
-// across the top, and today ringed in that red the way the popover marks it.
-let tileTop = NSColor(srgbRed: 0.33, green: 0.56, blue: 1.0, alpha: 1)
-let tileBottom = NSColor(srgbRed: 0.16, green: 0.25, blue: 0.80, alpha: 1)
+// Glance: a white calendar card, Calendar's red across the top and today
+// ringed in that red, tilted a little to the right on a black tile with two
+// blue lights behind it.
+let tileTop = NSColor(srgbRed: 0.07, green: 0.08, blue: 0.11, alpha: 1)
+let tileBottom = NSColor(srgbRed: 0.02, green: 0.02, blue: 0.04, alpha: 1)
+let lightOrb = NSColor(srgbRed: 0.56, green: 0.70, blue: 1.0, alpha: 1)
+let deepOrb = NSColor(srgbRed: 0.23, green: 0.43, blue: 0.96, alpha: 1)
 let header = NSColor(srgbRed: 1.0, green: 0.23, blue: 0.19, alpha: 1)
-let page = NSColor(srgbRed: 0.99, green: 0.99, blue: 1.0, alpha: 1)
-let cell = NSColor(srgbRed: 0.87, green: 0.89, blue: 0.93, alpha: 1)
+let page = NSColor(srgbRed: 0.96, green: 0.97, blue: 1.0, alpha: 1)
+let cell = NSColor(srgbRed: 0.83, green: 0.86, blue: 0.94, alpha: 1)
+/// Degrees the card leans to the right.
+let tilt = 8.0
 
 func roundedRect(_ rect: NSRect, radius: CGFloat) -> NSBezierPath {
     NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+}
+
+/// A light behind the card: solid in the middle, softening at its rim.
+func orb(center: NSPoint, radius: CGFloat, color: NSColor) {
+    let gradient = NSGradient(colorsAndLocations:
+        (color, 0.0),
+        (color, 0.78),
+        (color.withAlphaComponent(0.0), 1.0)
+    )
+    gradient?.draw(
+        fromCenter: center, radius: 0,
+        toCenter: center, radius: radius,
+        options: []
+    )
 }
 
 func drawAppIcon() -> NSImage {
@@ -33,86 +52,104 @@ func drawAppIcon() -> NSImage {
         let tilePath = roundedRect(tileRect, radius: radius)
         NSGradient(starting: tileBottom, ending: tileTop)?.draw(in: tilePath, angle: 90)
 
-        // A soft sheen over the upper half, as Liquid Glass catches light.
+        // The two lights, kept inside the tile.
         NSGraphicsContext.saveGraphicsState()
         tilePath.addClip()
+        orb(
+            center: NSPoint(x: tileRect.minX + tile * 0.80, y: tileRect.maxY - tile * 0.20),
+            radius: tile * 0.22,
+            color: lightOrb
+        )
+        orb(
+            center: NSPoint(x: tileRect.minX + tile * 0.18, y: tileRect.maxY - tile * 0.84),
+            radius: tile * 0.17,
+            color: deepOrb
+        )
+        // A soft sheen over the upper half, as Liquid Glass catches light.
         NSGradient(
             starting: NSColor.white.withAlphaComponent(0.0),
-            ending: NSColor.white.withAlphaComponent(0.22)
+            ending: NSColor.white.withAlphaComponent(0.08)
         )?.draw(
             in: NSRect(x: tileRect.minX, y: tileRect.midY, width: tile, height: tile / 2),
             angle: 90
         )
         NSGraphicsContext.restoreGraphicsState()
-        // A hairline rim, lighter at the top edge.
-        NSColor.white.withAlphaComponent(0.28).setStroke()
+        // A hairline rim, so the black tile holds its edge on a dark Dock.
+        NSColor.white.withAlphaComponent(0.14).setStroke()
         let rim = roundedRect(tileRect.insetBy(dx: 3, dy: 3), radius: radius - 3)
         rim.lineWidth = 6
         rim.stroke()
 
-        // The card, lifted off the tile.
-        let inset = tile * 0.17
+        // The card, tilted about the tile's centre. A negative angle turns
+        // it clockwise once the drawing is flipped for export.
+        NSGraphicsContext.saveGraphicsState()
+        let turn = NSAffineTransform()
+        turn.translateX(by: canvas / 2, yBy: canvas / 2)
+        turn.rotate(byDegrees: -tilt)
+        turn.translateX(by: -canvas / 2, yBy: -canvas / 2)
+        turn.concat()
+
+        let side = tile * 0.64
         let card = NSRect(
-            x: origin + inset,
-            y: origin + inset * 0.92,
-            width: tile - inset * 2,
-            height: tile - inset * 2
+            x: (canvas - side) / 2,
+            y: (canvas - side) / 2,
+            width: side,
+            height: side
         )
-        let corner = tile * 0.085
+        let corner = side * 0.25
+        let cardPath = roundedRect(card, radius: corner)
         NSGraphicsContext.saveGraphicsState()
         let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
-        shadow.shadowBlurRadius = 28
-        shadow.shadowOffset = NSSize(width: 0, height: 12)
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.55)
+        shadow.shadowBlurRadius = 40
+        shadow.shadowOffset = NSSize(width: 0, height: -18)
         shadow.set()
         page.setFill()
-        roundedRect(card, radius: corner).fill()
+        cardPath.fill()
         NSGraphicsContext.restoreGraphicsState()
 
-        let bandHeight = card.height * 0.21
+        // The header is clipped to the card's own outline, so the red meets
+        // its rounded corners exactly, with no page showing round its edge.
+        let bandHeight = side * 0.25
         NSGraphicsContext.saveGraphicsState()
-        roundedRect(card, radius: corner).addClip()
+        cardPath.addClip()
         header.setFill()
-        NSRect(x: card.minX, y: card.maxY - bandHeight, width: card.width, height: bandHeight).fill()
+        NSRect(x: card.minX, y: card.maxY - bandHeight, width: side, height: bandHeight).fill()
         NSGraphicsContext.restoreGraphicsState()
 
-        let gridTop = card.minY + card.height * 0.11
-        let grid = NSRect(
-            x: card.minX + card.width * 0.12,
-            y: gridTop,
-            width: card.width * 0.76,
-            height: card.maxY - bandHeight - card.height * 0.1 - gridTop
-        )
+        // Four by three days under the header, today ringed in red.
+        let cellSize = side * 8 / 64
+        let gap = side * 5 / 64
         let cols = 4
         let rows = 3
-        let gap = grid.width * 0.08
-        let cellW = (grid.width - gap * CGFloat(cols - 1)) / CGFloat(cols)
-        let cellH = (grid.height - gap * CGFloat(rows - 1)) / CGFloat(rows)
+        let gridWidth = cellSize * CGFloat(cols) + gap * CGFloat(cols - 1)
+        let left = card.minX + (side - gridWidth) / 2
+        let top = card.maxY - side * 22 / 64
         for row in 0..<rows {
             for col in 0..<cols {
                 let rect = NSRect(
-                    x: grid.minX + CGFloat(col) * (cellW + gap),
-                    y: grid.minY + CGFloat(row) * (cellH + gap),
-                    width: cellW,
-                    height: cellH
+                    x: left + CGFloat(col) * (cellSize + gap),
+                    y: top - cellSize - CGFloat(row) * (cellSize + gap),
+                    width: cellSize,
+                    height: cellSize
                 )
-                let path = roundedRect(rect, radius: cellW * 0.26)
+                let rounding = cellSize * 0.27
                 if row == 1 && col == 2 {
-                    // Today: ringed, not filled.
-                    let stroke = cellW * 0.13
+                    let stroke = cellSize * 0.22
                     let ring = roundedRect(
                         rect.insetBy(dx: stroke / 2, dy: stroke / 2),
-                        radius: cellW * 0.26 - stroke / 2
+                        radius: rounding - stroke / 2
                     )
                     ring.lineWidth = stroke
                     header.setStroke()
                     ring.stroke()
                 } else {
                     cell.setFill()
-                    path.fill()
+                    roundedRect(rect, radius: rounding).fill()
                 }
             }
         }
+        NSGraphicsContext.restoreGraphicsState()
         return true
     }
     return image
