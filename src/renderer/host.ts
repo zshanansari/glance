@@ -16,7 +16,6 @@ export type DesktopApi = {
     image: number[] | null,
   ) => Promise<void>;
   beep: () => Promise<void>;
-  getUpcomingEvent: () => Promise<UpcomingEvent | null>;
   getCalendarEvents: (startAt: number, endAt: number) => Promise<UpcomingEvent[]>;
   getDismissedEvents: () => Promise<DismissedOccurrence[]>;
   dismissUpcomingEvent: (id: string, endAt: number) => Promise<void>;
@@ -82,7 +81,6 @@ export const api: DesktopApi = {
   setTrayLabel: (title, iconDay, style, image) =>
     invoke<void>("set_tray_label", { title, iconDay, style, image }),
   beep: () => invoke<void>("beep"),
-  getUpcomingEvent: () => invoke<UpcomingEvent | null>("get_upcoming_event"),
   getCalendarEvents: (startAt, endAt) =>
     invoke<UpcomingEvent[]>("get_calendar_events", { startAt, endAt }),
   getDismissedEvents: () => invoke<DismissedOccurrence[]>("get_dismissed_events"),

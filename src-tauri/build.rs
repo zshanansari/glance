@@ -22,7 +22,6 @@ const COMMANDS: &[&str] = &[
     "install_update",
     "open_repository",
     "open_link",
-    "get_upcoming_event",
     "get_calendar_events",
     "get_dismissed_events",
     "dismiss_upcoming_event",

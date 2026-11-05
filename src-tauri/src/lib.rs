@@ -368,9 +368,7 @@ fn remember_status_item_menu(tray: &tauri::tray::TrayIcon, share: &TrayMenuShare
             return;
         };
         if let Ok(mut slot) = share.lock() {
-            if slot.is_none() {
-                *slot = item.menu(mtm).map(TrayMenu);
-            }
+            *slot = item.menu(mtm).map(TrayMenu);
         }
         item.setMenu(None);
     });
@@ -397,7 +395,6 @@ fn handle_tray_click(
     tray: &tauri::tray::TrayIcon,
     event: TrayIconEvent,
     #[cfg(target_os = "macos")] menu: &TrayMenuShare,
-    toggle: fn(&AppHandle, tauri::Rect),
 ) {
     let TrayIconEvent::Click {
         button,
@@ -409,7 +406,7 @@ fn handle_tray_click(
         return;
     };
     match tray_click_intent(button, button_state) {
-        TrayClickIntent::Toggle => toggle(
+        TrayClickIntent::Toggle => toggle_calendar(
             tray.app_handle(),
             clicked_rect(tray.app_handle(), button_rect(tray, rect)),
         ),
@@ -984,7 +981,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                     event,
                     #[cfg(target_os = "macos")]
                     &status_menu,
-                    toggle_calendar,
                 );
             }
         })
@@ -1674,12 +1670,6 @@ fn dismiss_upcoming_event(
 }
 
 #[tauri::command]
-async fn get_upcoming_event(app: AppHandle) -> Result<Option<events::UpcomingEvent>, String> {
-    let hidden = hidden_calendar_ids(&app);
-    on_main_async(app, move || events::fetch_upcoming(&hidden)).await?
-}
-
-#[tauri::command]
 async fn get_calendar_events(
     app: AppHandle,
     start_at: i64,
@@ -1949,7 +1939,6 @@ pub fn run() {
             install_update,
             open_repository,
             open_link,
-            get_upcoming_event,
             get_calendar_events,
             get_dismissed_events,
             dismiss_upcoming_event,

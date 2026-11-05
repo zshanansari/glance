@@ -990,17 +990,6 @@ mod macos {
         }
     }
 
-    pub fn fetch_macos(hidden: &[String]) -> Result<Option<UpcomingEvent>, String> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|error| error.to_string())?;
-        let start_ms = now.as_millis() as i64;
-        let end_ms = start_ms.saturating_add(7 * 24 * 60 * 60 * 1000);
-        Ok(fetch_macos_range(start_ms, end_ms, hidden)?
-            .into_iter()
-            .next())
-    }
-
     pub fn open_reminder(id: &str) -> Result<(), String> {
         let string = NSString::from_str(&reminder_show_url(id));
         let Some(url) = NSURL::URLWithString(&string) else {
@@ -1104,18 +1093,6 @@ pub fn list_calendars() -> Result<Vec<CalendarInfo>, String> {
     #[cfg(not(target_os = "macos"))]
     {
         Ok(Vec::new())
-    }
-}
-
-pub fn fetch_upcoming(hidden: &[String]) -> Result<Option<UpcomingEvent>, String> {
-    #[cfg(target_os = "macos")]
-    {
-        macos::fetch_macos(hidden)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = hidden;
-        Ok(None)
     }
 }
 
