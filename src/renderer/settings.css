@@ -148,23 +148,19 @@ input {
 /* The app, where System Settings shows the account: icon, name, version. */
 .sidebar-identity {
   display: flex;
-  gap: 9px;
+  gap: 6px;
   align-items: center;
   margin: 0 0 12px;
-  padding: 6px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  text-align: left;
+  padding: 0 6px;
 }
 
-.sidebar-identity:hover {
-  background: var(--sidebar-selection);
-}
-
+/* The app icon carries macOS's clear margin, about a tenth of its size on
+   each side; pulling it out by that much lines the artwork up with the pane
+   tiles below. */
 .sidebar-identity img {
   width: 36px;
   height: 36px;
+  margin-left: calc(36px * -100 / 1024);
 }
 
 .sidebar-identity span {
@@ -735,9 +731,11 @@ select:hover {
   line-height: 24px;
 }
 
-/* The version rides on the name's line, lighter, so the two read as one. */
+/* The version rides on the name's line, smaller and lighter, so the name
+   leads. */
 .about-version {
   color: var(--secondary);
+  font-size: 13px;
   font-weight: 400;
 }
 

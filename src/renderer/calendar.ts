@@ -535,6 +535,10 @@ function startCalendar(api: DesktopApi): void {
   });
   api.onCalendarHidden(() => {
     delete document.documentElement.dataset.keyboard;
+    document.documentElement.dataset.pointerAway = "";
+  });
+  document.addEventListener("mousemove", () => {
+    delete document.documentElement.dataset.pointerAway;
   });
   document.addEventListener("keydown", (event) => {
     if (!event.metaKey && event.key !== "Escape") {

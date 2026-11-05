@@ -10,15 +10,14 @@
   <body>
     <main class="page">
       <div class="tabs" id="tabs" role="tablist" aria-label="Settings" data-tauri-drag-region>
-        <!-- Where System Settings shows the account: the app itself, which
-             opens About. -->
-        <button type="button" class="sidebar-identity" data-tab="about">
+        <!-- Where System Settings shows the account: the app itself. -->
+        <div class="sidebar-identity">
           <img src="icon.png" alt="" />
           <span>
             <strong>Glance</strong>
             <small id="sidebar-version"></small>
           </span>
-        </button>
+        </div>
         <button
           type="button"
           role="tab"

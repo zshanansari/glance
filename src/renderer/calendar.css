@@ -109,6 +109,9 @@ button:focus {
   gap: 2px;
 }
 
+/* A popover that closed under the pointer keeps WebKit's hover on whatever
+   was clicked, so it would reopen still lit. Hover waits for the pointer to
+   move again; calendar.ts sets and clears the flag. */
 .icon-button {
   display: inline-grid;
   place-items: center;
@@ -118,7 +121,7 @@ button:focus {
   color: var(--secondary);
 }
 
-.icon-button:hover {
+:root:not([data-pointer-away]) .icon-button:hover {
   background: var(--quaternary);
   color: var(--label);
 }
@@ -137,7 +140,7 @@ button:focus {
   font-weight: 500;
 }
 
-.today-button:hover {
+:root:not([data-pointer-away]) .today-button:hover {
   background: var(--tertiary);
 }
 
@@ -278,7 +281,7 @@ button:focus {
   color: var(--tertiary);
 }
 
-.day:hover:not(.is-selected) .day-number {
+:root:not([data-pointer-away]) .day:hover:not(.is-selected) .day-number {
   background: var(--quaternary);
 }
 
@@ -433,22 +436,22 @@ button:focus {
 }
 
 /* The menu highlight: the row takes the accent, its text turns white. */
-.day-event:hover {
+:root:not([data-pointer-away]) .day-event:hover {
   background: var(--accent);
   color: var(--on-accent);
 }
 
-.day-event:hover .day-event-time,
-.day-event:hover .day-event-when,
-.day-event.is-past:hover .day-event-title {
+:root:not([data-pointer-away]) .day-event:hover .day-event-time,
+:root:not([data-pointer-away]) .day-event:hover .day-event-when,
+:root:not([data-pointer-away]) .day-event.is-past:hover .day-event-title {
   color: var(--on-accent);
 }
 
-.day-event:hover .day-event-dot {
+:root:not([data-pointer-away]) .day-event:hover .day-event-dot {
   box-shadow: 0 0 0 1px var(--on-accent);
 }
 
-.day-event:hover .day-event-join {
+:root:not([data-pointer-away]) .day-event:hover .day-event-join {
   background: var(--on-accent);
   color: var(--accent);
 }
@@ -480,13 +483,13 @@ button:focus {
   font: inherit;
 }
 
-.menu-row:hover,
+:root:not([data-pointer-away]) .menu-row:hover,
 :root[data-keyboard] .menu-row:focus {
   background: var(--accent);
   color: var(--on-accent);
 }
 
-.menu-row:hover kbd,
+:root:not([data-pointer-away]) .menu-row:hover kbd,
 :root[data-keyboard] .menu-row:focus kbd {
   color: var(--on-accent);
 }
