@@ -241,9 +241,12 @@ input {
   display: none;
 }
 
+/* At least the window's height, so the legal line sits at the foot; taller
+   when release notes are open, and then the pane scrolls rather than
+   squeezing the links. */
 #panel-about:not([hidden]) {
   display: flex;
-  height: 100%;
+  min-height: 100%;
 }
 
 /* First-run welcome: the whole window, centered, nothing else showing. */
@@ -777,6 +780,7 @@ select {
 
 .about-links {
   display: flex;
+  flex: none;
   flex-direction: column;
   overflow: hidden;
   border-radius: 12px;
