@@ -67,6 +67,12 @@ describe("refused chords", () => {
     );
   });
 
+  it("knows a stored chord and a recorded one are the same", () => {
+    expect(chordProblem("Control+Command+KeyK", "Control+Command+K", "shows the calendar")).toBe(
+      "⌃⌘K already shows the calendar. Try another.",
+    );
+  });
+
   it("accepts a free chord", () => {
     expect(chordProblem("Control+Command+KeyJ", "Control+Command+KeyK", "shows the calendar")).toBeNull();
   });

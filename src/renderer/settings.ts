@@ -441,15 +441,25 @@ function startSettings(api: DesktopApi): void {
     key: "toggleCalendarShortcut" | "joinMeetingShortcut",
     other: () => { chord: string; name: string },
   ): void => {
-    const stopRecording = (): void => {
-      if (field.dataset.recording !== "true") return;
+    // While a field records, Glance's own chords are set aside so their keys
+    // reach it; otherwise ⌃⌘K would open the month rather than be recorded.
+    const endRecording = (): void => {
       field.dataset.recording = "false";
       field.classList.remove("is-recording");
+      void api.suspendShortcuts(false);
+    };
+    const stopRecording = (): void => {
+      if (field.dataset.recording !== "true") return;
+      endRecording();
+      // A note about a refused chord is done with once recording stops.
+      showShortcutProblem(problem, null);
       paintShortcut(field, field.dataset.chord ?? "");
     };
     field.addEventListener("click", () => {
       // WebKit leaves a clicked button unfocused, so its keydown would never fire.
       field.focus();
+      showShortcutProblem(problem, null);
+      void api.suspendShortcuts(true);
       field.dataset.recording = "true";
       field.classList.add("is-recording");
       field.textContent = "Press keys…";
@@ -470,14 +480,12 @@ function startSettings(api: DesktopApi): void {
       showShortcutProblem(problem, refused);
       // A refused chord keeps the field listening for another.
       if (refused) return;
-      field.dataset.recording = "false";
-      field.classList.remove("is-recording");
+      endRecording();
       paintShortcut(field, chord);
       void api.updateSettings({ [key]: chord });
     });
     clear.addEventListener("click", () => {
-      field.dataset.recording = "false";
-      field.classList.remove("is-recording");
+      if (field.dataset.recording === "true") endRecording();
       showShortcutProblem(problem, null);
       paintShortcut(field, "");
       void api.updateSettings({ [key]: "" });

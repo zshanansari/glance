@@ -11,6 +11,7 @@
     "core:window:allow-start-dragging",
     "allow-get-settings",
     "allow-update-settings",
+    "allow-suspend-shortcuts",
     "allow-beep",
     "allow-list-calendars",
     "allow-request-calendar-access",

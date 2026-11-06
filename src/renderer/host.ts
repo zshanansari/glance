@@ -49,6 +49,7 @@ export type DesktopApi = {
   openSettings: () => Promise<void>;
   getAppVersion: () => Promise<string>;
   onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void;
+  suspendShortcuts: (suspended: boolean) => Promise<void>;
   onShortcutFailed: (
     listener: (failure: { setting: "toggleCalendarShortcut" | "joinMeetingShortcut"; chord: string }) => void,
   ) => () => void;
@@ -117,6 +118,7 @@ export const api: DesktopApi = {
   openSettings: () => invoke<void>("open_settings"),
   getAppVersion: () => invoke<string>("app_version"),
   onSettingsChanged: (listener) => subscribe<AppSettings>("settings-changed", listener),
+  suspendShortcuts: (suspended) => invoke<void>("suspend_shortcuts", { suspended }),
   onShortcutFailed: (listener) => subscribe("shortcut-failed", listener),
   onCalendarShown: (listener) => subscribe<void>("calendar-shown", listener),
   onCalendarHidden: (listener) => subscribe<void>("calendar-hidden", listener),

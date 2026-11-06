@@ -106,6 +106,8 @@ struct AppState {
     shortcuts: Mutex<RegisteredShortcuts>,
     /// One rebinding at a time, so two quick edits cannot interleave.
     shortcut_rebind: Mutex<()>,
+    /// Whether Settings has the chords set aside while it records one.
+    shortcuts_suspended: AtomicBool,
     /// The calendar status item's glyph before any update dot, so the dot can
     /// come and go without the renderer repainting. None is text only.
     tray_glyph: Mutex<Option<Vec<u8>>>,
@@ -890,6 +892,49 @@ fn rebind_shortcut(app: &AppHandle, action: ShortcutAction, chord: &str) -> bool
     ok
 }
 
+/// Settings records a chord by hearing its keys, but a chord Glance has bound
+/// never reaches it: macOS hands it to the hotkey first, so pressing ⌃⌘K to
+/// record would open the month instead. Recording sets the bindings aside,
+/// and they come back when it ends.
+#[tauri::command]
+fn suspend_shortcuts(app: AppHandle, suspended: bool) {
+    set_shortcuts_suspended(&app, suspended);
+}
+
+fn set_shortcuts_suspended(app: &AppHandle, suspended: bool) {
+    let state = app.state::<AppState>();
+    if state.shortcuts_suspended.swap(suspended, Ordering::SeqCst) == suspended {
+        return;
+    }
+    // Registering blocks on the main thread, so it happens off it, in turn
+    // with any rebinding.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let state = handle.state::<AppState>();
+        let Ok(_rebinding) = state.shortcut_rebind.lock() else {
+            return;
+        };
+        // A quick pair of calls leaves only the last one to act.
+        if state.shortcuts_suspended.load(Ordering::SeqCst) != suspended {
+            return;
+        }
+        let bound: Vec<Shortcut> = match state.shortcuts.lock() {
+            Ok(registered) => [registered.toggle_calendar, registered.join_meeting]
+                .into_iter()
+                .flatten()
+                .collect(),
+            Err(_) => return,
+        };
+        for shortcut in bound {
+            let _ = if suspended {
+                handle.global_shortcut().unregister(shortcut)
+            } else {
+                handle.global_shortcut().register(shortcut)
+            };
+        }
+    });
+}
+
 /// What Settings hears when macOS would not bind a chord.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -973,6 +1018,8 @@ fn dismiss_settings(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(SETTINGS_LABEL) {
         let _ = window.hide();
     }
+    // A recording cut short by closing Settings must not leave them off.
+    set_shortcuts_suspended(app, false);
     let _ = app.set_activation_policy(ActivationPolicy::Accessory);
 }
 
@@ -1990,6 +2037,7 @@ pub fn run() {
                 dismissed_path,
                 shortcuts: Mutex::new(RegisteredShortcuts::default()),
                 shortcut_rebind: Mutex::new(()),
+                shortcuts_suspended: AtomicBool::new(false),
                 tray_glyph: Mutex::new(Some(TRAY_ICON.to_vec())),
                 calendar_height: Mutex::new(CALENDAR_HEIGHT),
             });
@@ -2039,6 +2087,7 @@ pub fn run() {
             open_link,
             get_calendar_events,
             get_dismissed_events,
+            suspend_shortcuts,
             dismiss_upcoming_event,
             list_calendars,
             request_calendar_access,

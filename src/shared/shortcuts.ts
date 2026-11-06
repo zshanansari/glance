@@ -143,7 +143,9 @@ export function chordProblem(chord: string, other: string, otherName: string): s
   if (RESERVED_CHORDS.includes(chord)) {
     return `${chordLabel(chord)} belongs to macOS or most apps. Try another.`;
   }
-  if (other && chord === other) {
+  // Compared as macOS writes them, so `Control+Command+K` as stored and
+  // `Control+Command+KeyK` as recorded count as the one chord they are.
+  if (other && chordLabel(chord) === chordLabel(other)) {
     return `${chordLabel(chord)} already ${otherName}. Try another.`;
   }
   return null;

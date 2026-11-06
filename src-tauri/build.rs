@@ -15,6 +15,7 @@ const COMMANDS: &[&str] = &[
     "set_calendar_height",
     "popover_material",
     "open_settings",
+    "suspend_shortcuts",
     "app_version",
     "check_for_updates",
     "update_available",
