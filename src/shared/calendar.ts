@@ -108,6 +108,16 @@ export function weekdayLabels(
   });
 }
 
+/**
+ * The ISO week a row of the month belongs to: the week of its Monday. The
+ * first column is a Sunday or Saturday when the week starts there, and that
+ * day still belongs to the ISO week before.
+ */
+export function rowWeekNumber(row: readonly CalendarDay[]): number | null {
+  const monday = row.find((day) => new Date(day.year, day.month, day.day).getDay() === 1);
+  return (monday ?? row[0])?.weekNumber ?? null;
+}
+
 export function buildMonth(
   year: number,
   month: number,

@@ -6,6 +6,7 @@
  */
 import {
   REMINDER_LEAD_MS,
+  REMINDER_LINGER_MS,
   eventStatus,
   reminderEvent,
   reminderStillDue,
@@ -16,6 +17,13 @@ import { sfSymbol } from "./icons";
 import { meetingBrand } from "../shared/meetings";
 import { meetingIcon } from "./brand-icons";
 import { markPopoverMaterial, popoverHeight } from "./popover-size";
+import type { AppSettings } from "../shared/settings";
+
+/** Follows Settings' Theme, as the month does, instead of only the system. */
+function applyTheme(theme: AppSettings["theme"]): void {
+  if (theme === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", theme);
+}
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
@@ -115,15 +123,17 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
     if (!enabled) return;
     try {
       const [events, dismissed] = await Promise.all([
-        api.getCalendarEvents(now, now + REMINDER_LEAD_MS),
+        api.getCalendarEvents(now - REMINDER_LINGER_MS, now + REMINDER_LEAD_MS),
         api.getDismissedEvents().catch(() => []),
       ]);
       if (run !== checking || showing) return;
-      const event = reminderEvent(events, now, dismissed);
-      if (!event || offered.has(occurrenceKey(event))) return;
+      const event = reminderEvent(events, now, dismissed, (candidate) =>
+        offered.has(occurrenceKey(candidate)),
+      );
+      if (!event) return;
       paint(event, now);
       // The host holds it back while the month is open, which lists the
-      // same meeting; the next tick can still offer it.
+      // same meeting; a later tick offers it, until a few minutes in.
       if (await api.showReminder()) {
         offered.add(occurrenceKey(event));
         showing = event;
@@ -133,13 +143,20 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
     }
   };
 
+  // The host hides the card when the month opens; it is done with then.
+  api.onReminderHidden(() => {
+    showing = null;
+  });
+
   void markPopoverMaterial(() => api.getPopoverMaterial());
   void api.getSettings().then((settings) => {
     enabled = settings.remindBeforeMeetings;
+    applyTheme(settings.theme);
     void check();
   });
   api.onSettingsChanged((settings) => {
     enabled = settings.remindBeforeMeetings;
+    applyTheme(settings.theme);
     void check();
   });
   api.onClockTick(() => void check());

@@ -252,8 +252,11 @@ fn close_calendar(app: &AppHandle) {
     }
 }
 
+/// Hides the card and tells its page, which otherwise keeps holding the
+/// meeting it showed and would offer no other until that one's time ran out.
 fn close_reminder(app: &AppHandle) {
     fade_out_and_hide(app, REMINDER_LABEL);
+    let _ = app.emit_to(REMINDER_LABEL, "reminder-hidden", ());
 }
 
 /// Clears AppKit's pressed look on the status item when its popover closes.
@@ -557,8 +560,10 @@ fn apply_window_theme(window: &WebviewWindow, theme: &str) {
 }
 
 fn apply_app_theme(app: &AppHandle, theme: &str) {
-    if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
-        apply_window_theme(&window, theme);
+    for label in [CALENDAR_LABEL, REMINDER_LABEL] {
+        if let Some(window) = app.get_webview_window(label) {
+            apply_window_theme(&window, theme);
+        }
     }
     if let Some(window) = app.get_webview_window(SETTINGS_LABEL) {
         let _ = window.set_theme(window_theme(theme));
@@ -904,6 +909,19 @@ fn present_settings(app: &AppHandle) {
         let _ = window.unminimize();
         glass::present(&window);
         glass::place_window_buttons(&window);
+    }
+}
+
+/// The permission prompts need a regular app to come forward. Once one is
+/// answered, Glance goes back to living in the menu bar alone, unless
+/// Settings is open, which keeps its Dock icon while it is up.
+fn settle_after_access_prompt(app: &AppHandle) {
+    let settings_open = app
+        .get_webview_window(SETTINGS_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+    if !settings_open {
+        let _ = app.set_activation_policy(ActivationPolicy::Accessory);
     }
 }
 
@@ -1476,7 +1494,9 @@ fn install_update_from_menu(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         if let Err(message) = updates::install(&app).await {
             let _ = app.emit("update-failed", message);
-            present_settings(&app);
+            // This runs on a worker thread; windows are AppKit's, main only.
+            let shown = app.clone();
+            let _ = app.run_on_main_thread(move || present_settings(&shown));
         }
     });
 }
@@ -1701,7 +1721,11 @@ async fn get_calendar_events(
     end_at: i64,
 ) -> Result<Vec<events::UpcomingEvent>, String> {
     let hidden = hidden_calendar_ids(&app);
-    on_main_async(app, move || events::fetch_range(start_at, end_at, &hidden)).await?
+    let pending =
+        on_main_async(app, move || events::start_range(start_at, end_at, &hidden)).await??;
+    tauri::async_runtime::spawn_blocking(move || pending.finish())
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -1713,7 +1737,7 @@ async fn list_calendars(app: AppHandle) -> Result<Vec<events::CalendarInfo>, Str
 async fn request_calendar_access(app: AppHandle) -> Result<bool, String> {
     let _ = app.set_activation_policy(ActivationPolicy::Regular);
     let waiting = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
         waiting
             .run_on_main_thread(move || {
@@ -1746,7 +1770,9 @@ async fn request_calendar_access(app: AppHandle) -> Result<bool, String> {
         Ok(granted)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string());
+    settle_after_access_prompt(&app);
+    result?
 }
 
 #[tauri::command]
@@ -1758,7 +1784,7 @@ async fn get_calendar_access(app: AppHandle) -> Result<bool, String> {
 async fn request_reminders_access(app: AppHandle) -> Result<bool, String> {
     let _ = app.set_activation_policy(ActivationPolicy::Regular);
     let waiting = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
         waiting
             .run_on_main_thread(move || {
@@ -1779,7 +1805,9 @@ async fn request_reminders_access(app: AppHandle) -> Result<bool, String> {
         Ok(granted)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string());
+    settle_after_access_prompt(&app);
+    result?
 }
 
 #[tauri::command]

@@ -247,7 +247,9 @@ function startSettings(api: DesktopApi): void {
     const selected = selectedWeekdays();
     highlightDays.replaceChildren(
     ...highlightDaysFrom(weekStartsOn).map((day) => {
-      const wrap = document.createElement("label");
+      // A div, not a label: a label would pass a click on the letter on to
+      // the button as a second click, and the two would cancel out.
+      const wrap = document.createElement("div");
       wrap.className = "weekday-toggle";
       const caption = document.createElement("span");
       caption.textContent = weekdayLetter(day.id);

@@ -187,6 +187,22 @@ pub struct SettingsStore {
     current: AppSettings,
 }
 
+/// Reads settings one field at a time, so a field of the wrong type (a
+/// `null`, a string where a number belongs, a value from a newer or older
+/// version) falls back to its default alone instead of resetting the file.
+fn lenient_settings(value: &serde_json::Value) -> Option<AppSettings> {
+    let fields = value.as_object()?;
+    let mut kept = serde_json::Map::new();
+    for (key, field) in fields {
+        let mut trial = kept.clone();
+        trial.insert(key.clone(), field.clone());
+        if serde_json::from_value::<AppSettings>(serde_json::Value::Object(trial)).is_ok() {
+            kept.insert(key.clone(), field.clone());
+        }
+    }
+    serde_json::from_value(serde_json::Value::Object(kept)).ok()
+}
+
 impl SettingsStore {
     pub fn load(dir: PathBuf) -> Self {
         let path = dir.join("settings.json");
@@ -194,7 +210,7 @@ impl SettingsStore {
             .ok()
             .and_then(|raw| {
                 let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
-                let mut parsed: AppSettings = serde_json::from_value(value.clone()).ok()?;
+                let mut parsed = lenient_settings(&value)?;
                 if value.get("highlightWeekdays").is_none() {
                     let dim = value
                         .get("dimWeekends")
@@ -530,6 +546,32 @@ mod tests {
         assert!(settings.launch_at_login);
         assert!(settings.beep_on_the_hour);
         assert_eq!(settings.theme, "dark");
+    }
+
+    #[test]
+    fn one_mistyped_field_falls_back_alone() {
+        let dir = std::env::temp_dir().join(format!(
+            "glance-lenient-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).expect("dir");
+        fs::write(
+            dir.join("settings.json"),
+            r#"{"theme": "dark", "weekStartsOn": "1", "highlightWeekdays": [-1],
+                "joinMeetingShortcut": null, "showWeekNumbers": true}"#,
+        )
+        .expect("write");
+        let settings = SettingsStore::load(dir.clone()).value();
+        let defaults = AppSettings::default();
+        assert_eq!(settings.theme, "dark");
+        assert!(settings.show_week_numbers);
+        assert_eq!(settings.week_starts_on, defaults.week_starts_on);
+        assert_eq!(settings.highlight_weekdays, defaults.highlight_weekdays);
+        assert_eq!(settings.join_meeting_shortcut, defaults.join_meeting_shortcut);
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]

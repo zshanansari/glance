@@ -54,6 +54,7 @@ export type DesktopApi = {
   onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void;
   onCalendarShown: (listener: () => void) => () => void;
   onCalendarHidden: (listener: () => void) => () => void;
+  onReminderHidden: (listener: () => void) => () => void;
   onClockTick: (listener: () => void) => () => void;
   onEventDismissed: (listener: () => void) => () => void;
   onJoinUpcomingRequested: (listener: () => void) => () => void;
@@ -121,6 +122,7 @@ export const api: DesktopApi = {
   onSettingsChanged: (listener) => subscribe<AppSettings>("settings-changed", listener),
   onCalendarShown: (listener) => subscribe<void>("calendar-shown", listener),
   onCalendarHidden: (listener) => subscribe<void>("calendar-hidden", listener),
+  onReminderHidden: (listener) => subscribe<void>("reminder-hidden", listener),
   onClockTick: (listener) => subscribe<void>("clock-tick", listener),
   onEventDismissed: (listener) => subscribe<void>("event-dismissed", listener),
   onJoinUpcomingRequested: (listener) => subscribe<void>("join-upcoming", listener),

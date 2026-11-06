@@ -422,12 +422,11 @@ mod macos {
     use objc2_event_kit::{EKCalendar, EKEntityType, EKEventStore, EKReminder, EKSource};
     use objc2_foundation::{
         MainThreadMarker, NSCalendar, NSDate, NSDateComponentUndefined, NSDateComponents,
-        NSRunLoop, NSString, NSURL,
+        NSString, NSURL,
     };
     use std::cell::RefCell;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
-    use std::time::{Duration, Instant};
 
     thread_local! {
         static STORE: RefCell<Option<Retained<EKEventStore>>> = const { RefCell::new(None) };
@@ -795,7 +794,7 @@ mod macos {
         start_ms: i64,
         end_ms: i64,
         hidden: &[String],
-    ) -> Result<Vec<UpcomingEvent>, String> {
+    ) -> Result<super::PendingFetch, String> {
         require_main_thread();
         autoreleasepool(|_| {
             let store = event_store();
@@ -809,6 +808,7 @@ mod macos {
                 unsafe { store.refreshSourcesIfNecessary() };
             }
             if !can_fetch_events(status_code(), granted_this_session()) {
+                // calendar.ts matches these words to offer the access prompt.
                 return Err("Calendar access is not enabled".into());
             }
             let start = NSDate::dateWithTimeIntervalSince1970(start_ms as f64 / 1000.0);
@@ -880,11 +880,13 @@ mod macos {
                     has_participants: has_participants(&event),
                 });
             }
-            if can_fetch_events(reminder_status_code(), reminders_granted_this_session()) {
-                found.extend(fetch_macos_reminders(&store, start_ms, end_ms, hidden)?);
-            }
-            found.sort_by_key(|event| event.start_at);
-            Ok(found)
+            let reminders =
+                if can_fetch_events(reminder_status_code(), reminders_granted_this_session()) {
+                    Some(start_reminders_fetch(&store, start_ms, end_ms, hidden))
+                } else {
+                    None
+                };
+            Ok(super::PendingFetch { events: found, reminders })
         })
     }
 
@@ -901,12 +903,15 @@ mod macos {
         Some(((date.timeIntervalSince1970() * 1000.0) as i64, all_day))
     }
 
-    fn fetch_macos_reminders(
+    /// Asks EventKit for the range's reminders and returns where they will
+    /// arrive. EventKit answers on a queue of its own, so the caller waits off
+    /// the main thread rather than spinning its run loop here.
+    fn start_reminders_fetch(
         store: &EKEventStore,
         start_ms: i64,
         end_ms: i64,
         hidden: &[String],
-    ) -> Result<Vec<UpcomingEvent>, String> {
+    ) -> std::sync::mpsc::Receiver<Vec<UpcomingEvent>> {
         let start = NSDate::dateWithTimeIntervalSince1970(start_ms as f64 / 1000.0);
         let end = NSDate::dateWithTimeIntervalSince1970(end_ms as f64 / 1000.0);
         let predicate = unsafe {
@@ -974,20 +979,11 @@ mod macos {
                 let _ = sender.send(found);
             },
         );
+        // EventKit copies the block it keeps, so ours can go when this does.
         unsafe {
             store.fetchRemindersMatchingPredicate_completion(&predicate, &completion);
         }
-        std::mem::forget(completion);
-        let deadline = Instant::now() + Duration::from_secs(10);
-        loop {
-            if let Ok(found) = receiver.try_recv() {
-                return Ok(found);
-            }
-            if Instant::now() >= deadline {
-                return Err("Could not read reminders".into());
-            }
-            NSRunLoop::currentRunLoop().runUntilDate(&NSDate::dateWithTimeIntervalSinceNow(0.05));
-        }
+        receiver
     }
 
     pub fn open_reminder(id: &str) -> Result<(), String> {
@@ -1140,22 +1136,46 @@ pub fn open_date_time_settings() -> Result<(), String> {
     }
 }
 
-pub fn fetch_range(
-    start_ms: i64,
-    end_ms: i64,
-    hidden: &[String],
-) -> Result<Vec<UpcomingEvent>, String> {
+/// A range's events, read at once on the main thread, and its reminders,
+/// still on their way from EventKit.
+pub struct PendingFetch {
+    events: Vec<UpcomingEvent>,
+    reminders: Option<std::sync::mpsc::Receiver<Vec<UpcomingEvent>>>,
+}
+
+/// How long to wait for reminders before showing the events without them.
+const REMINDERS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+impl PendingFetch {
+    /// Joins the reminders to the events, in start order. Blocks while they
+    /// arrive, so it runs off the main thread. Reminders that fail or take
+    /// too long are left out; the events still show.
+    pub fn finish(self) -> Vec<UpcomingEvent> {
+        let mut found = self.events;
+        if let Some(receiver) = self.reminders {
+            match receiver.recv_timeout(REMINDERS_TIMEOUT) {
+                Ok(reminders) => found.extend(reminders),
+                Err(_) => eprintln!("Glance: reminders did not arrive; showing events only"),
+            }
+        }
+        found.sort_by_key(|event| event.start_at);
+        found
+    }
+}
+
+/// Starts reading a range. Call on the main thread, then `finish` off it.
+pub fn start_range(start_ms: i64, end_ms: i64, hidden: &[String]) -> Result<PendingFetch, String> {
     #[cfg(target_os = "macos")]
     {
         if end_ms <= start_ms {
-            return Ok(Vec::new());
+            return Ok(PendingFetch { events: Vec::new(), reminders: None });
         }
         macos::fetch_macos_range(start_ms, end_ms, hidden)
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (start_ms, end_ms, hidden);
-        Ok(Vec::new())
+        Ok(PendingFetch { events: Vec::new(), reminders: None })
     }
 }
 

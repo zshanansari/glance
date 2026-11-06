@@ -250,7 +250,9 @@ export function trayEventTime(
   now: number,
   locale?: string,
 ): string {
-  if (now >= event.startAt) return eventStatus(event, now).label;
+  // Once it starts, the countdown beside the date already says how long is
+  // left, so the time would only repeat it.
+  if (now >= event.startAt) return "";
   if (event.allDay) return "All day";
   return new Intl.DateTimeFormat(locale, {
     hour: "numeric",
@@ -300,20 +302,31 @@ export const REMINDER_LINGER_MS = 5 * MINUTE_MS;
 
 /**
  * The meeting to remind about now: timed, with a join link, not declined or
- * dismissed, and starting within the lead. The earliest start wins.
+ * dismissed, and starting within the lead. One that started a few minutes
+ * ago still qualifies when it was never offered, as when the month was open
+ * at its minute. A meeting about to start comes before one already running;
+ * otherwise the earliest start wins.
  */
 export function reminderEvent(
   events: readonly UpcomingEvent[],
   now: number,
   dismissed: readonly DismissedOccurrence[] = [],
+  offered: (event: UpcomingEvent) => boolean = () => false,
 ): UpcomingEvent | null {
   let best: UpcomingEvent | null = null;
+  const rank = (event: UpcomingEvent): number => (event.startAt > now ? 0 : 1);
   for (const event of events) {
     if (event.allDay || !event.joinUrl || event.response === "declined") continue;
-    if (occurrenceIsDismissed(event, dismissed, now)) continue;
+    if (occurrenceIsDismissed(event, dismissed, now) || offered(event)) continue;
     const until = event.startAt - now;
-    if (until <= 0 || until > REMINDER_LEAD_MS) continue;
-    if (!best || event.startAt < best.startAt) best = event;
+    if (until > REMINDER_LEAD_MS || !reminderStillDue(event, now)) continue;
+    if (
+      !best ||
+      rank(event) < rank(best) ||
+      (rank(event) === rank(best) && event.startAt < best.startAt)
+    ) {
+      best = event;
+    }
   }
   return best;
 }

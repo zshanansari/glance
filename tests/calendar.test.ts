@@ -6,6 +6,7 @@ import {
   isoWeekNumber,
   toIso,
   weekdayIndex,
+  rowWeekNumber,
 } from "../src/shared/calendar";
 
 describe("month grid", () => {
@@ -79,5 +80,20 @@ describe("date helpers", () => {
   it("uses ISO week numbers", () => {
     expect(isoWeekNumber(atNoon(2026, 0, 1))).toBe(1);
     expect(isoWeekNumber(atNoon(2026, 8, 8))).toBe(37);
+  });
+});
+
+describe("row week numbers", () => {
+  it("number a Sunday-first row by its Monday", () => {
+    // January 2026: the row Sun 4 – Sat 10 is ISO week 2, though Sun 4 is in week 1.
+    const month = buildMonth(2026, 0, 0, atNoon(2026, 0, 15));
+    const row = month.weeks.find((week) => week.some((day) => day.iso === "2026-01-05"))!;
+    expect(row[0]!.weekNumber).toBe(1);
+    expect(rowWeekNumber(row)).toBe(2);
+  });
+
+  it("match the first column when the week starts on Monday", () => {
+    const month = buildMonth(2026, 0, 1, atNoon(2026, 0, 15));
+    for (const row of month.weeks) expect(rowWeekNumber(row)).toBe(row[0]!.weekNumber);
   });
 });

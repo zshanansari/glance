@@ -4,6 +4,7 @@ import {
   buildMonth,
   dayName,
   fromIso,
+  rowWeekNumber,
   toIso,
 } from "../shared/calendar";
 import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } from "../shared/settings";
@@ -81,6 +82,9 @@ function paintColumnHighlights(
     ),
   );
 }
+
+/** The host's words when Calendar access has not been granted. */
+const CALENDAR_ACCESS_MISSING = "Calendar access is not enabled";
 
 function startCalendar(api: DesktopApi): void {
   const monthLabel = requireElement<HTMLHeadingElement>("month-label");
@@ -293,12 +297,17 @@ function startCalendar(api: DesktopApi): void {
       ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
       : "";
     if (eventError) {
-      const allow = document.createElement("button");
-      allow.type = "button";
-      allow.className = "menu-row";
-      allow.textContent = "Allow Calendar Access…";
-      allow.addEventListener("click", () => void requestAccess(allow));
-      dayEventsList.replaceChildren(allow);
+      // Only a missing permission is fixed by asking for one; any other
+      // failure is offered again instead of a prompt that would not help.
+      const needsAccess = eventError === CALENDAR_ACCESS_MISSING;
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "menu-row";
+      action.textContent = needsAccess ? "Allow Calendar Access…" : "Couldn’t Load Events. Try Again";
+      action.addEventListener("click", () =>
+        void (needsAccess ? requestAccess(action) : refreshUpcoming()),
+      );
+      dayEventsList.replaceChildren(action);
     } else if (!selectedEvents.length) {
       const empty = document.createElement("p");
       empty.className = "day-events-empty";
@@ -418,7 +427,7 @@ function startCalendar(api: DesktopApi): void {
         const number = document.createElement("th");
         number.scope = "row";
         number.className = "weeknum";
-        number.textContent = String(week[0]?.weekNumber ?? "");
+        number.textContent = String(rowWeekNumber(week) ?? "");
         row.append(number);
       }
       for (const day of week) {
@@ -658,12 +667,29 @@ function startCalendar(api: DesktopApi): void {
   });
   void markPopoverMaterial(() => api.getPopoverMaterial());
   api.onSettingsChanged(applySettings);
+  // A new day carries the selection with it when it was on the old today,
+  // so the month opens on today rather than yesterday. A day picked on
+  // purpose stays picked.
+  const followToday = (): void => {
+    const todayIso = toIso(new Date());
+    if (!renderedDay || renderedDay === todayIso || focusIso !== renderedDay) return;
+    const today = new Date();
+    focusIso = todayIso;
+    viewYear = today.getFullYear();
+    viewMonth = today.getMonth();
+    pinnedOutsideIso = null;
+    paintDayEvents();
+  };
+
   api.onClockTick(() => {
-    const hour = new Date().getHours();
+    const now = new Date();
+    const hour = now.getHours();
     if (hour !== lastHour) {
       lastHour = hour;
-      if (settings?.beepOnTheHour) void api.beep();
+      // Only on the hour itself: waking at 11:07 changes the hour too.
+      if (settings?.beepOnTheHour && now.getMinutes() === 0) void api.beep();
     }
+    followToday();
     refreshTray();
     render();
     void refreshUpcoming();
@@ -679,6 +705,7 @@ function startCalendar(api: DesktopApi): void {
   // around today on every open is not how a menu looks.
   api.onCalendarShown(() => {
     refreshTray();
+    followToday();
     if (toIso(new Date()) !== renderedDay) render();
     void refreshUpcoming();
   });

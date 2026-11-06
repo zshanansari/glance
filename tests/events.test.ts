@@ -349,18 +349,18 @@ describe("menu bar preview text", () => {
     expect(text).toBe("3:00 PM  Design sync");
   });
 
-  it("reads as now while the event is running", () => {
+  it("leaves the time to the countdown once the event is running", () => {
     expect(
       trayEventText(standup, standup.startAt, { showTitle: false, showTime: true }, "en-US"),
-    ).toBe("now");
+    ).toBeNull();
     expect(
       trayEventText(
         standup,
         standup.startAt + 15 * 60_000,
-        { showTitle: false, showTime: true },
+        { showTitle: true, showTime: true },
         "en-US",
       ),
-    ).toBe("45m left");
+    ).toBe("Design sync");
   });
 
   it("shortens a title that would eat the menu bar", () => {
@@ -414,7 +414,18 @@ describe("meeting reminder", () => {
   it("offers a meeting with a link on the tick a minute before it starts", () => {
     expect(reminderEvent([call], tickBefore)).toBe(call);
     expect(reminderEvent([call], start - 2 * 60_000 + 40)).toBeNull();
-    expect(reminderEvent([call], start)).toBeNull();
+  });
+
+  it("still offers a call it never offered, for its first few minutes", () => {
+    const offered = (candidate: UpcomingEvent) => candidate.id === call.id;
+    expect(reminderEvent([call], start + 60_000 + 40)).toBe(call);
+    expect(reminderEvent([call], start + 60_000 + 40, [], offered)).toBeNull();
+    expect(reminderEvent([call], start + 5 * 60_000 + 40)).toBeNull();
+  });
+
+  it("puts a call about to start ahead of one already running", () => {
+    const running = { ...call, id: "running", startAt: start - 3 * 60_000 };
+    expect(reminderEvent([running, call], tickBefore)).toBe(call);
   });
 
   it("skips calls with no link, all-day items, declines and dismissals", () => {
