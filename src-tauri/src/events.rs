@@ -808,7 +808,7 @@ mod macos {
                 unsafe { store.refreshSourcesIfNecessary() };
             }
             if !can_fetch_events(status_code(), granted_this_session()) {
-                // calendar.ts matches these words to offer the access prompt.
+                // src/shared/events.ts matches these words to offer the prompt.
                 return Err("Calendar access is not enabled".into());
             }
             let start = NSDate::dateWithTimeIntervalSince1970(start_ms as f64 / 1000.0);

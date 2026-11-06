@@ -165,3 +165,24 @@ export function dayName(date: Date, locale?: string): string {
     year: "numeric",
   }).format(date);
 }
+
+/**
+ * Whether the selection should move to today when the clock or an open
+ * finds a new day: only when it was on the day the month last showed as
+ * today. A day picked on purpose stays picked.
+ */
+export function selectionFollowsToday(
+  renderedToday: string,
+  selected: string,
+  today: string,
+): boolean {
+  return renderedToday !== "" && renderedToday !== today && selected === renderedToday;
+}
+
+/**
+ * Whether the hourly chime is due on this tick: the hour has turned and the
+ * clock is at its top. Waking at 11:07 turns the hour too, without a chime.
+ */
+export function chimeDue(lastHour: number, now: Date): boolean {
+  return now.getHours() !== lastHour && now.getMinutes() === 0;
+}

@@ -4,7 +4,9 @@ import {
   buildMonth,
   dayName,
   fromIso,
+  chimeDue,
   rowWeekNumber,
+  selectionFollowsToday,
   toIso,
 } from "../shared/calendar";
 import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } from "../shared/settings";
@@ -13,6 +15,7 @@ import {
   eventsOnDay,
   eventStatus,
   meetingToJoin,
+  needsCalendarAccess,
   eventTimeRange,
   trayEventText,
   trayIconEvent,
@@ -82,9 +85,6 @@ function paintColumnHighlights(
     ),
   );
 }
-
-/** The host's words when Calendar access has not been granted. */
-const CALENDAR_ACCESS_MISSING = "Calendar access is not enabled";
 
 function startCalendar(api: DesktopApi): void {
   const monthLabel = requireElement<HTMLHeadingElement>("month-label");
@@ -299,7 +299,7 @@ function startCalendar(api: DesktopApi): void {
     if (eventError) {
       // Only a missing permission is fixed by asking for one; any other
       // failure is offered again instead of a prompt that would not help.
-      const needsAccess = eventError === CALENDAR_ACCESS_MISSING;
+      const needsAccess = needsCalendarAccess(eventError);
       const action = document.createElement("button");
       action.type = "button";
       action.className = "menu-row";
@@ -672,7 +672,7 @@ function startCalendar(api: DesktopApi): void {
   // purpose stays picked.
   const followToday = (): void => {
     const todayIso = toIso(new Date());
-    if (!renderedDay || renderedDay === todayIso || focusIso !== renderedDay) return;
+    if (!selectionFollowsToday(renderedDay, focusIso, todayIso)) return;
     const today = new Date();
     focusIso = todayIso;
     viewYear = today.getFullYear();
@@ -683,12 +683,8 @@ function startCalendar(api: DesktopApi): void {
 
   api.onClockTick(() => {
     const now = new Date();
-    const hour = now.getHours();
-    if (hour !== lastHour) {
-      lastHour = hour;
-      // Only on the hour itself: waking at 11:07 changes the hour too.
-      if (settings?.beepOnTheHour && now.getMinutes() === 0) void api.beep();
-    }
+    if (settings?.beepOnTheHour && chimeDue(lastHour, now)) void api.beep();
+    lastHour = now.getHours();
     followToday();
     refreshTray();
     render();

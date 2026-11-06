@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   endOfTomorrow,
@@ -12,6 +13,8 @@ import {
   upcomingFetchEnd,
   upcomingHorizonEnd,
   meetingToJoin,
+  needsCalendarAccess,
+  CALENDAR_ACCESS_MISSING,
   reminderEvent,
   reminderStillDue,
   type EventFilters,
@@ -478,5 +481,17 @@ describe("join shortcut", () => {
     const tomorrow = call("tomorrow", at(10) + 86_400_000, at(11) + 86_400_000);
     const noLink = { ...call("no-link", at(11), at(12)), joinUrl: null };
     expect(meetingToJoin([over, declined, allDay, tomorrow, noLink], now)).toBeNull();
+  });
+});
+
+describe("a failed read", () => {
+  it("asks for Calendar access only when access is what is missing", () => {
+    expect(needsCalendarAccess("Calendar access is not enabled")).toBe(true);
+    expect(needsCalendarAccess("Could not read events")).toBe(false);
+  });
+
+  it("matches the words the host sends", () => {
+    const host = readFileSync("src-tauri/src/events.rs", "utf8");
+    expect(host).toContain(`"${CALENDAR_ACCESS_MISSING}"`);
   });
 });

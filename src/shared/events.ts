@@ -357,3 +357,14 @@ export function meetingToJoin(
   }
   return best;
 }
+
+/** The host's words when Calendar access has not been granted (events.rs). */
+export const CALENDAR_ACCESS_MISSING = "Calendar access is not enabled";
+
+/**
+ * Whether a failed read is fixed by asking for Calendar access. Any other
+ * failure is better offered again than met with a prompt that cannot help.
+ */
+export function needsCalendarAccess(error: string): boolean {
+  return error === CALENDAR_ACCESS_MISSING;
+}

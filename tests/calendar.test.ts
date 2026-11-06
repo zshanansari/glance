@@ -6,7 +6,9 @@ import {
   isoWeekNumber,
   toIso,
   weekdayIndex,
+  chimeDue,
   rowWeekNumber,
+  selectionFollowsToday,
 } from "../src/shared/calendar";
 
 describe("month grid", () => {
@@ -95,5 +97,28 @@ describe("row week numbers", () => {
   it("match the first column when the week starts on Monday", () => {
     const month = buildMonth(2026, 0, 1, atNoon(2026, 0, 15));
     for (const row of month.weeks) expect(rowWeekNumber(row)).toBe(row[0]!.weekNumber);
+  });
+});
+
+describe("a new day", () => {
+  it("moves the selection on when it was on the old today", () => {
+    expect(selectionFollowsToday("2026-11-05", "2026-11-05", "2026-11-06")).toBe(true);
+  });
+
+  it("keeps a day picked on purpose, and does nothing on the same day", () => {
+    expect(selectionFollowsToday("2026-11-05", "2026-11-09", "2026-11-06")).toBe(false);
+    expect(selectionFollowsToday("2026-11-06", "2026-11-06", "2026-11-06")).toBe(false);
+    expect(selectionFollowsToday("", "2026-11-06", "2026-11-06")).toBe(false);
+  });
+});
+
+describe("hourly chime", () => {
+  it("sounds on the tick at the top of a new hour", () => {
+    expect(chimeDue(10, new Date(2026, 10, 6, 11, 0, 0, 40))).toBe(true);
+  });
+
+  it("stays quiet when waking mid-hour or within the same hour", () => {
+    expect(chimeDue(9, new Date(2026, 10, 6, 11, 7))).toBe(false);
+    expect(chimeDue(11, new Date(2026, 10, 6, 11, 0))).toBe(false);
   });
 });
