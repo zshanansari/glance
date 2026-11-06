@@ -46,6 +46,17 @@ Then the script:
 4. Writes `latest.json` next to the DMG, pointing at this version’s GitHub
    download URL.
 
+With `--notes docs/release-notes/v<version>.md`, the notes go into
+`latest.json`, and installed copies show them under “What’s new” in Settings →
+About before updating. Without it, the notes are a link to the release page.
+Write the notes first: the file is read before the build starts. The script
+also refuses to start if the three version numbers disagree.
+
+`pnpm dmg:unnotarized` does the same without Apple's notarization, for a
+project with no Developer ID yet. `NOTARY_PROFILE` (a
+`xcrun notarytool store-credentials` profile) keeps the Apple password in the
+Keychain instead of passing it on the command line.
+
 When it finishes it prints the three files to upload.
 
 If the build stops with `can't find crate for serde_derive` (or another

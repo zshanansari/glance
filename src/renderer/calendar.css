@@ -493,9 +493,21 @@ button:focus {
   color: var(--label);
 }
 
-/* A failed open or join, said where the count usually sits. */
+/* A failed open or join, said where the count usually sits. It has the
+   whole heading line to itself while it shows. */
 #day-events-count.is-failure {
   color: var(--calendar);
+}
+
+.day-events-heading.is-failing h2 {
+  display: none;
+}
+
+.day-events-heading.is-failing #day-events-count {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .day-event-join {

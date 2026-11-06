@@ -407,6 +407,9 @@ function startCalendar(api: DesktopApi): void {
       day: "numeric",
     }).format(selectedDate);
     dayEventsCount.classList.toggle("is-failure", failure !== null);
+    // The message takes the whole line for its few seconds, rather than
+    // squeezing the date to "Frid…".
+    dayEventsCount.parentElement?.classList.toggle("is-failing", failure !== null);
     dayEventsCount.textContent =
       failure ??
       (selectedEvents.length
