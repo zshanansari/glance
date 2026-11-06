@@ -18,7 +18,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { payloadUrl, updaterManifest } from "./updater-manifest.mjs";
+import { payloadUrl, updaterManifest, updaterTargets } from "./updater-manifest.mjs";
 
 const ENV_FILE = ".env.notarization";
 const DMG_DIR = "src-tauri/target/release/bundle/dmg";
@@ -120,6 +120,11 @@ function writeManifest(version, notes) {
     version,
     notes,
     signature,
+    targets: updaterTargets(
+      spawnSync("lipo", ["-archs", join(MACOS_DIR, "Glance.app", "Contents", "MacOS", "glance")], {
+        encoding: "utf8",
+      }).stdout ?? "",
+    ),
     url: payloadUrl({ repository: REPOSITORY, tag, file: payload.split("/").pop() }),
   });
   const path = join(DMG_DIR, "latest.json");

@@ -1,0 +1,28 @@
+{
+  "menuBarIcon": "filled",
+  "showWeekday": true,
+  "showMonth": false,
+  "weekStartsOn": 0,
+  "showWeekNumbers": false,
+  "highlightWeekdays": [
+    0,
+    6
+  ],
+  "launchAtLogin": false,
+  "beepOnTheHour": false,
+  "showUpcomingEvent": false,
+  "upcomingHorizonDays": 1,
+  "upcomingIconLeadMinutes": 0,
+  "includeEventsWithoutParticipants": true,
+  "includeEventsWithoutLocation": true,
+  "showEventTitleInMenuBar": false,
+  "showEventTimeInMenuBar": false,
+  "remindBeforeMeetings": true,
+  "toggleCalendarShortcut": "Control+Command+K",
+  "joinMeetingShortcut": "",
+  "hiddenCalendarIds": [],
+  "autoUpdate": true,
+  "theme": "system",
+  "dayHighlight": "red",
+  "onboarded": false
+}

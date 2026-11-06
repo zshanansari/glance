@@ -60,11 +60,6 @@ export function endOfMonth(year: number, month: number): Date {
   return atNoon(year, month + 1, 0);
 }
 
-export function clampToMonth(date: Date, year: number, month: number): Date {
-  const last = endOfMonth(year, month).getDate();
-  return atNoon(year, month, Math.min(date.getDate(), last));
-}
-
 /**
  * ISO-8601 week number. Week 1 contains the year's first Thursday.
  * Independent of the displayed week start, so the number stays stable

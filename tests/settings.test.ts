@@ -1,69 +1,46 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  DAY_HIGHLIGHTS,
   DEFAULT_SETTINGS,
   MENU_BAR_ICONS,
-  calendarIsVisible,
   calendarsOfKind,
   groupCalendarsBySource,
-  formatMenuBarDate,
   highlightedColumnRuns,
   menuBarLabel,
   trayLabelKey,
-  normalizeHiddenCalendarIds,
-  normalizeSettings,
   upcomingHorizonLabel,
   upcomingIconLeadLabel,
   highlightDaysFrom,
 } from "../src/shared/settings";
 
-describe("normalizeSettings", () => {
-  it("falls back to defaults for unusable input", () => {
-    expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
-    expect(normalizeSettings("nope")).toEqual(DEFAULT_SETTINGS);
+// The host (settings.rs) reads, migrates and checks the settings file; this
+// side only needs the same defaults and the same choices, so both are held
+// to one fixture.
+const defaults = JSON.parse(readFileSync("tests/fixtures/default-settings.json", "utf8"));
+
+describe("settings shared with the host", () => {
+  it("starts from the same defaults as settings.rs", () => {
+    expect(DEFAULT_SETTINGS).toEqual(defaults);
   });
 
-  it("keeps recognised values", () => {
-    const result = normalizeSettings({
-      menuBarIcon: "framed",
-      showWeekday: false,
-      showMonth: true,
-      weekStartsOn: 1,
-      showWeekNumbers: true,
-      highlightWeekdays: [1, 5],
-      launchAtLogin: true,
-      beepOnTheHour: true,
-      showUpcomingEvent: true,
-      upcomingHorizonHours: 48,
-      upcomingIconLeadMinutes: 15,
-      hiddenCalendarIds: ["work"],
-      theme: "dark",
-    });
-    expect(result.menuBarIcon).toBe("framed");
-    expect(result.showWeekday).toBe(false);
-    expect(result.showMonth).toBe(true);
-    expect(result.weekStartsOn).toBe(1);
-    expect(result.showWeekNumbers).toBe(true);
-    expect(result.highlightWeekdays).toEqual([1, 5]);
-    expect(result.launchAtLogin).toBe(true);
-    expect(result.beepOnTheHour).toBe(true);
-    expect(result.showUpcomingEvent).toBe(true);
-    expect(result.upcomingHorizonDays).toBe(2);
-    expect(result.upcomingIconLeadMinutes).toBe(15);
-    expect(result.hiddenCalendarIds).toEqual(["work"]);
-    expect(result.theme).toBe("dark");
+  it("offers the same colors for today as settings.rs accepts", () => {
+    const rust = readFileSync("src-tauri/src/settings.rs", "utf8");
+    const block = rust.slice(rust.indexOf("DAY_HIGHLIGHTS"), rust.indexOf("];", rust.indexOf("DAY_HIGHLIGHTS")));
+    const hostIds = [...block.matchAll(/"([a-z]+)"/g)].map((match) => match[1]);
+    expect(DAY_HIGHLIGHTS.map((option) => option.id).sort()).toEqual(hostIds.sort());
   });
 
-  it("shows every calendar until some are hidden", () => {
-    expect(normalizeSettings({}).hiddenCalendarIds).toEqual([]);
-    expect(
-      normalizeSettings({ hiddenCalendarIds: ["work", "", "home", "work"] }).hiddenCalendarIds,
-    ).toEqual(["home", "work"]);
-    expect(normalizeHiddenCalendarIds(["birthdays"])).toEqual(["birthdays"]);
-    expect(calendarIsVisible("home", [])).toBe(true);
-    expect(calendarIsVisible("work", ["work"])).toBe(false);
-    expect(calendarIsVisible(null, ["work"])).toBe(true);
+  it("offers the same menu bar styles as settings.rs accepts", () => {
+    const rust = readFileSync("src-tauri/src/settings.rs", "utf8");
+    const start = rust.indexOf("MENU_BAR_ICONS");
+    const block = rust.slice(start, rust.indexOf("];", start));
+    const hostIds = [...block.matchAll(/"([a-z]+)"/g)].map((match) => match[1]);
+    expect(MENU_BAR_ICONS.map(({ id }) => id).sort()).toEqual(hostIds.sort());
   });
+});
 
+describe("calendar lists", () => {
   it("groups calendars by account and sorts titles", () => {
     expect(
       groupCalendarsBySource([
@@ -100,75 +77,6 @@ describe("normalizeSettings", () => {
     expect(calendarsOfKind(items, "reminder")).toEqual([items[1]]);
   });
 
-  it.each([0, 1, 2, 3, 4, 5, 6])("preserves weekday %i as the first day", (day) => {
-    expect(normalizeSettings({ weekStartsOn: day }).weekStartsOn).toBe(day);
-  });
-
-  it("defaults to Saturday and Sunday columns", () => {
-    expect(normalizeSettings({}).highlightWeekdays).toEqual([0, 6]);
-  });
-
-  it("installs updates automatically by default", () => {
-    expect(normalizeSettings({}).autoUpdate).toBe(true);
-    expect(normalizeSettings({ autoUpdate: false }).autoUpdate).toBe(false);
-  });
-
-  it("looks through the rest of today unless a longer window is stored", () => {
-    expect(normalizeSettings({}).upcomingHorizonDays).toBe(1);
-    for (const days of [1, 2, 3, 4, 5, 6, 7, 14, 30]) {
-      expect(normalizeSettings({ upcomingHorizonDays: days }).upcomingHorizonDays).toBe(days);
-    }
-    expect(normalizeSettings({ upcomingHorizonDays: 9 }).upcomingHorizonDays).toBe(1);
-  });
-
-  it("migrates the stored hour look-ahead to the matching day window", () => {
-    expect(normalizeSettings({ upcomingHorizonHours: 24 }).upcomingHorizonDays).toBe(1);
-    expect(normalizeSettings({ upcomingHorizonHours: 48 }).upcomingHorizonDays).toBe(2);
-    expect(normalizeSettings({ upcomingHorizonHours: 6 }).upcomingHorizonDays).toBe(1);
-    // A file that already names days keeps them.
-    expect(
-      normalizeSettings({ upcomingHorizonHours: 48, upcomingHorizonDays: 7 })
-        .upcomingHorizonDays,
-    ).toBe(7);
-  });
-
-  it("keeps the events icon visible unless a lead time is stored", () => {
-    expect(normalizeSettings({}).upcomingIconLeadMinutes).toBe(0);
-    for (const minutes of [1, 15, 30, 60, 240, 480, 720, 1440]) {
-      expect(
-        normalizeSettings({ upcomingIconLeadMinutes: minutes }).upcomingIconLeadMinutes,
-      ).toBe(minutes);
-    }
-    expect(normalizeSettings({ upcomingIconLeadMinutes: 20 }).upcomingIconLeadMinutes).toBe(0);
-  });
-
-  it("moves a retired lead to the nearest one that survived", () => {
-    expect(normalizeSettings({ upcomingIconLeadMinutes: 10 }).upcomingIconLeadMinutes).toBe(15);
-    expect(normalizeSettings({ upcomingIconLeadMinutes: 120 }).upcomingIconLeadMinutes).toBe(60);
-  });
-
-  it("shows every event and keeps the menu bar glyph-only by default", () => {
-    const settings = normalizeSettings({});
-    expect(settings.includeEventsWithoutParticipants).toBe(true);
-    expect(settings.includeEventsWithoutLocation).toBe(true);
-    expect(settings.showEventTitleInMenuBar).toBe(false);
-    expect(settings.showEventTimeInMenuBar).toBe(false);
-    expect(settings.remindBeforeMeetings).toBe(true);
-  });
-
-  it("binds the calendar to a chord and leaves join unset", () => {
-    const settings = normalizeSettings({});
-    expect(settings.toggleCalendarShortcut).toBe("Control+Command+K");
-    expect(settings.joinMeetingShortcut).toBe("");
-    expect(
-      normalizeSettings({ toggleCalendarShortcut: " Control+Command+J " })
-        .toggleCalendarShortcut,
-    ).toBe("Control+Command+J");
-    expect(
-      normalizeSettings({ joinMeetingShortcut: 7 }).joinMeetingShortcut,
-    ).toBe("");
-  });
-
   it("names the icon lead and list window the way Settings shows them", () => {
     expect(upcomingHorizonLabel(1)).toBe("Today");
     expect(upcomingHorizonLabel(2)).toBe("Today and tomorrow");
@@ -182,37 +90,6 @@ describe("normalizeSettings", () => {
     expect(upcomingIconLeadLabel(60)).toBe("1 hour before");
     expect(upcomingIconLeadLabel(240)).toBe("4 hours before");
     expect(upcomingIconLeadLabel(1440)).toBe("24 hours before");
-  });
-
-  it("migrates dim weekends off to no highlighted columns", () => {
-    expect(normalizeSettings({ dimWeekends: false }).highlightWeekdays).toEqual([]);
-  });
-
-  it("lets every column be cleared", () => {
-    expect(normalizeSettings({ highlightWeekdays: [] }).highlightWeekdays).toEqual(
-      [],
-    );
-  });
-
-  it("migrates the retired outline glyph to the framed date", () => {
-    expect(normalizeSettings({ menuBarIcon: "outline" }).menuBarIcon).toBe("framed");
-  });
-
-  it("keeps the undated calendar glyph", () => {
-    expect(normalizeSettings({ menuBarIcon: "calendar" }).menuBarIcon).toBe("calendar");
-  });
-
-  it("rejects values the interface does not offer", () => {
-    const result = normalizeSettings({
-      menuBarIcon: "rainbow",
-      weekStartsOn: 7,
-      theme: "solarized",
-      showWeekNumbers: "yes",
-    });
-    expect(result.menuBarIcon).toBe(DEFAULT_SETTINGS.menuBarIcon);
-    expect(result.weekStartsOn).toBe(DEFAULT_SETTINGS.weekStartsOn);
-    expect(result.theme).toBe(DEFAULT_SETTINGS.theme);
-    expect(result.showWeekNumbers).toBe(false);
   });
 });
 
@@ -290,35 +167,6 @@ describe("menu bar label", () => {
       style: "none",
     });
   });
-
-  it("migrates a format persisted before icon styles existed", () => {
-    expect(normalizeSettings({ menuBarFormat: "weekdayDay" })).toMatchObject({
-      menuBarIcon: "filled",
-      showWeekday: true,
-      showMonth: false,
-    });
-    expect(normalizeSettings({ menuBarFormat: "full" })).toMatchObject({
-      menuBarIcon: "filled",
-      showWeekday: true,
-      showMonth: true,
-    });
-    expect(normalizeSettings({ menuBarFormat: "dateOnly" })).toMatchObject({
-      menuBarIcon: "none",
-      showWeekday: true,
-      showMonth: false,
-    });
-  });
-
-  it("still formats plain text for the tray title", () => {
-    expect(formatMenuBarDate(filled, date, "en-US")).toBe("");
-    expect(
-      formatMenuBarDate(
-        { menuBarIcon: "none", showWeekday: true, showMonth: false },
-        date,
-        "en-US",
-      ),
-    ).toMatch(/Tue/);
-  });
 });
 
 describe("highlighted columns", () => {
@@ -344,21 +192,6 @@ describe("dayHighlight and onboarded", () => {
   it("default to red and an unseen welcome", () => {
     expect(DEFAULT_SETTINGS.dayHighlight).toBe("red");
     expect(DEFAULT_SETTINGS.onboarded).toBe(false);
-  });
-
-  it("keep known values and drop anything else", () => {
-    expect(normalizeSettings({ dayHighlight: "accent", onboarded: true })).toMatchObject({
-      dayHighlight: "accent",
-      onboarded: true,
-    });
-    for (const color of ["blue", "purple", "pink", "orange", "yellow", "green", "graphite"]) {
-      expect(normalizeSettings({ dayHighlight: color }).dayHighlight).toBe(color);
-    }
-    expect(normalizeSettings({ dayHighlight: "calendar" }).dayHighlight).toBe("red");
-    expect(normalizeSettings({ dayHighlight: "rainbow", onboarded: "yes" })).toMatchObject({
-      dayHighlight: "red",
-      onboarded: false,
-    });
   });
 });
 

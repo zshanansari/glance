@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TARGET, payloadUrl, updaterManifest } from "../scripts/updater-manifest.mjs";
+import { payloadUrl, updaterManifest, updaterTargets } from "../scripts/updater-manifest.mjs";
 
 const base = {
   version: "v0.3.0",
@@ -18,12 +18,21 @@ describe("updater manifest", () => {
 
   it("carries the signature and payload for the shipped target", () => {
     const manifest = updaterManifest(base);
-    expect(manifest.platforms[TARGET]).toEqual({
+    expect(manifest.platforms["darwin-aarch64"]).toEqual({
       signature: base.signature,
       url: base.url,
     });
     expect(manifest.pub_date).toBe("2026-09-09T12:00:00.000Z");
     expect(manifest.notes).toBe("Fixes things");
+  });
+
+  it("names the targets the built binary serves", () => {
+    expect(updaterTargets("arm64\n")).toEqual(["darwin-aarch64"]);
+    expect(updaterTargets("x86_64")).toEqual(["darwin-x86_64"]);
+    expect(updaterTargets("x86_64 arm64")).toEqual(["darwin-x86_64", "darwin-aarch64"]);
+    expect(() => updaterTargets("")).toThrow(/no updater target/);
+    const universal = updaterManifest({ ...base, targets: ["darwin-x86_64", "darwin-aarch64"] });
+    expect(Object.keys(universal.platforms)).toEqual(["darwin-x86_64", "darwin-aarch64"]);
   });
 
   it("refuses a manifest nothing could verify", () => {

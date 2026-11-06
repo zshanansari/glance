@@ -6,10 +6,6 @@ export type MenuBarIconStyle = "filled" | "framed" | "calendar" | "none";
 export const UPCOMING_HORIZON_DAYS = [1, 2, 3, 4, 5, 6, 7, 14, 30] as const;
 export type UpcomingHorizonDays = (typeof UPCOMING_HORIZON_DAYS)[number];
 
-/** Hour look-aheads written before the day-based window. */
-export const ONE_DAY_HORIZON_HOURS = 24;
-export const TWO_DAYS_HORIZON_HOURS = 48;
-
 /** 0 means the events item follows the upcoming list window. */
 export const ICON_LEAD_ALWAYS = 0;
 /** 1 is a sentinel: hold the events item back until the event starts. */
@@ -18,12 +14,6 @@ export const UPCOMING_ICON_LEAD_MINUTES = [
   ICON_LEAD_AT_START, 15, 30, 60, 240, 480, 720, 1440, ICON_LEAD_ALWAYS,
 ] as const;
 export type UpcomingIconLeadMinutes = (typeof UPCOMING_ICON_LEAD_MINUTES)[number];
-
-/** Leads that no longer exist, mapped to the nearest one that does. */
-const RETIRED_ICON_LEADS: Record<number, UpcomingIconLeadMinutes> = {
-  10: 15,
-  120: 60,
-};
 
 export function upcomingHorizonLabel(days: UpcomingHorizonDays): string {
   if (days === 1) return "Today";
@@ -127,32 +117,6 @@ const PART_OPTIONS: Record<MenuBarPart, Intl.DateTimeFormatOptions> = {
   month: { month: "short" },
 };
 
-/** Styles that no longer exist, mapped to the nearest one that does. */
-const RETIRED_ICONS: Record<string, MenuBarIconStyle> = {
-  outline: "framed",
-};
-
-/**
- * Formats persisted before icon style and weekday/month toggles. Mapped to the
- * nearest equivalent so an existing settings file is not silently reset.
- */
-const LEGACY_FORMATS: Record<
-  string,
-  Pick<AppSettings, "menuBarIcon" | "showWeekday" | "showMonth">
-> = {
-  iconOnly: { menuBarIcon: "filled", showWeekday: false, showMonth: false },
-  iconDay: { menuBarIcon: "filled", showWeekday: false, showMonth: false },
-  iconWeekdayDay: { menuBarIcon: "filled", showWeekday: true, showMonth: false },
-  iconWeekdayDayMonth: { menuBarIcon: "filled", showWeekday: true, showMonth: true },
-  dateOnly: { menuBarIcon: "none", showWeekday: true, showMonth: false },
-  weekdayDay: { menuBarIcon: "filled", showWeekday: true, showMonth: false },
-  monthDay: { menuBarIcon: "filled", showWeekday: false, showMonth: true },
-  weekdayMonthDay: { menuBarIcon: "filled", showWeekday: true, showMonth: true },
-  day: { menuBarIcon: "filled", showWeekday: false, showMonth: false },
-  weekday: { menuBarIcon: "filled", showWeekday: true, showMonth: false },
-  full: { menuBarIcon: "filled", showWeekday: true, showMonth: true },
-};
-
 export const WEEK_STARTS: { id: WeekStartsOn; label: string }[] = [
   { id: 0, label: "Sunday" },
   { id: 1, label: "Monday" },
@@ -209,46 +173,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   onboarded: false,
 };
 
-const ICON_IDS = new Set(MENU_BAR_ICONS.map((item) => item.id));
-const WEEK_START_IDS = new Set(WEEK_STARTS.map((item) => item.id));
-const THEMES = new Set<Theme>(["system", "light", "dark"]);
-const HORIZON_DAYS = new Set<number>(UPCOMING_HORIZON_DAYS);
-const ICON_LEAD_MINUTES = new Set<number>(UPCOMING_ICON_LEAD_MINUTES);
-
-function asBoolean(value: unknown, fallback: boolean): boolean {
-  return typeof value === "boolean" ? value : fallback;
-}
-
-function isWeekday(value: unknown): value is Weekday {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 6;
-}
-
 export function weekdayLetter(id: Weekday, locale?: string): string {
   // 5 January 2020 is a Sunday, so adding `id` lands on that weekday.
   return new Intl.DateTimeFormat(locale, { weekday: "narrow" }).format(
     new Date(2020, 0, 5 + id, 12),
   );
-}
-export function normalizeHighlightWeekdays(value: unknown): Weekday[] {
-  if (!Array.isArray(value)) return [...DEFAULT_HIGHLIGHT_WEEKDAYS];
-  return [...new Set(value.filter(isWeekday))].sort((a, b) => a - b);
-}
-
-export function normalizeHiddenCalendarIds(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return [
-    ...new Set(
-      value.filter((item): item is string => typeof item === "string" && item.length > 0),
-    ),
-  ].sort();
-}
-
-export function calendarIsVisible(
-  calendarId: string | null | undefined,
-  hidden: readonly string[],
-): boolean {
-  if (!calendarId) return true;
-  return !hidden.includes(calendarId);
 }
 
 export function calendarsOfKind(
@@ -359,142 +288,7 @@ export function menuBarLabel(
   };
 }
 
-export function formatMenuBarDate(
-  settings: Pick<AppSettings, "menuBarIcon" | "showWeekday" | "showMonth">,
-  date: Date,
-  locale?: string,
-): string {
-  return menuBarLabel(settings, date, locale).text ?? "";
-}
-
 /** Enough of the label to know the menu bar must be redrawn. */
 export function trayLabelKey(label: MenuBarLabel): string {
   return `${label.text ?? ""}|${label.day ?? ""}|${label.style}`;
-}
-
-function migrateMenuBar(
-  input: Record<string, unknown>,
-): Pick<AppSettings, "menuBarIcon" | "showWeekday" | "showMonth"> {
-  const storedIcon =
-    typeof input.menuBarIcon === "string"
-      ? RETIRED_ICONS[input.menuBarIcon] ?? input.menuBarIcon
-      : input.menuBarIcon;
-  if (ICON_IDS.has(storedIcon as MenuBarIconStyle)) {
-    return {
-      menuBarIcon: storedIcon as MenuBarIconStyle,
-      showWeekday: asBoolean(input.showWeekday, DEFAULT_SETTINGS.showWeekday),
-      showMonth: asBoolean(input.showMonth, DEFAULT_SETTINGS.showMonth),
-    };
-  }
-  const storedFormat =
-    typeof input.menuBarFormat === "string" ? input.menuBarFormat : "";
-  return LEGACY_FORMATS[storedFormat] ?? {
-    menuBarIcon: DEFAULT_SETTINGS.menuBarIcon,
-    showWeekday: DEFAULT_SETTINGS.showWeekday,
-    showMonth: DEFAULT_SETTINGS.showMonth,
-  };
-}
-
-/**
- * Day windows replaced the 24 / 48 hour look-ahead. Older files carry the
- * hours, which stood for the same two windows.
- */
-function normalizeHorizonDays(input: Record<string, unknown>): UpcomingHorizonDays {
-  const days = input.upcomingHorizonDays;
-  if (HORIZON_DAYS.has(days as number)) return days as UpcomingHorizonDays;
-  const hours = input.upcomingHorizonHours;
-  if (hours === TWO_DAYS_HORIZON_HOURS) return 2;
-  if (hours === ONE_DAY_HORIZON_HOURS) return 1;
-  return DEFAULT_SETTINGS.upcomingHorizonDays;
-}
-
-function normalizeIconLead(value: unknown): UpcomingIconLeadMinutes {
-  if (ICON_LEAD_MINUTES.has(value as number)) return value as UpcomingIconLeadMinutes;
-  const retired = RETIRED_ICON_LEADS[value as number];
-  return retired ?? DEFAULT_SETTINGS.upcomingIconLeadMinutes;
-}
-
-/** A recorded chord, or the fallback when the file holds something else. */
-function normalizeShortcut(value: unknown, fallback: string): string {
-  return typeof value === "string" ? value.trim() : fallback;
-}
-
-export function normalizeSettings(raw: unknown): AppSettings {
-  const input =
-    raw && typeof raw === "object" && !Array.isArray(raw)
-      ? (raw as Record<string, unknown>)
-      : {};
-  const weekStartsOn = input.weekStartsOn;
-  const theme = input.theme;
-  const menuBar = migrateMenuBar(input);
-
-  return {
-    ...menuBar,
-    weekStartsOn: WEEK_START_IDS.has(weekStartsOn as WeekStartsOn)
-      ? (weekStartsOn as WeekStartsOn)
-      : DEFAULT_SETTINGS.weekStartsOn,
-    showWeekNumbers: asBoolean(
-      input.showWeekNumbers,
-      DEFAULT_SETTINGS.showWeekNumbers,
-    ),
-    highlightWeekdays:
-      "highlightWeekdays" in input
-        ? normalizeHighlightWeekdays(input.highlightWeekdays)
-        : input.dimWeekends === false
-          ? []
-          : [...DEFAULT_HIGHLIGHT_WEEKDAYS],
-    launchAtLogin: asBoolean(
-      input.launchAtLogin,
-      DEFAULT_SETTINGS.launchAtLogin,
-    ),
-    beepOnTheHour: asBoolean(input.beepOnTheHour, DEFAULT_SETTINGS.beepOnTheHour),
-    showUpcomingEvent: asBoolean(
-      input.showUpcomingEvent,
-      DEFAULT_SETTINGS.showUpcomingEvent,
-    ),
-    upcomingHorizonDays: normalizeHorizonDays(input),
-    upcomingIconLeadMinutes: normalizeIconLead(input.upcomingIconLeadMinutes),
-    includeEventsWithoutParticipants: asBoolean(
-      input.includeEventsWithoutParticipants,
-      DEFAULT_SETTINGS.includeEventsWithoutParticipants,
-    ),
-    includeEventsWithoutLocation: asBoolean(
-      input.includeEventsWithoutLocation,
-      DEFAULT_SETTINGS.includeEventsWithoutLocation,
-    ),
-    showEventTitleInMenuBar: asBoolean(
-      input.showEventTitleInMenuBar,
-      DEFAULT_SETTINGS.showEventTitleInMenuBar,
-    ),
-    showEventTimeInMenuBar: asBoolean(
-      input.showEventTimeInMenuBar,
-      DEFAULT_SETTINGS.showEventTimeInMenuBar,
-    ),
-    remindBeforeMeetings: asBoolean(
-      input.remindBeforeMeetings,
-      DEFAULT_SETTINGS.remindBeforeMeetings,
-    ),
-    toggleCalendarShortcut: normalizeShortcut(
-      input.toggleCalendarShortcut,
-      DEFAULT_SETTINGS.toggleCalendarShortcut,
-    ),
-    joinMeetingShortcut: normalizeShortcut(
-      input.joinMeetingShortcut,
-      DEFAULT_SETTINGS.joinMeetingShortcut,
-    ),
-    hiddenCalendarIds:
-      "hiddenCalendarIds" in input
-        ? normalizeHiddenCalendarIds(input.hiddenCalendarIds)
-        : [...DEFAULT_SETTINGS.hiddenCalendarIds],
-    autoUpdate: asBoolean(input.autoUpdate, DEFAULT_SETTINGS.autoUpdate),
-    theme: THEMES.has(theme as Theme) ? (theme as Theme) : DEFAULT_SETTINGS.theme,
-    // "calendar" was Calendar Red before the system colors joined it.
-    dayHighlight:
-      input.dayHighlight === "calendar"
-        ? "red"
-        : DAY_HIGHLIGHTS.some((option) => option.id === input.dayHighlight)
-          ? (input.dayHighlight as DayHighlight)
-          : DEFAULT_SETTINGS.dayHighlight,
-    onboarded: asBoolean(input.onboarded, DEFAULT_SETTINGS.onboarded),
-  };
 }

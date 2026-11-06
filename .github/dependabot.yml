@@ -5,3 +5,19 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # The web side's build and test tools.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+  # Tauri, its plugins and the macOS bindings.
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    groups:
+      cargo:
+        patterns: ["*"]

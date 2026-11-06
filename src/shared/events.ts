@@ -135,6 +135,35 @@ export function dayCountdownEvents(
   return countdownEvents(live, now);
 }
 
+export type TimeRange = { start: number; end: number };
+
+/**
+ * The fewest reads that cover every range: overlapping or touching ranges
+ * merge into one, and ones far apart stay apart, so looking at a month a
+ * year away does not read the whole year in between.
+ */
+export function coveringRanges(ranges: readonly TimeRange[]): TimeRange[] {
+  const sorted = ranges
+    .filter((range) => range.end > range.start)
+    .map((range) => ({ ...range }))
+    .sort((a, b) => a.start - b.start);
+  const merged: TimeRange[] = [];
+  for (const range of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
+    else merged.push(range);
+  }
+  return merged;
+}
+
+/** Whether an event touches a range. */
+export function eventOverlaps(
+  event: Pick<UpcomingEvent, "startAt" | "endAt">,
+  range: TimeRange,
+): boolean {
+  return event.startAt < range.end && event.endAt > range.start;
+}
+
 /** Local midnight that closes the day `days - 1` days after today. */
 export function endOfDay(now: number, days: number): number {
   const boundary = new Date(now);
@@ -146,11 +175,6 @@ export function endOfDay(now: number, days: number): number {
 /** Local midnight that closes today. */
 export function endOfToday(now = new Date()): number {
   return endOfDay(now.getTime(), 1);
-}
-
-/** Local midnight that ends the "today and tomorrow" window. */
-export function endOfTomorrow(now = new Date()): number {
-  return endOfDay(now.getTime(), 2);
 }
 
 /** When the countdown's look-ahead ends. */
@@ -410,6 +434,28 @@ export function trayEventText(
   if (options.showTitle) parts.push(trayEventTitle(event.title));
   const text = parts.filter((part) => part.length > 0).join("  ");
   return text.length ? text : null;
+}
+
+/**
+ * The menu bar item's title: the date (unless the cutout glyph carries it),
+ * then "• in 25m" for the event being counted down, then its time and name
+ * when Settings asks for them. Empty for a glyph-only item.
+ */
+export function trayTitle(
+  dateText: string | null,
+  event: Pick<UpcomingEvent, "startAt" | "endAt" | "allDay" | "title"> | null,
+  now: number,
+  options: { showTitle: boolean; showTime: boolean },
+  locale?: string,
+): string {
+  const status = event && now < event.endAt ? eventStatus(event, now).label : "";
+  // A hair space keeps "2h 21m" from reading as one long number without
+  // opening the full word space the menu bar font would otherwise give it.
+  const countdown = status ? status.replace(/(\d+)([hm])/g, "$1\u200a$2") : null;
+  const eventText = countdown && event ? trayEventText(event, now, options, locale) : null;
+  return [dateText ?? "", countdown && `\u2022 ${countdown}`, eventText]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function eventTimeRange(

@@ -20,18 +20,15 @@ pub(crate) fn response_for(status: isize, is_attendee: bool) -> Response {
     if !is_attendee {
         return Response::Confirmed;
     }
+    // EKParticipantStatus: 0 unknown, 1 pending, 2 accepted, 3 declined,
+    // 4 tentative, 5 delegated, 6 completed, 7 in process. Delegating hands
+    // the seat to someone else, so for this calendar it reads as declined.
     match status {
         2 | 6 | 7 => Response::Accepted,
-        3 => Response::Declined,
+        3 | 5 => Response::Declined,
         4 => Response::Tentative,
-        5 => Response::Pending,
         _ => Response::Pending,
     }
-}
-
-#[allow(dead_code)]
-fn default_event_kind() -> String {
-    "event".into()
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -43,17 +40,13 @@ pub struct UpcomingEvent {
     pub end_at: i64,
     pub calendar: Option<String>,
     /// The calendar's color as `#rrggbb`, for the dots under each day.
-    #[serde(default)]
     pub color: Option<String>,
     pub location: Option<String>,
     pub join_url: Option<String>,
     pub response: Response,
-    #[serde(default = "default_event_kind")]
     pub kind: String,
-    #[serde(default)]
     pub all_day: bool,
     /// Whether anyone else was invited. Reminders and solo blocks are false.
-    #[serde(default)]
     pub has_participants: bool,
 }
 
@@ -98,12 +91,7 @@ pub fn save_dismissed(path: &std::path::Path, list: &[DismissedOccurrence]) {
     }
 }
 
-pub fn dismiss_occurrence(
-    list: &mut Vec<DismissedOccurrence>,
-    id: String,
-    end_at: i64,
-    now: i64,
-) {
+pub fn dismiss_occurrence(list: &mut Vec<DismissedOccurrence>, id: String, end_at: i64, now: i64) {
     prune_dismissed(list, now);
     if end_at <= now || id.len() > MAX_DISMISSED_ID_LEN {
         return;
@@ -251,7 +239,16 @@ const ZOOM_DOMAINS: &[&str] = &["zoom.us", "zoom.com"];
 /// Zoom's join paths: meetings, personal rooms, webinars, the web client.
 const ZOOM_JOIN_PATHS: &[&str] = &["/j/", "/my/", "/w/", "/s/", "/wc/"];
 /// Zoom's own sites that sit on a subdomain but never hold a meeting.
-const ZOOM_SITES: &[&str] = &["community", "support", "marketplace", "explore", "developers", "blog", "news", "status"];
+const ZOOM_SITES: &[&str] = &[
+    "community",
+    "support",
+    "marketplace",
+    "explore",
+    "developers",
+    "blog",
+    "news",
+    "status",
+];
 
 /// The host of an https address, lowercased and without a trailing dot.
 fn host_of(raw: &str) -> Option<String> {
@@ -283,7 +280,10 @@ fn meeting_place(host: &str, path: &str) -> bool {
         let site = subdomain_of(host, domain)
             .and_then(|sub| sub.rsplit('.').next())
             .is_some_and(|label| ZOOM_SITES.contains(&label));
-        return !site && ZOOM_JOIN_PATHS.iter().any(|prefix| path.starts_with(prefix));
+        return !site
+            && ZOOM_JOIN_PATHS
+                .iter()
+                .any(|prefix| path.starts_with(prefix));
     }
     // Webex meetings live on a company's own subdomain; www is the brochure.
     if let Some(sub) = subdomain_of(host, "webex.com") {
@@ -491,8 +491,8 @@ mod macos {
     use objc2_app_kit::{NSApplication, NSColorSpace, NSWorkspace};
     use objc2_event_kit::{EKCalendar, EKEntityType, EKEventStore, EKReminder, EKSource};
     use objc2_foundation::{
-        MainThreadMarker, NSCalendar, NSDate, NSDateComponentUndefined, NSDateComponents,
-        NSString, NSURL,
+        MainThreadMarker, NSCalendar, NSDate, NSDateComponentUndefined, NSDateComponents, NSString,
+        NSURL,
     };
     use std::cell::RefCell;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -956,7 +956,10 @@ mod macos {
                 } else {
                     None
                 };
-            Ok(super::PendingFetch { events: found, reminders })
+            Ok(super::PendingFetch {
+                events: found,
+                reminders,
+            })
         })
     }
 
@@ -1238,14 +1241,20 @@ pub fn start_range(start_ms: i64, end_ms: i64, hidden: &[String]) -> Result<Pend
     #[cfg(target_os = "macos")]
     {
         if end_ms <= start_ms {
-            return Ok(PendingFetch { events: Vec::new(), reminders: None });
+            return Ok(PendingFetch {
+                events: Vec::new(),
+                reminders: None,
+            });
         }
         macos::fetch_macos_range(start_ms, end_ms, hidden)
     }
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (start_ms, end_ms, hidden);
-        Ok(PendingFetch { events: Vec::new(), reminders: None })
+        Ok(PendingFetch {
+            events: Vec::new(),
+            reminders: None,
+        })
     }
 }
 
@@ -1423,6 +1432,8 @@ mod tests {
         assert_eq!(response_for(4, true), Response::Tentative);
         assert_eq!(response_for(1, true), Response::Pending);
         assert_eq!(response_for(0, true), Response::Pending);
+        assert_eq!(response_for(5, true), Response::Declined);
+        assert_eq!(response_for(6, true), Response::Accepted);
     }
 
     #[test]
@@ -1513,7 +1524,10 @@ mod tests {
 
     #[test]
     fn a_meeting_host_over_plain_http_is_not_joinable() {
-        assert_eq!(extract_join_url(None, None, Some("http://zoom.us/j/99")), None);
+        assert_eq!(
+            extract_join_url(None, None, Some("http://zoom.us/j/99")),
+            None
+        );
     }
 
     #[test]
@@ -1539,6 +1553,20 @@ mod tests {
         std::fs::write(&path, "not json").unwrap();
         assert!(load_dismissed(&path, now).is_empty());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// meetings.ts names the service of every link this side lets Join open;
+    /// both read the same list of links.
+    #[test]
+    fn join_links_match_the_shared_fixture() {
+        let links: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../../tests/fixtures/meeting-links.json"))
+                .expect("fixture is JSON");
+        for link in links {
+            let url = link["url"].as_str().expect("url");
+            let joinable = link["joinable"].as_bool().expect("joinable");
+            assert_eq!(super::is_meeting_url(url), joinable, "{url}");
+        }
     }
 
     #[test]

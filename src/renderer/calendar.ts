@@ -13,15 +13,17 @@ import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } f
 import {
   endOfToday,
   eventsOnDay,
+  coveringRanges,
   dayCountdownEvents,
+  eventOverlaps,
   pastToFold,
   trayDescription,
+  trayTitle,
   type DismissedOccurrence,
   eventStatus,
   meetingToJoin,
   needsCalendarAccess,
   eventTimeRange,
-  trayEventText,
   trayIconEvent,
   upcomingFetchEnd,
   type UpcomingEvent,
@@ -182,30 +184,47 @@ function startCalendar(api: DesktopApi): void {
         selected.getMonth(),
         selected.getDate() + 1,
       ).getTime();
-      const outside = selectedEnd <= rangeStart || selectedStart >= rangeEnd;
-      const [monthEvents, selectedEvents] = await Promise.all([
-        api.getCalendarEvents(rangeStart, rangeEnd),
-        outside ? api.getCalendarEvents(selectedStart, selectedEnd) : Promise.resolve([]),
+      const month = { start: rangeStart, end: rangeEnd };
+      const day = { start: selectedStart, end: selectedEnd };
+      const upcoming = current.showUpcomingEvent
+        ? {
+            start: now,
+            end: upcomingFetchEnd(now, current.upcomingHorizonDays, current.upcomingIconLeadMinutes),
+          }
+        : null;
+      // One read covers the month, the selected day and the countdown's
+      // window whenever they overlap, as they do on the current month.
+      const reads = coveringRanges(upcoming ? [month, day, upcoming] : [month, day]);
+      const [batches, dismissed] = await Promise.all([
+        Promise.all(reads.map((range) => api.getCalendarEvents(range.start, range.end))),
+        // The day list leaves dismissed meetings unmarked, countdown on or off.
+        api.getDismissedEvents().catch(() => []),
       ]);
-      let next: UpcomingEvent | null = null;
-      // The day list leaves dismissed meetings unmarked, countdown on or off.
-      const dismissed = await api.getDismissedEvents().catch(() => []);
-      if (current.showUpcomingEvent) {
-        const nextEvents = await api.getCalendarEvents(
-          now,
-          upcomingFetchEnd(now, current.upcomingHorizonDays, current.upcomingIconLeadMinutes),
-        );
-        next = trayIconEvent(nextEvents, now, {
-          upcomingHorizonDays: current.upcomingHorizonDays,
-          upcomingIconLeadMinutes: current.upcomingIconLeadMinutes,
-          filters: current,
-          dismissed,
-        });
-      }
+      const seen = new Set<string>();
+      const all = batches.flat().filter((event) => {
+        const key = `${event.id}@${event.startAt}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const next = upcoming
+        ? trayIconEvent(
+            all.filter((event) => eventOverlaps(event, upcoming)),
+            now,
+            {
+              upcomingHorizonDays: current.upcomingHorizonDays,
+              upcomingIconLeadMinutes: current.upcomingIconLeadMinutes,
+              filters: current,
+              dismissed,
+            },
+          )
+        : null;
       if (request !== eventRequest) return;
       upcomingEvent = next;
       dismissedEvents = dismissed;
-      const fetched = [...monthEvents, ...selectedEvents];
+      const fetched = all.filter(
+        (event) => eventOverlaps(event, month) || eventOverlaps(event, day),
+      );
       const key = JSON.stringify(
         fetched.map((event) => [
           event.id,
@@ -476,29 +495,16 @@ function startCalendar(api: DesktopApi): void {
     if (!settings) return;
     const now = new Date();
     const label = menuBarLabel(settings, now);
-    const status = upcomingEvent && now.getTime() < upcomingEvent.endAt
-      ? eventStatus(upcomingEvent, now.getTime()).label
-      : "";
     // The status item carries the real pressed highlight now, so the title
-    // stays as it reads when the popover is closed.
-    const dateTitle = label.style === "framed" ? "" : label.text ?? "";
-    // A hair space keeps "2h 21m" from reading as one long number without
-    // opening the full word space the menu bar font would otherwise give it.
-    const countdown = status ? status.replace(/(\d+)([hm])/g, "$1\u200a$2") : null;
-    // The countdown follows the date after a bullet, with the event's time
-    // and title after it when Settings asks for them.
-    const eventText =
-      countdown && upcomingEvent
-        ? trayEventText(upcomingEvent, now.getTime(), {
-            showTitle: settings.showEventTitleInMenuBar,
-            showTime: settings.showEventTimeInMenuBar,
-          })
-        : null;
-    const title = [dateTitle, countdown && `\u2022 ${countdown}`, eventText]
-      .filter(Boolean)
-      .join(" ");
+    // stays as it reads when the popover is closed. The cutout style draws
+    // its date into the glyph instead of the title.
+    const counting = upcomingEvent && now.getTime() < upcomingEvent.endAt ? upcomingEvent : null;
+    const title = trayTitle(label.style === "framed" ? null : label.text, counting, now.getTime(), {
+      showTitle: settings.showEventTitleInMenuBar,
+      showTime: settings.showEventTimeInMenuBar,
+    });
     const trayStyle = label.style;
-    const description = trayDescription(now.getTime(), countdown ? upcomingEvent : null);
+    const description = trayDescription(now.getTime(), counting);
     const signature = `${trayLabelKey(label)}|${title}|${description}`;
     if (signature === lastTrayLabel) return;
     lastTrayLabel = signature;

@@ -38,12 +38,7 @@ pub struct AppSettings {
     pub week_starts_on: u8,
     pub show_week_numbers: bool,
     pub highlight_weekdays: Vec<u8>,
-    /// Read only so files from before column highlighting can be migrated.
-    #[allow(dead_code)]
-    #[serde(default, skip_serializing)]
-    pub dim_weekends: bool,
     /// Read only so files from before icon styles can be migrated.
-    #[allow(dead_code)]
     #[serde(default, skip_serializing)]
     pub menu_bar_format: String,
     pub launch_at_login: bool,
@@ -52,7 +47,6 @@ pub struct AppSettings {
     /// Days the countdown looks ahead, counted through local midnight.
     pub upcoming_horizon_days: u16,
     /// Read only so files from before the day window can be migrated.
-    #[allow(dead_code)]
     #[serde(default, skip_serializing)]
     pub upcoming_horizon_hours: u8,
     /// 0 follows the look-ahead; 1 holds the countdown back until the event starts.
@@ -84,7 +78,6 @@ impl Default for AppSettings {
             week_starts_on: 0,
             show_week_numbers: false,
             highlight_weekdays: vec![0, 6],
-            dim_weekends: true,
             menu_bar_format: String::new(),
             launch_at_login: false,
             beep_on_the_hour: false,
@@ -143,7 +136,10 @@ impl AppSettings {
         if !DAY_HIGHLIGHTS.contains(&self.day_highlight.as_str()) {
             self.day_highlight = base.day_highlight.clone();
         }
-        if !matches!(self.upcoming_horizon_days, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 14 | 30) {
+        if !matches!(
+            self.upcoming_horizon_days,
+            1 | 2 | 3 | 4 | 5 | 6 | 7 | 14 | 30
+        ) {
             self.upcoming_horizon_days = base.upcoming_horizon_days;
         }
         // Leads that no longer exist land on the nearest one that does, so an
@@ -159,8 +155,10 @@ impl AppSettings {
         ) {
             self.upcoming_icon_lead_minutes = base.upcoming_icon_lead_minutes;
         }
-        self.toggle_calendar_shortcut =
-            usable_shortcut(&self.toggle_calendar_shortcut, &base.toggle_calendar_shortcut);
+        self.toggle_calendar_shortcut = usable_shortcut(
+            &self.toggle_calendar_shortcut,
+            &base.toggle_calendar_shortcut,
+        );
         self.join_meeting_shortcut =
             usable_shortcut(&self.join_meeting_shortcut, &base.join_meeting_shortcut);
         // One chord cannot do two things; the calendar keeps it.
@@ -408,7 +406,10 @@ mod tests {
         let path = dir.join("settings.json");
         write_atomically(&path, b"{\"theme\": \"dark\"}\n").expect("first write");
         write_atomically(&path, b"{\"theme\": \"light\"}\n").expect("second write");
-        assert_eq!(fs::read_to_string(&path).expect("reads"), "{\"theme\": \"light\"}\n");
+        assert_eq!(
+            fs::read_to_string(&path).expect("reads"),
+            "{\"theme\": \"light\"}\n"
+        );
         assert!(!path.with_extension("json.tmp").exists());
         let mode = fs::metadata(&path).expect("metadata").permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
@@ -492,10 +493,7 @@ mod tests {
         for minutes in [0, 1, 15, 30, 60, 240, 480, 720, 1440] {
             let mut input = base.clone();
             input.upcoming_icon_lead_minutes = minutes;
-            assert_eq!(
-                input.normalize(&base).upcoming_icon_lead_minutes,
-                minutes
-            );
+            assert_eq!(input.normalize(&base).upcoming_icon_lead_minutes, minutes);
         }
         let mut input = base.clone();
         input.upcoming_icon_lead_minutes = 20;
@@ -567,13 +565,27 @@ mod tests {
     #[test]
     fn refuses_chords_that_belong_to_macos_or_need_no_modifier() {
         let base = AppSettings::default();
-        for chord in ["Command+KeyQ", "Cmd+C", "Command+Space", "Shift+KeyK", "KeyK", "Command+", "Hyper+KeyK"] {
+        for chord in [
+            "Command+KeyQ",
+            "Cmd+C",
+            "Command+Space",
+            "Shift+KeyK",
+            "KeyK",
+            "Command+",
+            "Hyper+KeyK",
+        ] {
             let mut input = base.clone();
             input.toggle_calendar_shortcut = chord.into();
             input.join_meeting_shortcut = chord.into();
             let settings = input.normalize(&base);
-            assert_eq!(settings.toggle_calendar_shortcut, base.toggle_calendar_shortcut, "{chord}");
-            assert_eq!(settings.join_meeting_shortcut, base.join_meeting_shortcut, "{chord}");
+            assert_eq!(
+                settings.toggle_calendar_shortcut, base.toggle_calendar_shortcut,
+                "{chord}"
+            );
+            assert_eq!(
+                settings.join_meeting_shortcut, base.join_meeting_shortcut,
+                "{chord}"
+            );
         }
     }
 
@@ -590,8 +602,14 @@ mod tests {
 
     #[test]
     fn spells_chords_one_way() {
-        assert_eq!(super::canonical_chord("cmd+ctrl+k").as_deref(), Some("Control+Command+KeyK"));
-        assert_eq!(super::canonical_chord("Option+Shift+5").as_deref(), Some("Alt+Shift+Digit5"));
+        assert_eq!(
+            super::canonical_chord("cmd+ctrl+k").as_deref(),
+            Some("Control+Command+KeyK")
+        );
+        assert_eq!(
+            super::canonical_chord("Option+Shift+5").as_deref(),
+            Some("Alt+Shift+Digit5")
+        );
         assert_eq!(super::canonical_chord("Shift+KeyK"), None);
     }
 
@@ -621,6 +639,25 @@ mod tests {
         let mut input = base.clone();
         input.week_starts_on = 3;
         assert_eq!(input.normalize(&base).week_starts_on, 3);
+    }
+
+    /// The settings window starts from `DEFAULT_SETTINGS` in settings.ts; both
+    /// are held to one fixture so the two cannot drift apart.
+    #[test]
+    fn defaults_match_the_shared_fixture() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/default-settings.json"))
+                .expect("fixture is JSON");
+        let ours = serde_json::to_value(AppSettings::default()).expect("defaults serialize");
+        assert_eq!(ours, fixture);
+    }
+
+    #[test]
+    fn lets_every_highlighted_column_be_cleared() {
+        let base = AppSettings::default();
+        let mut input = base.clone();
+        input.highlight_weekdays = Vec::new();
+        assert!(input.normalize(&base).highlight_weekdays.is_empty());
     }
 
     #[test]
@@ -693,7 +730,10 @@ mod tests {
         assert!(settings.show_week_numbers);
         assert_eq!(settings.week_starts_on, defaults.week_starts_on);
         assert_eq!(settings.highlight_weekdays, defaults.highlight_weekdays);
-        assert_eq!(settings.join_meeting_shortcut, defaults.join_meeting_shortcut);
+        assert_eq!(
+            settings.join_meeting_shortcut,
+            defaults.join_meeting_shortcut
+        );
         let _ = fs::remove_dir_all(dir);
     }
 

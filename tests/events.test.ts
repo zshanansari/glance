@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  endOfTomorrow,
+  endOfDay,
   eventInIconLead,
   eventInUpcomingHorizon,
   eventPassesFilters,
@@ -9,6 +9,7 @@ import {
   eventStatus,
   eventTimeRange,
   trayEventText,
+  trayTitle,
   trayIconEvent,
   upcomingFetchEnd,
   upcomingHorizonEnd,
@@ -21,6 +22,8 @@ import {
   type UpcomingEvent,
   eventsOnDay,
   countdownEvents,
+  coveringRanges,
+  eventOverlaps,
   dayCountdownEvents,
   leadEvent,
   pastToFold,
@@ -81,9 +84,9 @@ describe("event time range", () => {
   });
 });
 
-describe("today and tomorrow window", () => {
+describe("the end of a two-day window", () => {
   it("ends at the local midnight that closes tomorrow", () => {
-    const boundary = new Date(endOfTomorrow(new Date(2026, 8, 9, 23, 30)));
+    const boundary = new Date(endOfDay(new Date(2026, 8, 9, 23, 30).getTime(), 2));
     expect(boundary.getFullYear()).toBe(2026);
     expect(boundary.getMonth()).toBe(8);
     expect(boundary.getDate()).toBe(11);
@@ -93,11 +96,11 @@ describe("today and tomorrow window", () => {
 
   it("covers the rest of today from early morning", () => {
     const now = new Date(2026, 8, 9, 0, 5);
-    expect(endOfTomorrow(now) - now.getTime()).toBeGreaterThan(47 * 3_600_000);
+    expect(endOfDay(now.getTime(), 2) - now.getTime()).toBeGreaterThan(47 * 3_600_000);
   });
 
   it("crosses a month boundary", () => {
-    const boundary = new Date(endOfTomorrow(new Date(2026, 8, 30, 18, 0)));
+    const boundary = new Date(endOfDay(new Date(2026, 8, 30, 18, 0).getTime(), 2));
     expect(boundary.getMonth()).toBe(9);
     expect(boundary.getDate()).toBe(2);
   });
@@ -674,5 +677,73 @@ describe("folding today's finished meetings", () => {
 
   it("leaves a single finished meeting in place", () => {
     expect(pastToFold([meeting("a", 9), meeting("c", 15)], at(12))).toEqual([]);
+  });
+});
+
+describe("reading the calendar", () => {
+  const day = 86_400_000;
+  const at = (days: number) => Date.UTC(2026, 10, 1) + days * day;
+
+  it("reads the month, the selected day and the countdown window at once when they overlap", () => {
+    const month = { start: at(-6), end: at(44) };
+    const selected = { start: at(6), end: at(7) };
+    const upcoming = { start: at(6.5), end: at(36) };
+    expect(coveringRanges([month, selected, upcoming])).toEqual([month]);
+  });
+
+  it("keeps a far-away month apart from the countdown window", () => {
+    const month = { start: at(360), end: at(410) };
+    const upcoming = { start: at(6), end: at(7) };
+    expect(coveringRanges([month, upcoming])).toEqual([upcoming, month]);
+  });
+
+  it("joins ranges that touch, and drops empty ones", () => {
+    expect(
+      coveringRanges([
+        { start: at(0), end: at(1) },
+        { start: at(1), end: at(2) },
+        { start: at(5), end: at(5) },
+      ]),
+    ).toEqual([{ start: at(0), end: at(2) }]);
+  });
+
+  it("knows which events touch a range", () => {
+    const range = { start: at(1), end: at(2) };
+    expect(eventOverlaps({ startAt: at(0.5), endAt: at(1.5) }, range)).toBe(true);
+    expect(eventOverlaps({ startAt: at(2), endAt: at(3) }, range)).toBe(false);
+    expect(eventOverlaps({ startAt: at(0), endAt: at(1) }, range)).toBe(false);
+  });
+});
+
+describe("the menu bar title", () => {
+  const start = new Date(2026, 10, 9, 15, 0).getTime();
+  const call = { startAt: start, endAt: start + 30 * 60_000, allDay: false, title: "Design sync" };
+  const plain = { showTitle: false, showTime: false };
+  const hair = "\u200a";
+
+  it("is just the date with nothing to count down", () => {
+    expect(trayTitle("Mon 9", null, start, plain)).toBe("Mon 9");
+    expect(trayTitle(null, null, start, plain)).toBe("");
+  });
+
+  it("adds the countdown after a bullet, with hair spaces in the units", () => {
+    expect(trayTitle("Mon 9", call, start - 2 * 3_600_000 - 21 * 60_000, plain)).toBe(
+      `Mon 9 \u2022 in 2${hair}h 21${hair}m`,
+    );
+    expect(trayTitle(null, call, start - 25 * 60_000, plain)).toBe(`\u2022 in 25${hair}m`);
+  });
+
+  it("adds the time and name when Settings asks, and drops the time once it starts", () => {
+    const both = { showTitle: true, showTime: true };
+    expect(trayTitle(null, call, start - 25 * 60_000, both, "en-US")).toBe(
+      `\u2022 in 25${hair}m 3:00 PM  Design sync`,
+    );
+    expect(trayTitle(null, call, start + 15 * 60_000, both, "en-US")).toBe(
+      `\u2022 15${hair}m left Design sync`,
+    );
+  });
+
+  it("drops the countdown once the event is over", () => {
+    expect(trayTitle("Mon 9", call, start + 31 * 60_000, plain)).toBe("Mon 9");
   });
 });

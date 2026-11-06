@@ -57,7 +57,10 @@ static STATUS: Mutex<UpdateStatus> = Mutex::new(UpdateStatus {
 
 /// What the last check said.
 pub fn status() -> UpdateStatus {
-    STATUS.lock().map(|status| status.clone()).unwrap_or_default()
+    STATUS
+        .lock()
+        .map(|status| status.clone())
+        .unwrap_or_default()
 }
 
 fn now_ms() -> i64 {
@@ -79,7 +82,9 @@ fn record(app: &AppHandle, outcome: Result<Option<(String, Option<String>)>, &st
             Ok(found) => {
                 status.error = None;
                 status.version = found.as_ref().map(|(version, _)| version.clone());
-                status.notes = found.and_then(|(_, notes)| notes).filter(|notes| !notes.trim().is_empty());
+                status.notes = found
+                    .and_then(|(_, notes)| notes)
+                    .filter(|notes| !notes.trim().is_empty());
             }
             Err(error) => status.error = Some(error.to_string()),
         }
@@ -172,7 +177,9 @@ pub async fn check(app: &AppHandle) -> Result<Option<Update>, String> {
     match &outcome {
         Ok(found) => record(
             app,
-            Ok(found.as_ref().map(|update| (update.version.clone(), update.body.clone()))),
+            Ok(found
+                .as_ref()
+                .map(|update| (update.version.clone(), update.body.clone()))),
         ),
         Err(error) => record(app, Err(error)),
     }

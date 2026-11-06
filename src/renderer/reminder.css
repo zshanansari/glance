@@ -169,9 +169,6 @@ body {
   max-width: 40px;
 }
 
-.detail-row.muted .label {
-  color: var(--secondary);
-}
 
 .visually-hidden {
   position: absolute;

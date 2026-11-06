@@ -36,6 +36,20 @@ export function reminderHeading(event: UpcomingEvent, now: number): string {
   return `Starts in ${spokenDuration(event.startAt - now)}`;
 }
 
+/**
+ * What a clock tick does with the card: put away one that is off or past its
+ * time, reword one still due, look for a meeting when none is showing and
+ * reminders are on, or nothing.
+ */
+export function reminderStep(
+  showing: Pick<UpcomingEvent, "startAt" | "endAt"> | null,
+  enabled: boolean,
+  now: number,
+): "hide" | "refresh" | "look" | "idle" {
+  if (showing) return enabled && reminderStillDue(showing, now) ? "refresh" : "hide";
+  return enabled ? "look" : "idle";
+}
+
 function occurrenceKey(event: Pick<UpcomingEvent, "id" | "startAt">): string {
   return `${event.id}@${event.startAt}`;
 }
@@ -154,12 +168,10 @@ export function startReminder(
   const check = async (): Promise<void> => {
     const run = ++checking;
     const now = Date.now();
-    if (showing) {
-      if (!enabled || !reminderStillDue(showing, now)) hide();
-      else refreshHeading(showing, now);
-      return;
-    }
-    if (!enabled) return;
+    const step = reminderStep(showing, enabled, now);
+    if (step === "hide") hide();
+    if (showing && step === "refresh") refreshHeading(showing, now);
+    if (step !== "look") return;
     try {
       const [events, dismissed] = await Promise.all([
         api.getCalendarEvents(now - REMINDER_LINGER_MS, now + REMINDER_LEAD_MS),
