@@ -71,7 +71,8 @@ export function framedGlyphPng(text: string): number[] {
   return Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-/** A CSS mask for the Appearance picker. */
-export function framedGlyphMask(text: string): string {
-  return `url("${draw(text).toDataURL("image/png")}")`;
+/** The cutout glyph as a mask, with its width over height, for a preview. */
+export function framedGlyph(text: string): { mask: string; aspect: number } {
+  const canvas = draw(text);
+  return { mask: `url("${canvas.toDataURL("image/png")}")`, aspect: canvas.width / canvas.height };
 }

@@ -5,6 +5,7 @@ import {
   DAY_HIGHLIGHTS,
   DEFAULT_SETTINGS,
   MENU_BAR_ICONS,
+  menuBarLabel,
   UPCOMING_HORIZON_DAYS,
   UPCOMING_ICON_LEAD_MINUTES,
   upcomingHorizonLabel,
@@ -25,7 +26,7 @@ import {
 import { installTauriBridge, type DesktopApi } from "./host";
 import { sfSymbol, type SymbolName } from "./icons";
 import { enhanceSwitches } from "./switches";
-import { framedGlyphMask } from "./tray-frame";
+import { framedGlyph } from "./tray-frame";
 
 /** Each pane's sidebar tile, as System Settings marks its panes. */
 const TAB_ICONS: Record<string, { symbol: SymbolName; color: string }> = {
@@ -68,16 +69,7 @@ function fillSelect(
   );
 }
 
-/** Each style previewed with today's date, the way the menu bar would show it. */
-function trayGlyphUrl(style: MenuBarIconStyle, date: Date): string | null {
-  if (style === "none") return null;
-  if (style === "framed") return framedGlyphMask(String(date.getDate()));
-  if (style === "calendar") return `url("tray/calendar.png")`;
-  const day = String(date.getDate()).padStart(2, "0");
-  return `url("tray/filled/day-${day}.png")`;
-}
-
-function buildIconStyles(picker: HTMLElement, date = new Date()): void {
+function buildIconStyles(picker: HTMLElement): void {
   picker.replaceChildren(
     ...MENU_BAR_ICONS.map((item) => {
       const button = document.createElement("button");
@@ -86,21 +78,68 @@ function buildIconStyles(picker: HTMLElement, date = new Date()): void {
       button.dataset.style = item.id;
       button.setAttribute("aria-checked", "false");
       button.tabIndex = -1;
-
-      const glyph = document.createElement("span");
-      glyph.className = item.id === "none" ? "mb-icon none" : "mb-icon";
-      glyph.setAttribute("aria-hidden", "true");
-      const mask = trayGlyphUrl(item.id, date);
-      if (mask) glyph.style.setProperty("--tray-glyph", mask);
-      else glyph.textContent = String(date.getDate());
-      // Named under the glyph, so the choice does not rest on the picture.
+      // A small menu bar showing what this style draws, filled in by
+      // paintIconPreviews, then the style's name under it.
+      const preview = document.createElement("span");
+      preview.className = "mb-preview";
+      preview.setAttribute("aria-hidden", "true");
       const name = document.createElement("span");
       name.className = "mb-name";
       name.textContent = item.label;
-      button.append(glyph, name);
+      button.append(preview, name);
       return button;
     }),
   );
+}
+
+/**
+ * Draws each style as the menu bar would, with today's date and the weekday
+ * and month switches as they are now, so the choice is made on the result
+ * rather than on a bare icon.
+ */
+function paintIconPreviews(
+  picker: HTMLElement,
+  parts: Pick<AppSettings, "showWeekday" | "showMonth">,
+  date = new Date(),
+): void {
+  for (const button of Array.from(picker.querySelectorAll<HTMLButtonElement>("button"))) {
+    const style = button.dataset.style as MenuBarIconStyle;
+    const preview = button.querySelector<HTMLElement>(".mb-preview");
+    if (!preview) continue;
+    // Only the two switches come from settings: the style is this tile's own.
+    const label = menuBarLabel(
+      { menuBarIcon: style, showWeekday: parts.showWeekday, showMonth: parts.showMonth },
+      date,
+    );
+    const nodes: HTMLElement[] = [];
+    const glyph = (mask: string, aspect = 1): void => {
+      const icon = document.createElement("span");
+      icon.className = "mb-icon";
+      icon.style.setProperty("--tray-glyph", mask);
+      icon.style.setProperty("--glyph-aspect", String(aspect));
+      nodes.push(icon);
+    };
+    if (style === "framed") {
+      const framed = framedGlyph(label.text ?? String(date.getDate()));
+      glyph(framed.mask, framed.aspect);
+    } else if (style === "calendar") {
+      glyph(`url("tray/calendar.png")`);
+    } else if (style === "filled") {
+      glyph(`url("tray/filled/day-${String(date.getDate()).padStart(2, "0")}.png")`);
+    }
+    if (style !== "framed" && label.text) {
+      const text = document.createElement("span");
+      text.className = "mb-text";
+      text.textContent = label.text;
+      nodes.push(text);
+    }
+    preview.replaceChildren(...nodes);
+    // VoiceOver hears the style and what it would show.
+    button.setAttribute(
+      "aria-label",
+      `${MENU_BAR_ICONS.find((item) => item.id === style)?.label ?? style}${label.text ? `, ${label.text}` : ""}`,
+    );
+  }
 }
 
 function paintIconStyle(picker: HTMLElement, id: MenuBarIconStyle): void {
@@ -544,6 +583,7 @@ function startSettings(api: DesktopApi): void {
   const paint = (settings: AppSettings): void => {
     applyTheme(settings.theme);
     paintIconStyle(iconStyles, settings.menuBarIcon);
+    paintIconPreviews(iconStyles, settings);
     showWeekday.checked = settings.showWeekday;
     showMonth.checked = settings.showMonth;
     weekStart.value = String(settings.weekStartsOn);
@@ -630,6 +670,11 @@ function startSettings(api: DesktopApi): void {
     const patch = patchFromForm();
     applyTheme(patch.theme ?? "system");
     paintHighlightName();
+    // The previews follow the weekday and month switches as they flip.
+    paintIconPreviews(iconStyles, {
+      showWeekday: patch.showWeekday ?? false,
+      showMonth: patch.showMonth ?? false,
+    });
     paintUpcomingOptions(
       patch.showUpcomingEvent ?? false,
       patch.upcomingIconLeadMinutes ?? ICON_LEAD_ALWAYS,
