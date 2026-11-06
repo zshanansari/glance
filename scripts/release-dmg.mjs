@@ -127,6 +127,49 @@ function writeManifest(version, notes) {
   return { manifest: path, payload, signature: `${payload}.sig` };
 }
 
+/**
+ * The certificate the app is signed with. It has to be the same one every
+ * release: macOS records a Calendar permission against the signature, and an
+ * ad-hoc signature changes with every build, so each update would come back
+ * asking for access again. "-" (ad-hoc) is refused for that reason.
+ */
+function signingIdentity() {
+  const identity = (process.env.APPLE_SIGNING_IDENTITY ?? "").trim();
+  if (!identity || identity === "-") {
+    console.error(
+      "Set APPLE_SIGNING_IDENTITY to the certificate releases are signed with,\n" +
+        'for example APPLE_SIGNING_IDENTITY="Glance Development".\n\n' +
+        "An ad-hoc signature changes with every build, so installed copies would\n" +
+        "lose Calendar access on each update.",
+    );
+    process.exit(1);
+  }
+  const found = spawnSync("security", ["find-identity", "-p", "codesigning"], {
+    encoding: "utf8",
+  });
+  if (!found.stdout?.includes(`"${identity}"`)) {
+    console.error(`No code-signing certificate named "${identity}" in the keychain.`);
+    process.exit(1);
+  }
+  return identity;
+}
+
+/**
+ * Checks the built app is tied to the certificate rather than to this one
+ * build, which is what keeps Calendar access across updates.
+ */
+function assertStableSignature(app) {
+  const result = spawnSync("codesign", ["-d", "-r-", app], { encoding: "utf8" });
+  const requirement = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  if (!/designated => .*certificate/.test(requirement)) {
+    console.error(
+      `${app} is not signed with a certificate:\n${requirement.trim()}\n` +
+        "Installed copies would lose Calendar access after this update.",
+    );
+    process.exit(1);
+  }
+}
+
 /** The disk image this version built, never an older one left beside it. */
 function dmgFor(version) {
   const files = existsSync(DMG_DIR)
@@ -165,6 +208,8 @@ const version = releaseVersion();
 const notes = releaseNotes(`v${version}`);
 loadCredentials();
 loadSigningKey();
+const identity = signingIdentity();
+console.log(`Signing with "${identity}".`);
 
 /// --unnotarized ships without Apple's notarization, for a project with no
 /// Developer ID yet: Gatekeeper then asks on first launch (right-click, Open).
@@ -187,6 +232,7 @@ run("pnpm", ["tauri", "build", "--bundles", "app,dmg"], "Bundling", [
   ...SIGNING_SECRETS,
 ]);
 
+assertStableSignature(join(MACOS_DIR, "Glance.app"));
 const dmg = dmgFor(version);
 if (unnotarized) {
   console.warn(`\nNot notarizing ${dmg}: first launch will need right-click, Open.`);

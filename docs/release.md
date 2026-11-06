@@ -52,6 +52,23 @@ About before updating. Without it, the notes are a link to the release page.
 Write the notes first: the file is read before the build starts. The script
 also refuses to start if the three version numbers disagree.
 
+**Signing.** The script refuses to run without `APPLE_SIGNING_IDENTITY`, and
+refuses `-` (ad-hoc). macOS records Calendar and Reminders permission against
+the app's signature; an ad-hoc signature changes with every build, so each
+update would come back asking for access. Without a Developer ID, releases are
+signed with the self-signed **Glance Development** certificate in the login
+keychain, and the script checks the built app is tied to it before going on:
+
+```bash
+APPLE_SIGNING_IDENTITY="Glance Development" pnpm dmg:unnotarized --notes docs/release-notes/v<version>.md
+```
+
+Every release must use the same certificate. Back it up (Keychain Access →
+export "Glance Development" with its private key as a password-protected
+`.p12`) and keep it with the update signing key: if it is lost, the next
+release is signed differently and every installed copy asks for Calendar
+access again, once.
+
 `pnpm dmg:unnotarized` does the same without Apple's notarization, for a
 project with no Developer ID yet. `NOTARY_PROFILE` (a
 `xcrun notarytool store-credentials` profile) keeps the Apple password in the
