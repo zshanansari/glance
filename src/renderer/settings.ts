@@ -20,6 +20,7 @@ import {
   type Weekday,
   type WeekStartsOn,
   type DayHighlight,
+  ICON_LEAD_ALWAYS,
 } from "../shared/settings";
 import { installTauriBridge, type DesktopApi } from "./host";
 import { sfSymbol, type SymbolName } from "./icons";
@@ -29,11 +30,15 @@ import { framedGlyphMask } from "./tray-frame";
 /** Each pane's sidebar tile, as System Settings marks its panes. */
 const TAB_ICONS: Record<string, { symbol: SymbolName; color: string }> = {
   general: { symbol: "gearshape.fill", color: "#8e8e93" },
-  appearance: { symbol: "circle.lefthalf.filled", color: "#1c1c1e" },
+  // Dark gray rather than near-black, so the tile still reads on the dark
+  // sidebar; the hairline in settings.css does the rest.
+  appearance: { symbol: "circle.lefthalf.filled", color: "#48484a" },
   calendar: { symbol: "calendar", color: "#ff3b30" },
   events: { symbol: "calendar.badge.clock", color: "#ff9500" },
   about: { symbol: "info.circle.fill", color: "#8e8e93" },
-};import { bindCalendarAccess } from "./calendar-access";
+};
+
+import { bindCalendarAccess } from "./calendar-access";
 import { chordFromKeyboard, chordLabel, chordProblem } from "../shared/shortcuts";
 import { rovingTarget } from "../shared/roving";
 
@@ -302,10 +307,13 @@ function startSettings(api: DesktopApi): void {
     showEventTitle,
   ];
 
-  const paintUpcomingOptions = (enabled: boolean): void => {
+  const paintUpcomingOptions = (enabled: boolean, leadMinutes: number): void => {
     for (const input of upcomingControls()) {
-      input.disabled = !enabled;
-      input.closest(".row")?.classList.toggle("is-off", !enabled);
+      // Look ahead only bounds the Always lead; any other lead already says
+      // how far ahead the countdown looks.
+      const off = !enabled || (input === upcomingHorizon && leadMinutes !== ICON_LEAD_ALWAYS);
+      input.disabled = off;
+      input.closest(".row")?.classList.toggle("is-off", off);
     }
   };
 
@@ -548,7 +556,7 @@ function startSettings(api: DesktopApi): void {
     includeWithoutLocation.checked = settings.includeEventsWithoutLocation;
     showEventTitle.checked = settings.showEventTitleInMenuBar;
     showEventTime.checked = settings.showEventTimeInMenuBar;
-    paintUpcomingOptions(settings.showUpcomingEvent);
+    paintUpcomingOptions(settings.showUpcomingEvent, settings.upcomingIconLeadMinutes);
     paintShortcut(toggleCalendarShortcut, settings.toggleCalendarShortcut);
     paintShortcut(joinMeetingShortcut, settings.joinMeetingShortcut);
     hiddenCalendarIds = settings.hiddenCalendarIds;
@@ -581,6 +589,15 @@ function startSettings(api: DesktopApi): void {
     dayHighlight: chosenHighlight(),
   });
 
+  // A hover left behind when the window closes under a still pointer would
+  // greet the next open. Hovers wait for the pointer to move again.
+  window.addEventListener("blur", () => {
+    document.documentElement.dataset.pointerAway = "";
+  });
+  document.addEventListener("mousemove", () => {
+    delete document.documentElement.dataset.pointerAway;
+  });
+
   // Sets the sidebar's single Tab stop on the pane that opens first.
   showTab(
     tabs.querySelector<HTMLElement>("[role='tab'][aria-selected='true']")?.dataset.tab ?? "general",
@@ -608,7 +625,10 @@ function startSettings(api: DesktopApi): void {
     const patch = patchFromForm();
     applyTheme(patch.theme ?? "system");
     paintHighlightName();
-    paintUpcomingOptions(patch.showUpcomingEvent ?? false);
+    paintUpcomingOptions(
+      patch.showUpcomingEvent ?? false,
+      patch.upcomingIconLeadMinutes ?? ICON_LEAD_ALWAYS,
+    );
     void api.updateSettings(patch);
   });
 

@@ -303,7 +303,7 @@ input {
   color: var(--on-accent);
 }
 
-.action.primary:hover:not(:disabled) {
+:where(:root:not([data-pointer-away])) .action.primary:hover:not(:disabled) {
   background: var(--accent);
   filter: brightness(1.08);
 }
@@ -508,7 +508,7 @@ select {
   -webkit-appearance: none;
 }
 
-select:hover {
+:where(:root:not([data-pointer-away])) select:hover {
   background-color: var(--control-fill);
 }
 
@@ -525,8 +525,8 @@ select:hover {
   background: var(--control-fill);
 }
 
-.action:hover:not(:disabled),
-.row .shortcut:hover:not(:disabled) {
+:where(:root:not([data-pointer-away])) .action:hover:not(:disabled),
+:where(:root:not([data-pointer-away])) .row .shortcut:hover:not(:disabled) {
   background: var(--control-fill-hover);
 }
 
@@ -566,7 +566,7 @@ select:hover {
   color: var(--secondary);
 }
 
-.preview:hover {
+:where(:root:not([data-pointer-away])) .preview:hover {
   background: var(--control-fill);
   color: var(--label);
 }
@@ -592,7 +592,7 @@ select:hover {
   background: transparent;
 }
 
-.icon-styles button:hover {
+:where(:root:not([data-pointer-away])) .icon-styles button:hover {
   background: var(--control-fill);
 }
 
@@ -801,7 +801,7 @@ select:hover {
   color: var(--secondary);
 }
 
-.about-links button:hover .about-dest {
+:where(:root:not([data-pointer-away])) .about-links button:hover .about-dest {
   color: var(--label);
 }
 
@@ -832,7 +832,7 @@ select:hover {
   cursor: pointer;
 }
 
-.link:hover {
+:where(:root:not([data-pointer-away])) .link:hover {
   text-decoration: underline;
 }
 
@@ -981,4 +981,12 @@ button:focus-visible {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* A line of explanation under a card, as System Settings sets one. */
+.group-note {
+  margin: 6px 10px 0;
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 14px;
 }

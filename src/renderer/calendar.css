@@ -459,6 +459,45 @@ button:focus {
   color: var(--secondary);
 }
 
+/* Responses, as Calendar draws them: a declined meeting struck through and
+   dimmed, a tentative one with a hollow dot. Unanswered stays plain. */
+.day-event.is-declined .day-event-title {
+  color: var(--secondary);
+  text-decoration: line-through;
+}
+
+.day-event.is-declined .day-event-dot,
+.day-event.is-tentative .day-event-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--event-color, var(--accent));
+}
+
+/* "2 earlier": today's finished meetings, folded. */
+.day-events-fold {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: calc(100% - 10px);
+  height: 22px;
+  margin: 0 5px;
+  padding: 0 9px 0 25px;
+  border-radius: 6px;
+  color: var(--secondary);
+  font-size: 11px;
+  text-align: left;
+}
+
+:root:not([data-pointer-away]) .day-events-fold:hover,
+:root[data-keyboard] .day-events-fold:focus {
+  background: var(--quaternary);
+  color: var(--label);
+}
+
+/* A failed open or join, said where the count usually sits. */
+#day-events-count.is-failure {
+  color: var(--calendar);
+}
+
 .day-event-join {
   flex: 0 0 auto;
   height: 20px;
@@ -479,6 +518,8 @@ button:focus {
   place-items: center;
   width: 20px;
   height: 20px;
+  /* Room between it and "in 1h 38m" at the end of the time line. */
+  margin-left: 6px;
   margin-right: 4px;
   border-radius: 10px;
   color: var(--secondary);

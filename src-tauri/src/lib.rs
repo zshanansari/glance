@@ -1061,7 +1061,9 @@ fn handle_menu_action(app: &AppHandle, id: &str) {
 }
 
 fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+    // The shortcuts are shown as macOS menus show them, and work while the
+    // menu is open.
+    let settings = MenuItem::with_id(app, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
     let date_time = MenuItem::with_id(
         app,
         "date-time",
@@ -1070,7 +1072,7 @@ fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         None::<&str>,
     )?;
-    let quit = MenuItem::with_id(app, "quit", "Quit Glance", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Glance", true, Some("CmdOrCtrl+Q"))?;
     let separator = PredefinedMenuItem::separator(app)?;
     Menu::with_items(
         app,

@@ -13,8 +13,10 @@ import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } f
 import {
   endOfToday,
   eventsOnDay,
-  countdownEvents,
+  dayCountdownEvents,
+  pastToFold,
   trayDescription,
+  type DismissedOccurrence,
   eventStatus,
   meetingToJoin,
   needsCalendarAccess,
@@ -148,6 +150,13 @@ function startCalendar(api: DesktopApi): void {
   // What the day list last drew, so a minute that changes nothing leaves it,
   // and whatever has focus in it, alone.
   let dayEventsKey = "";
+  let dismissedEvents: DismissedOccurrence[] = [];
+  // Today's finished meetings fold into one line until it is opened; the
+  // fold closes again with the popover.
+  let pastOpen = false;
+  // A failed open or join says so in the heading for a few seconds.
+  let failure: string | null = null;
+  let failureTimer = 0;
 
   // The month's events always load, for the dots and the day list. The
   // menu bar preview is the part the Upcoming setting turns on.
@@ -179,12 +188,13 @@ function startCalendar(api: DesktopApi): void {
         outside ? api.getCalendarEvents(selectedStart, selectedEnd) : Promise.resolve([]),
       ]);
       let next: UpcomingEvent | null = null;
+      // The day list leaves dismissed meetings unmarked, countdown on or off.
+      const dismissed = await api.getDismissedEvents().catch(() => []);
       if (current.showUpcomingEvent) {
         const nextEvents = await api.getCalendarEvents(
           now,
           upcomingFetchEnd(now, current.upcomingHorizonDays, current.upcomingIconLeadMinutes),
         );
-        const dismissed = await api.getDismissedEvents().catch(() => []);
         next = trayIconEvent(nextEvents, now, {
           upcomingHorizonDays: current.upcomingHorizonDays,
           upcomingIconLeadMinutes: current.upcomingIconLeadMinutes,
@@ -194,9 +204,17 @@ function startCalendar(api: DesktopApi): void {
       }
       if (request !== eventRequest) return;
       upcomingEvent = next;
+      dismissedEvents = dismissed;
       const fetched = [...monthEvents, ...selectedEvents];
       const key = JSON.stringify(
-        fetched.map((event) => [event.id, event.startAt, event.endAt, event.title, event.joinUrl]),
+        fetched.map((event) => [
+          event.id,
+          event.startAt,
+          event.endAt,
+          event.title,
+          event.joinUrl,
+          event.response,
+        ]),
       );
       const unchanged = key === eventsKey && eventError === null;
       eventsKey = key;
@@ -253,7 +271,8 @@ function startCalendar(api: DesktopApi): void {
     const open = document.createElement("button");
     open.type = "button";
     open.className = "day-event-open";
-    open.title = "Open in Calendar";
+    // A long name is cut short in the row; the tooltip carries it whole.
+    open.title = event.title;
     const occurrence = `${event.id}@${event.startAt}`;
     open.dataset.focusKey = `open:${occurrence}`;
     const dot = document.createElement("span");
@@ -273,9 +292,21 @@ function startCalendar(api: DesktopApi): void {
       time.append(when);
       row.classList.add("is-next");
     }
+    // Declined and tentative read as Calendar draws them. Unanswered looks
+    // like any other meeting: plenty of teams never reply to their own.
+    if (event.response === "declined" || event.response === "tentative") {
+      row.classList.add(`is-${event.response}`);
+      const said = document.createElement("span");
+      said.className = "visually-hidden";
+      said.textContent = `, ${event.response}`;
+      title.append(said);
+    }
     open.append(dot, title, time);
     open.addEventListener("click", () => {
-      void api.openEvent(event.id).then(() => api.hideCalendar());
+      api.openEvent(event.id).then(
+        () => api.hideCalendar(),
+        () => showFailure("Couldn’t open this event in Calendar"),
+      );
     });
     row.append(open);
     if (event.joinUrl && event.endAt > now) {
@@ -288,7 +319,10 @@ function startCalendar(api: DesktopApi): void {
       join.title = "Join meeting";
       join.textContent = "Join";
       join.addEventListener("click", () => {
-        void api.joinMeeting(url).then(() => api.hideCalendar());
+        api.joinMeeting(url).then(
+          () => api.hideCalendar(),
+          () => showFailure("Couldn’t open the meeting link"),
+        );
       });
       row.append(join);
     }
@@ -322,12 +356,16 @@ function startCalendar(api: DesktopApi): void {
     const selectedDate = fromIso(focusIso);
     const now = Date.now();
     const listed = eventsOnDay(calendarEvents, selectedDate);
+    const isToday = focusIso === toIso(new Date(now));
     const counting = new Set(
-      focusIso === toIso(new Date(now)) ? countdownEvents(listed, now) : [],
+      isToday ? dayCountdownEvents(listed, now, upcomingEvent, dismissedEvents) : [],
     );
+    const folded = isToday && !pastOpen ? pastToFold(listed, now) : [];
     const key = JSON.stringify([
       focusIso,
       eventError,
+      failure,
+      folded.length,
       upcomingEvent && [upcomingEvent.id, upcomingEvent.endAt],
       listed.map((event) => [
         event.id,
@@ -336,14 +374,22 @@ function startCalendar(api: DesktopApi): void {
         event.title,
         event.joinUrl,
         event.color,
+        event.response,
         event.endAt <= now,
         counting.has(event) ? eventStatus(event, now).label : "",
       ]),
     ]);
     if (key === dayEventsKey) return;
     dayEventsKey = key;
-    keepingFocus(dayEventsList, () => paintDayEventRows(selectedDate, listed, counting, now), (lost) =>
-      lost.startsWith("dismiss:") ? `open:${lost.slice("dismiss:".length)}` : null,
+    keepingFocus(
+      dayEventsList,
+      () => paintDayEventRows(selectedDate, listed, counting, new Set(folded), now),
+      (lost) => {
+        if (lost.startsWith("dismiss:")) return `open:${lost.slice("dismiss:".length)}`;
+        // Opening the fold hands focus to the first meeting it showed.
+        if (lost === "fold" && listed[0]) return `open:${listed[0].id}@${listed[0].startAt}`;
+        return null;
+      },
     );
     syncHeight();
   };
@@ -352,6 +398,7 @@ function startCalendar(api: DesktopApi): void {
     selectedDate: Date,
     selectedEvents: UpcomingEvent[],
     next: Set<UpcomingEvent>,
+    folded: Set<UpcomingEvent>,
     now: number,
   ): void => {
     dayEventsTitle.textContent = new Intl.DateTimeFormat(undefined, {
@@ -359,9 +406,12 @@ function startCalendar(api: DesktopApi): void {
       month: "long",
       day: "numeric",
     }).format(selectedDate);
-    dayEventsCount.textContent = selectedEvents.length
-      ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
-      : "";
+    dayEventsCount.classList.toggle("is-failure", failure !== null);
+    dayEventsCount.textContent =
+      failure ??
+      (selectedEvents.length
+        ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
+        : "");
     if (eventError) {
       // Only a missing permission is fixed by asking for one; any other
       // failure is offered again instead of a prompt that would not help.
@@ -382,10 +432,41 @@ function startCalendar(api: DesktopApi): void {
     } else {
       // On today, the meeting that is on or comes next says how soon, and so
       // does every other one at that same moment.
-      dayEventsList.replaceChildren(
-        ...selectedEvents.map((event) => dayEventRow(event, now, next.has(event))),
-      );
+      const rows = selectedEvents
+        .filter((event) => !folded.has(event))
+        .map((event) => dayEventRow(event, now, next.has(event)));
+      if (folded.size) rows.unshift(foldRow(folded.size));
+      dayEventsList.replaceChildren(...rows);
     }
+  };
+
+  /** "2 earlier": today's finished meetings, folded until asked for. */
+  const foldRow = (count: number): HTMLElement => {
+    const fold = document.createElement("button");
+    fold.type = "button";
+    fold.className = "day-events-fold";
+    fold.dataset.focusKey = "fold";
+    fold.setAttribute("aria-expanded", "false");
+    const label = document.createElement("span");
+    label.textContent = `${count} earlier`;
+    fold.append(label, sfSymbol("chevron.right", 10));
+    fold.title = `Show ${count} meetings that have ended`;
+    fold.addEventListener("click", () => {
+      pastOpen = true;
+      paintDayEvents();
+    });
+    return fold;
+  };
+
+  const showFailure = (message: string): void => {
+    failure = message;
+    announce(message);
+    paintDayEvents();
+    window.clearTimeout(failureTimer);
+    failureTimer = window.setTimeout(() => {
+      failure = null;
+      paintDayEvents();
+    }, 4000);
   };
 
   const refreshTray = (): void => {
@@ -650,6 +731,11 @@ function startCalendar(api: DesktopApi): void {
     delete document.documentElement.dataset.keyboard;
   });
   api.onCalendarHidden(() => {
+    // The fold closes with the popover; a reopen shows today's meetings tidy.
+    if (pastOpen) {
+      pastOpen = false;
+      paintDayEvents();
+    }
     delete document.documentElement.dataset.keyboard;
     document.documentElement.dataset.pointerAway = "";
   });

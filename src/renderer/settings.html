@@ -298,6 +298,49 @@
               </div>
             </div>
           </div>
+          <div class="group">
+            <h2 id="calendars-heading">Calendars</h2>
+            <div class="card">
+              <div class="row" id="calendar-access-row">
+                <div class="copy">
+                  <label for="calendar-access">Calendar access</label>
+                  <p>macOS will ask. After a denial, allow Glance under Privacy &amp; Security.</p>
+                  <p id="calendar-access-status" aria-live="polite" hidden></p>
+                </div>
+                <button type="button" class="action" id="calendar-access">Allow Access…</button>
+              </div>
+              <div
+                class="calendar-sources"
+                id="calendar-sources"
+                hidden
+                role="group"
+                aria-labelledby="calendar-sources-label"
+              ></div>
+            </div>
+            <p class="group-note">
+              A calendar you turn off leaves all of Glance: the month, the countdown and the
+              meeting reminder.
+            </p>
+          </div>
+          <div class="group">
+            <h2 id="reminders-heading">Reminders</h2>
+            <div class="card">
+              <div class="row" id="reminders-access-row" hidden>
+                <div class="copy">
+                  <label for="reminders-access">Reminders access</label>
+                  <p>macOS will ask. After a denial, allow Glance under Privacy &amp; Security.</p>
+                </div>
+                <button type="button" class="action" id="reminders-access">Allow Access…</button>
+              </div>
+              <div
+                class="calendar-sources"
+                id="reminder-sources"
+                hidden
+                role="group"
+                aria-labelledby="reminder-sources-label"
+              ></div>
+            </div>
+          </div>
         </section>
 
         <section
@@ -327,7 +370,7 @@
               <div class="row" id="upcoming-horizon-row">
                 <div class="copy">
                   <label for="upcoming-horizon">Look ahead</label>
-                  <p>How far ahead it looks for the next event.</p>
+                  <p>With Always, how far ahead it looks for the next event.</p>
                 </div>
                 <select id="upcoming-horizon" name="upcomingHorizonDays"></select>
               </div>
@@ -401,45 +444,6 @@
                   switch
                 />
               </div>
-            </div>
-          </div>
-          <div class="group">
-            <h2 id="calendars-heading">Calendars</h2>
-            <div class="card">
-              <div class="row" id="calendar-access-row">
-                <div class="copy">
-                  <label for="calendar-access">Calendar access</label>
-                  <p>macOS will ask. After a denial, allow Glance under Privacy &amp; Security.</p>
-                  <p id="calendar-access-status" aria-live="polite" hidden></p>
-                </div>
-                <button type="button" class="action" id="calendar-access">Allow Access…</button>
-              </div>
-              <div
-                class="calendar-sources"
-                id="calendar-sources"
-                hidden
-                role="group"
-                aria-labelledby="calendar-sources-label"
-              ></div>
-            </div>
-          </div>
-          <div class="group">
-            <h2 id="reminders-heading">Reminders</h2>
-            <div class="card">
-              <div class="row" id="reminders-access-row" hidden>
-                <div class="copy">
-                  <label for="reminders-access">Reminders access</label>
-                  <p>macOS will ask. After a denial, allow Glance under Privacy &amp; Security.</p>
-                </div>
-                <button type="button" class="action" id="reminders-access">Allow Access…</button>
-              </div>
-              <div
-                class="calendar-sources"
-                id="reminder-sources"
-                hidden
-                role="group"
-                aria-labelledby="reminder-sources-label"
-              ></div>
             </div>
           </div>
         </section>

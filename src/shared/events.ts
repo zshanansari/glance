@@ -44,6 +44,29 @@ export function compareEvents(
   );
 }
 
+/** How soon a meeting must start to take over from one already running. */
+export const SOON_MS = 10 * 60_000;
+
+/**
+ * The event to count down to among `events`, all still to finish: the first
+ * by `compareEvents`, unless that one is already running and will still be
+ * running when another starts within `SOON_MS`. A long block such as
+ * "Focus time" then gives way to the meeting about to start inside it.
+ */
+export function leadEvent<T extends Pick<UpcomingEvent, "startAt" | "endAt" | "title" | "id">>(
+  events: readonly T[],
+  now: number,
+): T | null {
+  const sorted = [...events].sort(compareEvents);
+  const first = sorted[0];
+  if (!first || first.startAt > now) return first ?? null;
+  const soon = sorted.find(
+    (event) =>
+      event.startAt > now && event.startAt - now <= SOON_MS && first.endAt > event.startAt,
+  );
+  return soon ?? first;
+}
+
 /**
  * Everything that touches a local day, for the dots under it and the list
  * below the month. All-day items lead, then the rest in `compareEvents` order.
@@ -68,10 +91,48 @@ export function countdownEvents(
   const live = events
     .filter((event) => !event.allDay && event.endAt > now)
     .sort(compareEvents);
-  const lead = live[0];
+  const lead = leadEvent(live, now);
   if (!lead) return [];
   const label = eventStatus(lead, now).label;
   return live.filter((event) => eventStatus(event, now).label === label);
+}
+
+/**
+ * Today's finished timed meetings, to fold into one "2 earlier" line. A
+ * single one is left in place: folding it would save no room and cost a
+ * click. All-day items never fold.
+ */
+export function pastToFold(events: readonly UpcomingEvent[], now: number): UpcomingEvent[] {
+  const past = events.filter((event) => !event.allDay && event.endAt <= now);
+  return past.length >= 2 ? past : [];
+}
+
+/**
+ * The rows of a day's list that say how soon, matching the menu bar: the
+ * meeting it counts down to and any that read the same. A dismissed meeting
+ * says nothing. When the menu bar counts to nothing on this list (it is off,
+ * or its meeting is on another day), the list finds its own.
+ */
+export function dayCountdownEvents(
+  events: readonly UpcomingEvent[],
+  now: number,
+  tracked: UpcomingEvent | null,
+  dismissed: readonly DismissedOccurrence[] = [],
+): UpcomingEvent[] {
+  const live = events.filter(
+    (event) =>
+      !event.allDay && event.endAt > now && !occurrenceIsDismissed(event, dismissed, now),
+  );
+  if (tracked && tracked.endAt > now) {
+    const label = eventStatus(tracked, now).label;
+    const group = live
+      .filter((event) => eventStatus(event, now).label === label)
+      .sort(compareEvents);
+    if (group.some((event) => event.id === tracked.id && event.endAt === tracked.endAt)) {
+      return group;
+    }
+  }
+  return countdownEvents(live, now);
 }
 
 /** Local midnight that closes the day `days - 1` days after today. */
@@ -210,24 +271,19 @@ export function trayIconEvent(
   },
 ): UpcomingEvent | null {
   const dismissed = options.dismissed ?? [];
-  let best: UpcomingEvent | null = null;
-  for (const event of events) {
-    if (event.allDay) continue;
-    if (!eventPassesFilters(event, options.filters)) continue;
-    if (occurrenceIsDismissed(event, dismissed, now)) continue;
-    if (
+  const candidates = events.filter(
+    (event) =>
+      !event.allDay &&
+      eventPassesFilters(event, options.filters) &&
+      !occurrenceIsDismissed(event, dismissed, now) &&
       eventQualifiesForIcon(
         event,
         now,
         options.upcomingHorizonDays,
         options.upcomingIconLeadMinutes,
-      ) &&
-      (!best || compareEvents(event, best) < 0)
-    ) {
-      best = event;
-    }
-  }
-  return best;
+      ),
+  );
+  return leadEvent(candidates, now);
 }
 
 export type EventTiming = "upcoming" | "ongoing";
@@ -252,10 +308,7 @@ export function eventStatus(
   now = Date.now(),
 ): { label: string; timing: EventTiming } {
   if (now >= event.endAt) {
-    return {
-      label: "No upcoming events",
-      timing: "upcoming",
-    };
+    return { label: "ended", timing: "upcoming" };
   }
   if (now >= event.startAt && now < event.endAt) {
     if (now - event.startAt < NOW_WINDOW_MS) {
@@ -272,7 +325,7 @@ export function eventStatus(
   };
 }
 
-function spokenDuration(milliseconds: number): string {
+export function spokenDuration(milliseconds: number): string {
   const minutes = roundedMinutes(milliseconds);
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
@@ -457,15 +510,15 @@ export function meetingToJoin(
   events: readonly UpcomingEvent[],
   now: number,
 ): UpcomingEvent | null {
-  let best: UpcomingEvent | null = null;
-  const candidates: UpcomingEvent[] = [];
-  for (const event of events) {
-    if (event.allDay || !event.joinUrl || event.response === "declined") continue;
-    if (event.endAt <= now || event.startAt > endOfToday(new Date(now))) continue;
-    candidates.push(event);
-    if (!best || compareEvents(event, best) < 0) best = event;
-  }
-  return preferAnswered(best, candidates);
+  const candidates = events.filter(
+    (event) =>
+      !event.allDay &&
+      Boolean(event.joinUrl) &&
+      event.response !== "declined" &&
+      event.endAt > now &&
+      event.startAt <= endOfToday(new Date(now)),
+  );
+  return preferAnswered(leadEvent(candidates, now), candidates);
 }
 
 /** The host's words when Calendar access has not been granted (events.rs). */

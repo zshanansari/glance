@@ -21,6 +21,9 @@ import {
   type UpcomingEvent,
   eventsOnDay,
   countdownEvents,
+  dayCountdownEvents,
+  leadEvent,
+  pastToFold,
   spokenStatus,
   trayDescription,
 } from "../src/shared/events";
@@ -599,5 +602,77 @@ describe("the menu bar item for VoiceOver", () => {
 
   it("drops a meeting that is over", () => {
     expect(trayDescription(start + 31 * 60_000, call, "en-US")).toBe("Friday, November 6, 2026");
+  });
+});
+
+describe("a meeting about to start beats a long block", () => {
+  const at = (hour: number, minute = 0) => Date.UTC(2026, 10, 9, hour, minute);
+  const focus = { ...event, id: "focus", title: "Focus time", startAt: at(13), endAt: at(17) };
+  const sync = {
+    ...event,
+    id: "sync",
+    title: "Design sync",
+    startAt: at(15),
+    endAt: at(15, 30),
+    joinUrl: "https://zoom.us/j/1",
+  };
+  const lead = (now: number) => leadEvent([focus, sync], now)?.id;
+
+  it("keeps the running block until the meeting is near", () => {
+    expect(lead(at(14, 30))).toBe("focus");
+  });
+
+  it("hands over ten minutes before the meeting", () => {
+    expect(lead(at(14, 50))).toBe("sync");
+  });
+
+  it("keeps a running meeting that ends before the next begins", () => {
+    const short = { ...focus, endAt: at(14, 55) };
+    expect(leadEvent([short, sync], at(14, 50))?.id).toBe("focus");
+  });
+
+  it("drives the menu bar and the Join shortcut alike", () => {
+    const options = { upcomingHorizonDays: 1, upcomingIconLeadMinutes: ICON_LEAD_ALWAYS, filters: included };
+    expect(trayIconEvent([focus, sync], at(14, 52), options)?.id).toBe("sync");
+    const focusCall = { ...focus, joinUrl: "https://zoom.us/j/2" };
+    expect(meetingToJoin([focusCall, sync], at(14, 52))?.id).toBe("sync");
+  });
+});
+
+describe("the day list follows the menu bar", () => {
+  const at = (hour: number, minute = 0) => Date.UTC(2026, 10, 9, hour, minute);
+  const solo = { ...event, id: "solo", title: "Lunch", startAt: at(12), endAt: at(13), hasParticipants: false };
+  const team = { ...event, id: "team", title: "Team call", startAt: at(14), endAt: at(14, 30) };
+
+  it("marks the meeting the menu bar counts down to", () => {
+    // The countdown skips Lunch (no one invited), so the list does too.
+    const shown = dayCountdownEvents([solo, team], at(11, 30), team).map((item) => item.id);
+    expect(shown).toEqual(["team"]);
+  });
+
+  it("finds its own when the menu bar counts nothing here", () => {
+    const shown = dayCountdownEvents([solo, team], at(11, 30), null).map((item) => item.id);
+    expect(shown).toEqual(["solo"]);
+  });
+
+  it("leaves a dismissed meeting unmarked", () => {
+    const dismissed = [{ id: "solo", endAt: solo.endAt }];
+    const shown = dayCountdownEvents([solo, team], at(11, 30), null, dismissed).map((item) => item.id);
+    expect(shown).toEqual(["team"]);
+  });
+});
+
+describe("folding today's finished meetings", () => {
+  const at = (hour: number) => Date.UTC(2026, 10, 9, hour);
+  const meeting = (id: string, hour: number) => ({ ...event, id, startAt: at(hour), endAt: at(hour) + 30 * 60_000 });
+  const holiday = { ...event, id: "holiday", allDay: true, startAt: at(0), endAt: at(24) };
+
+  it("folds two or more", () => {
+    const folded = pastToFold([holiday, meeting("a", 9), meeting("b", 10), meeting("c", 15)], at(12));
+    expect(folded.map((item) => item.id)).toEqual(["a", "b"]);
+  });
+
+  it("leaves a single finished meeting in place", () => {
+    expect(pastToFold([meeting("a", 9), meeting("c", 15)], at(12))).toEqual([]);
   });
 });

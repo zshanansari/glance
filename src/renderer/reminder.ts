@@ -7,8 +7,8 @@
 import {
   REMINDER_LEAD_MS,
   REMINDER_LINGER_MS,
-  eventStatus,
   reminderEvent,
+  spokenDuration,
   reminderStillDue,
   type UpcomingEvent,
 } from "../shared/events";
@@ -27,11 +27,13 @@ function applyTheme(theme: AppSettings["theme"]): void {
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
-/** "Starts in 1 min" before the start, "Happening now" once it is under way. */
+/**
+ * "Starts in 1 minute" before the start, "Happening now" once it is under
+ * way. Words in full, as the card has room for them and VoiceOver reads it.
+ */
 export function reminderHeading(event: UpcomingEvent, now: number): string {
-  const status = eventStatus(event, now);
-  if (status.timing === "ongoing") return "Happening now";
-  return `Starts ${status.label.replace(/(\d+)m$/, "$1 min")}`;
+  if (now >= event.startAt) return "Happening now";
+  return `Starts in ${spokenDuration(event.startAt - now)}`;
 }
 
 function occurrenceKey(event: Pick<UpcomingEvent, "id" | "startAt">): string {
@@ -49,7 +51,17 @@ export function startReminder(
   const offered = new Set<string>();
   let checking = 0;
 
+  // A card that appears under a still pointer, or one hidden while hovered,
+  // shows no hover until the pointer moves.
+  const holdHover = (): void => {
+    document.documentElement.dataset.pointerAway = "";
+  };
+  document.addEventListener("mousemove", () => {
+    delete document.documentElement.dataset.pointerAway;
+  });
+
   const hide = (): void => {
+    holdHover();
     showing = null;
     if (announcer) announcer.textContent = "";
     void api.hideReminder();
@@ -65,8 +77,11 @@ export function startReminder(
     element.type = "button";
     element.className = "event interactive";
     element.addEventListener("click", () => {
-      void api.openEvent(event.id);
-      hide();
+      api.openEvent(event.id).then(hide, () => {
+        const message = "Couldn’t open this event in Calendar";
+        if (heading) heading.textContent = message;
+        if (announcer) announcer.textContent = message;
+      });
     });
     const dot = document.createElement("span");
     dot.className = `dot ${event.response}`;
@@ -114,15 +129,19 @@ export function startReminder(
     const url = event.joinUrl;
     if (url) {
       const { brand, label } = meetingBrand(url);
-      nodes.push(
-        action(meetingIcon(brand, 13), label, () => {
-          void api.joinMeeting(url);
-          hide();
-        }),
-      );
+      const join = action(meetingIcon(brand, 13), label, () => {
+        api.joinMeeting(url).then(hide, () => {
+          // The card stays, and says why nothing opened.
+          const text = join.querySelector(".label");
+          if (text) text.textContent = "Couldn’t open the meeting link";
+          if (announcer) announcer.textContent = "Couldn’t open the meeting link";
+        });
+      });
+      nodes.push(join);
     }
     nodes.push(
-      action(sfSymbol("eye.slash", 14), "Dismiss", () => {
+      // Skipping stops the countdown too; Escape only puts the card away.
+      action(sfSymbol("eye.slash", 14), "Skip this meeting", () => {
         void api.dismissUpcomingEvent(event.id, event.endAt);
         hide();
       }),
@@ -154,6 +173,7 @@ export function startReminder(
       paint(event, now);
       // The host holds it back while the month is open, which lists the
       // same meeting; a later tick offers it, until a few minutes in.
+      holdHover();
       if (await api.showReminder()) {
         offered.add(occurrenceKey(event));
         showing = event;
@@ -167,6 +187,7 @@ export function startReminder(
 
   // The host hides the card when the month opens; it is done with then.
   api.onReminderHidden(() => {
+    holdHover();
     showing = null;
   });
 
