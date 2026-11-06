@@ -369,6 +369,10 @@ input {
   line-height: 14px;
 }
 
+.copy .shortcut-problem {
+  color: var(--calendar);
+}
+
 .row-controls {
   display: flex;
   flex-shrink: 0;

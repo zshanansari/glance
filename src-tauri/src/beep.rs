@@ -119,14 +119,27 @@ pub fn play_native(path: &std::path::Path, volume: f32) -> Result<(), String> {
         if sound.is_null() {
             return Err("Could not load beep sound".into());
         }
-        let _: () = msg_send![sound, setVolume: volume.clamp(0.0, 1.0)];
-        let played: Bool = msg_send![sound, play];
+        // alloc/init hands back an owned sound. It must outlive play(), which
+        // returns at once, so the last one is held here and released when
+        // the next chime replaces it, an hour later.
+        let Some(sound) = objc2::rc::Retained::from_raw(sound) else {
+            return Err("Could not load beep sound".into());
+        };
+        let _: () = msg_send![&*sound, setVolume: volume.clamp(0.0, 1.0)];
+        let played: Bool = msg_send![&*sound, play];
+        LAST_SOUND.with(|last| *last.borrow_mut() = Some(sound));
         if played.as_bool() {
             Ok(())
         } else {
             Err("Could not play beep sound".into())
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+thread_local! {
+    static LAST_SOUND: std::cell::RefCell<Option<objc2::rc::Retained<objc2::runtime::AnyObject>>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ export type MeetingBrand =
   | "gotomeeting"
   | "generic";
 
+/** Brands only; the host decides what Join may open (`events.rs`). */
 const HOSTS: { brand: MeetingBrand; label: string; hosts: string[] }[] = [
   { brand: "meet", label: "Join Google Meet meeting", hosts: ["meet.google.com"] },
   { brand: "zoom", label: "Join Zoom meeting", hosts: ["zoom.us", "zoom.com"] },
@@ -19,11 +20,11 @@ const HOSTS: { brand: MeetingBrand; label: string; hosts: string[] }[] = [
     hosts: ["teams.microsoft.com", "teams.live.com"],
   },
   { brand: "webex", label: "Join Webex meeting", hosts: ["webex.com"] },
-  { brand: "jitsi", label: "Join Jitsi meeting", hosts: ["jit.si", "jitsi.org"] },
+  { brand: "jitsi", label: "Join Jitsi meeting", hosts: ["jit.si"] },
   {
     brand: "gotomeeting",
     label: "Join GoToMeeting meeting",
-    hosts: ["gotomeeting.com", "goto.com"],
+    hosts: ["gotomeeting.com", "meet.goto.com", "app.goto.com"],
   },
 ];
 

@@ -5,6 +5,10 @@
  * release step writes it. The app verifies `signature` against the public key
  * compiled into it, which is why the signature travels in the manifest rather
  * than beside the download.
+ *
+ * The manifest itself is not signed. Whoever can change it can offer a
+ * different version or a dead link, but not get a payload installed that the
+ * update key did not sign.
  */
 
 /** The only target this project ships; Intel Macs build from source. */

@@ -64,8 +64,38 @@ pub struct DismissedOccurrence {
     pub end_at: i64,
 }
 
+/// Most dismissals kept at once. Each lasts only until its meeting ends, so
+/// this is far more than a real calendar needs; the cap only stops a
+/// webview gone wrong from growing the list, and the file, without end.
+pub const MAX_DISMISSED: usize = 200;
+
+/// The id is an EventKit identifier; anything longer is not one.
+const MAX_DISMISSED_ID_LEN: usize = 512;
+
 pub fn prune_dismissed(list: &mut Vec<DismissedOccurrence>, now: i64) {
-    list.retain(|item| item.end_at > now);
+    list.retain(|item| item.end_at > now && item.id.len() <= MAX_DISMISSED_ID_LEN);
+    if list.len() > MAX_DISMISSED {
+        let extra = list.len() - MAX_DISMISSED;
+        list.drain(..extra);
+    }
+}
+
+/// Dismissals saved by an earlier run, still current. A missing or unreadable
+/// file is an empty list.
+pub fn load_dismissed(path: &std::path::Path, now: i64) -> Vec<DismissedOccurrence> {
+    let mut list: Vec<DismissedOccurrence> = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default();
+    prune_dismissed(&mut list, now);
+    list
+}
+
+/// Keeps dismissals across a restart, so a skipped meeting stays skipped.
+pub fn save_dismissed(path: &std::path::Path, list: &[DismissedOccurrence]) {
+    if let Ok(body) = serde_json::to_string(list) {
+        let _ = crate::settings::write_atomically(path, body.as_bytes());
+    }
 }
 
 pub fn dismiss_occurrence(
@@ -75,7 +105,7 @@ pub fn dismiss_occurrence(
     now: i64,
 ) {
     prune_dismissed(list, now);
-    if end_at <= now {
+    if end_at <= now || id.len() > MAX_DISMISSED_ID_LEN {
         return;
     }
     if list
@@ -85,6 +115,7 @@ pub fn dismiss_occurrence(
         return;
     }
     list.push(DismissedOccurrence { id, end_at });
+    prune_dismissed(list, now);
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -210,42 +241,81 @@ pub(crate) const DATE_TIME_SETTINGS_URLS: &[&str] = &[
     "x-apple.systempreferences:com.apple.preference.datetime",
 ];
 
-/// Hosts recognised as a joinable meeting. Keep in step with `meetings.ts`.
-const MEETING_HOSTS: &[&str] = &[
-    "meet.google.com",
-    "zoom.us",
-    "zoom.com",
-    "facetime.apple.com",
-    "teams.microsoft.com",
-    "teams.live.com",
-    "webex.com",
-    "jit.si",
-    "jitsi.org",
-    "gotomeeting.com",
-    "goto.com",
-];
+/// Where each service holds its meetings. Keep in step with `meetings.ts`.
+///
+/// Hosts are matched exactly or as a subdomain, never as a lookalike suffix,
+/// and a service's marketing, support and community sites are left out: an
+/// invitation is written by whoever sent it, so Join must only ever open a
+/// meeting, not any page a sender chose on a known company's domain.
+const ZOOM_DOMAINS: &[&str] = &["zoom.us", "zoom.com"];
+/// Zoom's join paths: meetings, personal rooms, webinars, the web client.
+const ZOOM_JOIN_PATHS: &[&str] = &["/j/", "/my/", "/w/", "/s/", "/wc/"];
+/// Zoom's own sites that sit on a subdomain but never hold a meeting.
+const ZOOM_SITES: &[&str] = &["community", "support", "marketplace", "explore", "developers", "blog", "news", "status"];
 
-fn host_of(url: &str) -> Option<String> {
-    let rest = url.split_once("://")?.1;
-    let host = rest.split(['/', '?', '#']).next()?.trim();
-    let host = host.split('@').next_back()?.trim();
-    if host.is_empty() {
-        return None;
+/// The host of an https address, lowercased and without a trailing dot.
+fn host_of(raw: &str) -> Option<String> {
+    let url = url::Url::parse(raw).ok()?;
+    match url.host()? {
+        url::Host::Domain(host) => Some(host.trim_end_matches('.').to_ascii_lowercase()),
+        _ => None,
     }
-    Some(host.trim_end_matches('.').to_ascii_lowercase())
 }
 
 fn serves_host(host: &str, domain: &str) -> bool {
     host == domain || host.ends_with(&format!(".{domain}"))
 }
 
-fn is_meeting_url(url: &str) -> bool {
-    url.starts_with("https://")
-        && host_of(url).is_some_and(|host| {
-        MEETING_HOSTS
-            .iter()
-            .any(|domain| serves_host(&host, domain))
-    })
+/// The label left of `domain` in `host`, as `acme` in `acme.zoom.us`.
+fn subdomain_of<'a>(host: &'a str, domain: &str) -> Option<&'a str> {
+    host.strip_suffix(domain)?.strip_suffix('.')
+}
+
+/// Whether a host and path belong to a meeting on a known service.
+fn meeting_place(host: &str, path: &str) -> bool {
+    if host == "meet.google.com" || host == "teams.microsoft.com" || host == "teams.live.com" {
+        return true;
+    }
+    if host == "facetime.apple.com" {
+        return path.starts_with("/join");
+    }
+    if let Some(domain) = ZOOM_DOMAINS.iter().find(|domain| serves_host(host, domain)) {
+        let site = subdomain_of(host, domain)
+            .and_then(|sub| sub.rsplit('.').next())
+            .is_some_and(|label| ZOOM_SITES.contains(&label));
+        return !site && ZOOM_JOIN_PATHS.iter().any(|prefix| path.starts_with(prefix));
+    }
+    // Webex meetings live on a company's own subdomain; www is the brochure.
+    if let Some(sub) = subdomain_of(host, "webex.com") {
+        return sub != "www";
+    }
+    // Jitsi's public rooms live on meet.jit.si; jitsi.org is the project site.
+    if serves_host(host, "jit.si") {
+        return true;
+    }
+    if serves_host(host, "gotomeeting.com") {
+        return true;
+    }
+    host == "meet.goto.com" || host == "app.goto.com"
+}
+
+/// A link Join may open: https, no credentials or odd port, on a meeting host.
+fn is_meeting_url(raw: &str) -> bool {
+    let Ok(url) = url::Url::parse(raw) else {
+        return false;
+    };
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+    {
+        return false;
+    }
+    let Some(url::Host::Domain(host)) = url.host() else {
+        return false;
+    };
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    meeting_place(&host, url.path())
 }
 
 fn from_hex(byte: u8) -> Option<u8> {
@@ -1444,6 +1514,70 @@ mod tests {
     #[test]
     fn a_meeting_host_over_plain_http_is_not_joinable() {
         assert_eq!(extract_join_url(None, None, Some("http://zoom.us/j/99")), None);
+    }
+
+    #[test]
+    fn dismissals_are_capped_and_survive_a_restart() {
+        use super::{dismiss_occurrence, load_dismissed, save_dismissed, MAX_DISMISSED};
+        let now = 1_000;
+        let mut list = Vec::new();
+        for index in 0..MAX_DISMISSED + 5 {
+            dismiss_occurrence(&mut list, format!("event-{index}"), 5_000, now);
+        }
+        assert_eq!(list.len(), MAX_DISMISSED);
+        // The oldest go first.
+        assert_eq!(list[0].id, "event-5");
+        dismiss_occurrence(&mut list, "x".repeat(600), 5_000, now);
+        assert!(list.iter().all(|item| item.id.len() < 600));
+
+        let dir = std::env::temp_dir().join(format!("glance-dismissed-{}", std::process::id()));
+        let path = dir.join("dismissed.json");
+        save_dismissed(&path, &list);
+        assert_eq!(load_dismissed(&path, now), list);
+        // Once their meetings end, they are gone on the next load.
+        assert!(load_dismissed(&path, 6_000).is_empty());
+        std::fs::write(&path, "not json").unwrap();
+        assert!(load_dismissed(&path, now).is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn join_links_are_parsed_rather_than_split() {
+        use super::is_meeting_url;
+        for good in [
+            "https://meet.google.com/abc-defg-hij",
+            "https://zoom.us/j/123?pwd=x",
+            "https://us02web.zoom.us/j/123",
+            "https://acme.zoom.us/my/room",
+            "https://company.zoom.com/j/55",
+            "https://teams.microsoft.com/l/meetup-join/19%3a",
+            "https://acme.webex.com/meet/someone",
+            "https://meet.jit.si/SomeRoom",
+            "https://global.gotomeeting.com/join/123",
+            "https://meet.goto.com/123",
+            "https://facetime.apple.com/join#v=1",
+            "https://MEET.GOOGLE.COM./abc",
+        ] {
+            assert!(is_meeting_url(good), "{good} should be joinable");
+        }
+        for bad in [
+            "https://zoom.us/pricing",
+            "https://community.zoom.com/j/1",
+            "https://support.zoom.us/j/1",
+            "https://www.webex.com/pricing",
+            "https://jitsi.org/download",
+            "https://www.goto.com/meeting",
+            "https://zoom.us@evil.example/j/1",
+            "https://user:pass@zoom.us/j/1",
+            "https://zoom.us:8443/j/1",
+            "https://evil.example/zoom.us/j/1",
+            "https://notzoom.us/j/1",
+            "https://zoom.us.evil.example/j/1",
+            "https://127.0.0.1/j/1",
+            "javascript:alert(1)",
+        ] {
+            assert!(!is_meeting_url(bad), "{bad} should not be joinable");
+        }
     }
 
     #[test]

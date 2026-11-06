@@ -13,6 +13,7 @@ import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } f
 import {
   endOfToday,
   eventsOnDay,
+  countdownEvents,
   eventStatus,
   meetingToJoin,
   needsCalendarAccess,
@@ -315,13 +316,13 @@ function startCalendar(api: DesktopApi): void {
       dayEventsList.replaceChildren(empty);
     } else {
       const now = Date.now();
-      // On today, the meeting that is on or comes next says how soon.
-      const next =
-        focusIso === toIso(new Date(now))
-          ? selectedEvents.find((event) => !event.allDay && event.endAt > now)
-          : undefined;
+      // On today, the meeting that is on or comes next says how soon, and so
+      // does every other one at that same moment.
+      const next = new Set(
+        focusIso === toIso(new Date(now)) ? countdownEvents(selectedEvents, now) : [],
+      );
       dayEventsList.replaceChildren(
-        ...selectedEvents.map((event) => dayEventRow(event, now, event === next)),
+        ...selectedEvents.map((event) => dayEventRow(event, now, next.has(event))),
       );
     }
     syncHeight();

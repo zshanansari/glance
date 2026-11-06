@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { chordFromKeyboard, chordLabel } from "../src/shared/shortcuts";
+import { RESERVED_CHORDS, chordFromKeyboard, chordLabel, chordProblem } from "../src/shared/shortcuts";
 
 const chord = (overrides: Partial<Parameters<typeof chordFromKeyboard>[0]>) =>
   chordFromKeyboard({
@@ -51,5 +52,29 @@ describe("showing a chord", () => {
   it("has nothing to show for an unset shortcut", () => {
     expect(chordLabel("")).toBe("");
     expect(chordLabel("   ")).toBe("");
+  });
+});
+
+describe("refused chords", () => {
+  it("keeps macOS's own chords for macOS", () => {
+    expect(chordProblem("Command+KeyQ", "", "")).toMatch(/^⌘Q belongs to macOS/);
+    expect(chordProblem("Control+Space", "", "")).not.toBeNull();
+  });
+
+  it("will not give one chord two jobs", () => {
+    expect(chordProblem("Control+Command+KeyK", "Control+Command+KeyK", "shows the calendar")).toBe(
+      "⌃⌘K already shows the calendar. Try another.",
+    );
+  });
+
+  it("accepts a free chord", () => {
+    expect(chordProblem("Control+Command+KeyJ", "Control+Command+KeyK", "shows the calendar")).toBeNull();
+  });
+
+  it("lists the same reserved chords as the host", () => {
+    const rust = readFileSync("src-tauri/src/settings.rs", "utf8");
+    const block = rust.slice(rust.indexOf("pub const RESERVED_CHORDS"), rust.indexOf("];", rust.indexOf("pub const RESERVED_CHORDS")));
+    const hostList = [...block.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+    expect(hostList).toEqual([...RESERVED_CHORDS]);
   });
 });

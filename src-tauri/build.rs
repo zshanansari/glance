@@ -14,7 +14,6 @@ const COMMANDS: &[&str] = &[
     "set_reminder_height",
     "set_calendar_height",
     "popover_material",
-    "set_calendar_pinned",
     "open_settings",
     "app_version",
     "check_for_updates",
@@ -30,8 +29,6 @@ const COMMANDS: &[&str] = &[
     "get_calendar_access",
     "request_reminders_access",
     "get_reminders_access",
-    "open_calendar_privacy",
-    "open_reminders_privacy",
     "join_meeting",
     "open_event",
 ];

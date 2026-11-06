@@ -102,3 +102,49 @@ export function chordLabel(chord: string): string {
   );
   return `${glyphs.join("")}${keyGlyph(key)}`;
 }
+
+/**
+ * Chords macOS or nearly every app already answers to, spelled as
+ * `chordFromKeyboard` records them. Keep in step with `settings.rs`.
+ */
+export const RESERVED_CHORDS: readonly string[] = [
+  "Command+KeyQ",
+  "Command+KeyW",
+  "Command+KeyC",
+  "Command+KeyV",
+  "Command+KeyX",
+  "Command+KeyZ",
+  "Shift+Command+KeyZ",
+  "Command+KeyA",
+  "Command+KeyS",
+  "Command+KeyH",
+  "Command+KeyM",
+  "Command+KeyN",
+  "Command+KeyO",
+  "Command+KeyP",
+  "Command+KeyF",
+  "Command+KeyT",
+  "Command+Comma",
+  "Command+Tab",
+  "Command+Backquote",
+  "Command+Space",
+  "Control+Space",
+  "Alt+Command+Escape",
+  "Shift+Command+Digit3",
+  "Shift+Command+Digit4",
+  "Shift+Command+Digit5",
+];
+
+/**
+ * Why a recorded chord cannot be used, or null when it can. `other` is the
+ * chord the other shortcut holds, and `otherName` how to name that one.
+ */
+export function chordProblem(chord: string, other: string, otherName: string): string | null {
+  if (RESERVED_CHORDS.includes(chord)) {
+    return `${chordLabel(chord)} belongs to macOS or most apps. Try another.`;
+  }
+  if (other && chord === other) {
+    return `${chordLabel(chord)} already ${otherName}. Try another.`;
+  }
+  return null;
+}

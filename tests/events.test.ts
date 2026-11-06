@@ -20,6 +20,7 @@ import {
   type EventFilters,
   type UpcomingEvent,
   eventsOnDay,
+  countdownEvents,
 } from "../src/shared/events";
 import { ICON_LEAD_ALWAYS, ICON_LEAD_AT_START } from "../src/shared/settings";
 
@@ -298,21 +299,22 @@ describe("events icon lead", () => {
   });
 
   it("counts down the next qualifying event after one is dismissed", () => {
+    // "later" comes second in the list but starts first, so it leads.
     expect(
       trayIconEvent([event, later], now, {
         upcomingHorizonDays: 1,
         upcomingIconLeadMinutes: 30,
         filters: included,
-      }),
-    ).toBe(event);
-    expect(
-      trayIconEvent([event, later], now, {
-        upcomingHorizonDays: 1,
-        upcomingIconLeadMinutes: 30,
-        filters: included,
-        dismissed: [{ id: event.id, endAt: event.endAt }],
       }),
     ).toBe(later);
+    expect(
+      trayIconEvent([event, later], now, {
+        upcomingHorizonDays: 1,
+        upcomingIconLeadMinutes: 30,
+        filters: included,
+        dismissed: [{ id: later.id, endAt: later.endAt }],
+      }),
+    ).toBe(event);
   });
 
   it("leaves the list window alone when the icon uses a shorter lead", () => {
@@ -493,5 +495,82 @@ describe("a failed read", () => {
   it("matches the words the host sends", () => {
     const host = readFileSync("src-tauri/src/events.rs", "utf8");
     expect(host).toContain(`"${CALENDAR_ACCESS_MISSING}"`);
+  });
+});
+
+describe("meetings at the same moment", () => {
+  const at = (hour: number, minute = 0) => Date.UTC(2026, 10, 6, hour, minute);
+  const think = { ...event, id: "think", title: "Think Tank Meet", startAt: at(16), endAt: at(17) };
+  const share = { ...event, id: "share", title: "Share, Learn, Apply", startAt: at(16, 30), endAt: at(17) };
+  const pat = { ...event, id: "pat", title: "Axioned x Pat Hicks", startAt: at(19), endAt: at(19, 30) };
+  const scrum = { ...event, id: "scrum", title: "Mini-Scrum", startAt: at(19), endAt: at(19, 30) };
+  const day = [scrum, pat, share, think];
+
+  it("counts down every meeting ending together", () => {
+    const shown = countdownEvents(day, at(16, 55)).map((item) => item.id);
+    expect(shown).toEqual(["think", "share"]);
+  });
+
+  it("counts down every meeting starting together", () => {
+    const shown = countdownEvents(day, at(18, 35)).map((item) => item.id);
+    expect(shown).toEqual(["pat", "scrum"]);
+  });
+
+  it("leaves a meeting with a different end out of the countdown", () => {
+    const longer = { ...share, endAt: at(17, 30) };
+    const shown = countdownEvents([think, longer], at(16, 50)).map((item) => item.id);
+    expect(shown).toEqual(["think"]);
+  });
+
+  it("has nothing to count once the day is over", () => {
+    expect(countdownEvents(day, at(20))).toEqual([]);
+  });
+
+  it("menu bar picks the same tied meeting whatever order Calendar returns", () => {
+    const options = {
+      upcomingHorizonDays: 1,
+      upcomingIconLeadMinutes: ICON_LEAD_ALWAYS,
+      filters: included,
+    };
+    expect(trayIconEvent([scrum, pat], at(18, 35), options)?.id).toBe("pat");
+    expect(trayIconEvent([pat, scrum], at(18, 35), options)?.id).toBe("pat");
+  });
+
+  it("orders tied meetings by name in the day list", () => {
+    const titles = eventsOnDay([scrum, pat], new Date(pat.startAt)).map((item) => item.title);
+    expect(titles).toEqual(["Axioned x Pat Hicks", "Mini-Scrum"]);
+  });
+});
+
+describe("unanswered invitations", () => {
+  const start = Date.UTC(2026, 10, 6, 15, 0);
+  const meeting = (id: string, title: string, response: UpcomingEvent["response"]) => ({
+    ...event,
+    id,
+    title,
+    response,
+    joinUrl: `https://zoom.us/j/${id}`,
+    startAt: start,
+    endAt: start + 30 * 60_000,
+  });
+  const stranger = meeting("1", "A free prize", "pending");
+  const real = meeting("2", "Weekly sync", "accepted");
+
+  it("the reminder offers the answered meeting over an invitation at the same time", () => {
+    expect(reminderEvent([stranger, real], start - 30_000)?.id).toBe("2");
+  });
+
+  it("the Join shortcut opens the answered meeting over an invitation at the same time", () => {
+    expect(meetingToJoin([stranger, real], start - 10 * 60_000)?.id).toBe("2");
+  });
+
+  it("still offers an invitation when nothing answered is on", () => {
+    expect(reminderEvent([stranger], start - 30_000)?.id).toBe("1");
+    expect(meetingToJoin([stranger], start - 10 * 60_000)?.id).toBe("1");
+  });
+
+  it("an earlier invitation is not skipped for a later answered meeting", () => {
+    const later = { ...real, startAt: start + 60 * 60_000, endAt: start + 90 * 60_000 };
+    expect(meetingToJoin([stranger, later], start - 10 * 60_000)?.id).toBe("1");
   });
 });

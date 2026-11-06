@@ -6,7 +6,8 @@
     "settings"
   ],
   "permissions": [
-    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-start-dragging",
     "allow-get-settings",
     "allow-update-settings",

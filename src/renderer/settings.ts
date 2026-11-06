@@ -34,7 +34,7 @@ const TAB_ICONS: Record<string, { symbol: SymbolName; color: string }> = {
   events: { symbol: "calendar.badge.clock", color: "#ff9500" },
   about: { symbol: "info.circle.fill", color: "#8e8e93" },
 };import { bindCalendarAccess } from "./calendar-access";
-import { chordFromKeyboard, chordLabel } from "../shared/shortcuts";
+import { chordFromKeyboard, chordLabel, chordProblem } from "../shared/shortcuts";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -423,10 +423,23 @@ function startSettings(api: DesktopApi): void {
     field.classList.toggle("is-unset", !chord);
   };
 
+  const toggleCalendarShortcutProblem = requireElement<HTMLElement>(
+    "toggle-calendar-shortcut-problem",
+  );
+  const joinMeetingShortcutProblem = requireElement<HTMLElement>("join-meeting-shortcut-problem");
+
+  /** Says why a chord was refused under its field, or clears the note. */
+  const showShortcutProblem = (problem: HTMLElement, text: string | null): void => {
+    problem.textContent = text ?? "";
+    problem.hidden = !text;
+  };
+
   const bindShortcutField = (
     field: HTMLButtonElement,
     clear: HTMLButtonElement,
+    problem: HTMLElement,
     key: "toggleCalendarShortcut" | "joinMeetingShortcut",
+    other: () => { chord: string; name: string },
   ): void => {
     const stopRecording = (): void => {
       if (field.dataset.recording !== "true") return;
@@ -452,6 +465,11 @@ function startSettings(api: DesktopApi): void {
       }
       const chord = chordFromKeyboard(event);
       if (!chord) return;
+      const { chord: otherChord, name } = other();
+      const refused = chordProblem(chord, otherChord, name);
+      showShortcutProblem(problem, refused);
+      // A refused chord keeps the field listening for another.
+      if (refused) return;
       field.dataset.recording = "false";
       field.classList.remove("is-recording");
       paintShortcut(field, chord);
@@ -460,6 +478,7 @@ function startSettings(api: DesktopApi): void {
     clear.addEventListener("click", () => {
       field.dataset.recording = "false";
       field.classList.remove("is-recording");
+      showShortcutProblem(problem, null);
       paintShortcut(field, "");
       void api.updateSettings({ [key]: "" });
     });
@@ -468,9 +487,28 @@ function startSettings(api: DesktopApi): void {
   bindShortcutField(
     toggleCalendarShortcut,
     toggleCalendarShortcutClear,
+    toggleCalendarShortcutProblem,
     "toggleCalendarShortcut",
+    () => ({ chord: joinMeetingShortcut.dataset.chord ?? "", name: "joins your meeting" }),
   );
-  bindShortcutField(joinMeetingShortcut, joinMeetingShortcutClear, "joinMeetingShortcut");
+  bindShortcutField(
+    joinMeetingShortcut,
+    joinMeetingShortcutClear,
+    joinMeetingShortcutProblem,
+    "joinMeetingShortcut",
+    () => ({ chord: toggleCalendarShortcut.dataset.chord ?? "", name: "shows the calendar" }),
+  );
+
+  // The host could not bind a chord (another app holds it, or macOS wants
+  // Accessibility first) and has put the working one back.
+  api.onShortcutFailed(({ setting, chord }) => {
+    const problem =
+      setting === "toggleCalendarShortcut" ? toggleCalendarShortcutProblem : joinMeetingShortcutProblem;
+    showShortcutProblem(
+      problem,
+      `macOS would not let Glance use ${chordLabel(chord)}. Another app may hold it.`,
+    );
+  });
 
   const paint = (settings: AppSettings): void => {
     applyTheme(settings.theme);

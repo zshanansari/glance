@@ -28,15 +28,50 @@ export type UpcomingEvent = {
 };
 
 /**
+ * One order for events everywhere: by start, then end, then name. Meetings at
+ * the same time then sit in the same order in the day list as the menu bar
+ * picks from, rather than in whatever order Calendar returned them.
+ */
+export function compareEvents(
+  a: Pick<UpcomingEvent, "startAt" | "endAt" | "title" | "id">,
+  b: Pick<UpcomingEvent, "startAt" | "endAt" | "title" | "id">,
+): number {
+  return (
+    a.startAt - b.startAt ||
+    a.endAt - b.endAt ||
+    a.title.localeCompare(b.title) ||
+    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+}
+
+/**
  * Everything that touches a local day, for the dots under it and the list
- * below the month. All-day items lead, then the rest by start time.
+ * below the month. All-day items lead, then the rest in `compareEvents` order.
  */
 export function eventsOnDay(events: UpcomingEvent[], day: Date): UpcomingEvent[] {
   const start = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
   const end = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
   return events
     .filter((event) => event.startAt < end && event.endAt > start)
-    .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.startAt - b.startAt);
+    .sort((a, b) => Number(b.allDay) - Number(a.allDay) || compareEvents(a, b));
+}
+
+/**
+ * The day list's countdown: the first timed event still to finish, and every
+ * other one that reads the same, so two meetings ending at 5:00 both say
+ * "5m left" and two starting at 7:00 both say "in 25m".
+ */
+export function countdownEvents(
+  events: readonly UpcomingEvent[],
+  now: number,
+): UpcomingEvent[] {
+  const live = events
+    .filter((event) => !event.allDay && event.endAt > now)
+    .sort(compareEvents);
+  const lead = live[0];
+  if (!lead) return [];
+  const label = eventStatus(lead, now).label;
+  return live.filter((event) => eventStatus(event, now).label === label);
 }
 
 /** Local midnight that closes the day `days - 1` days after today. */
@@ -175,6 +210,7 @@ export function trayIconEvent(
   },
 ): UpcomingEvent | null {
   const dismissed = options.dismissed ?? [];
+  let best: UpcomingEvent | null = null;
   for (const event of events) {
     if (event.allDay) continue;
     if (!eventPassesFilters(event, options.filters)) continue;
@@ -185,12 +221,13 @@ export function trayIconEvent(
         now,
         options.upcomingHorizonDays,
         options.upcomingIconLeadMinutes,
-      )
+      ) &&
+      (!best || compareEvents(event, best) < 0)
     ) {
-      return event;
+      best = event;
     }
   }
-  return null;
+  return best;
 }
 
 export type EventTiming = "upcoming" | "ongoing";
@@ -301,11 +338,34 @@ export const REMINDER_LEAD_MS = 61_000;
 export const REMINDER_LINGER_MS = 5 * MINUTE_MS;
 
 /**
+ * Anyone can put an invitation on a calendar, so one nobody has answered
+ * gives way to an answered meeting at the same time: the card and the Join
+ * shortcut open the meeting the user said yes to. With nothing answered
+ * alongside it, the invitation is still offered.
+ */
+function preferAnswered(
+  best: UpcomingEvent | null,
+  candidates: readonly UpcomingEvent[],
+): UpcomingEvent | null {
+  if (!best || best.response !== "pending") return best;
+  const answered = candidates
+    .filter(
+      (event) =>
+        event.response !== "pending" &&
+        event.startAt < best.endAt &&
+        event.endAt > best.startAt,
+    )
+    .sort(compareEvents);
+  return answered[0] ?? best;
+}
+
+/**
  * The meeting to remind about now: timed, with a join link, not declined or
  * dismissed, and starting within the lead. One that started a few minutes
  * ago still qualifies when it was never offered, as when the month was open
  * at its minute. A meeting about to start comes before one already running;
- * otherwise the earliest start wins.
+ * otherwise the earliest start wins, and an answered meeting beats an
+ * unanswered invitation at the same time.
  */
 export function reminderEvent(
   events: readonly UpcomingEvent[],
@@ -314,21 +374,23 @@ export function reminderEvent(
   offered: (event: UpcomingEvent) => boolean = () => false,
 ): UpcomingEvent | null {
   let best: UpcomingEvent | null = null;
+  const candidates: UpcomingEvent[] = [];
   const rank = (event: UpcomingEvent): number => (event.startAt > now ? 0 : 1);
   for (const event of events) {
     if (event.allDay || !event.joinUrl || event.response === "declined") continue;
     if (occurrenceIsDismissed(event, dismissed, now) || offered(event)) continue;
     const until = event.startAt - now;
     if (until > REMINDER_LEAD_MS || !reminderStillDue(event, now)) continue;
+    candidates.push(event);
     if (
       !best ||
       rank(event) < rank(best) ||
-      (rank(event) === rank(best) && event.startAt < best.startAt)
+      (rank(event) === rank(best) && compareEvents(event, best) < 0)
     ) {
       best = event;
     }
   }
-  return best;
+  return preferAnswered(best, candidates);
 }
 
 /** Whether a reminder shown for this meeting should still be on screen. */
@@ -341,7 +403,8 @@ export function reminderStillDue(
 
 /**
  * The meeting the Join shortcut opens: one under way with a link, or else
- * the next one today. Declined invitations are skipped; the countdown's
+ * the next one today. Declined invitations are skipped, and an unanswered
+ * one gives way to an answered meeting at the same time. The countdown's
  * switches and dismissals are not consulted, so the shortcut works with the
  * countdown off.
  */
@@ -350,12 +413,14 @@ export function meetingToJoin(
   now: number,
 ): UpcomingEvent | null {
   let best: UpcomingEvent | null = null;
+  const candidates: UpcomingEvent[] = [];
   for (const event of events) {
     if (event.allDay || !event.joinUrl || event.response === "declined") continue;
     if (event.endAt <= now || event.startAt > endOfToday(new Date(now))) continue;
-    if (!best || event.startAt < best.startAt) best = event;
+    candidates.push(event);
+    if (!best || compareEvents(event, best) < 0) best = event;
   }
-  return best;
+  return preferAnswered(best, candidates);
 }
 
 /** The host's words when Calendar access has not been granted (events.rs). */

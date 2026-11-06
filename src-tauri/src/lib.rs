@@ -89,7 +89,6 @@ const UPDATE_MENU_ID: &str = "install-update";
 struct AppState {
     settings: Mutex<SettingsStore>,
     ignore_calendar_blur: AtomicBool,
-    calendar_pinned: AtomicBool,
     /// When blur last closed the calendar. A click on the tray icon arrives
     /// just after the blur it caused, and without this the toggle would read
     /// the popover as closed and open it straight back up.
@@ -99,6 +98,8 @@ struct AppState {
     calendar_fade: AtomicU64,
     reminder_fade: AtomicU64,
     dismissed_events: Mutex<Vec<events::DismissedOccurrence>>,
+    /// Where dismissals are kept between runs.
+    dismissed_path: PathBuf,
     /// The chords currently registered with the system, so a failed rebind
     /// can leave the working one in place. Held only to read or write the
     /// pair, never while the system is being asked to bind one.
@@ -838,32 +839,34 @@ fn run_shortcut(app: &AppHandle, action: ShortcutAction) {
 }
 
 /// Binds one chord, keeping the working one when the system refuses the new.
+/// False when the chord could not be bound.
 ///
 /// macOS may hand a chord to another app first, or ask for Accessibility
-/// before it will deliver one at all. Neither is worth an alert: log it and
-/// leave the previous binding alone.
+/// before it will deliver one at all. The previous binding is left alone,
+/// and the caller tells Settings so the field does not claim a chord that
+/// does nothing.
 ///
 /// Registering blocks on the main thread, so this must run off it and must
 /// not hold `shortcuts` while it waits: the main thread may be inside the
 /// hotkey handler, which reads that same state.
-fn rebind_shortcut(app: &AppHandle, action: ShortcutAction, chord: &str) {
+fn rebind_shortcut(app: &AppHandle, action: ShortcutAction, chord: &str) -> bool {
     let desired: Option<Shortcut> = match chord.trim() {
         "" => None,
         text => match text.parse::<Shortcut>() {
             Ok(shortcut) => Some(shortcut),
             Err(error) => {
                 eprintln!("Ignoring unreadable shortcut {text:?}: {error}");
-                return;
+                return false;
             }
         },
     };
     let state = app.state::<AppState>();
     let previous = match state.shortcuts.lock() {
         Ok(mut registered) => *registered.slot(action),
-        Err(_) => return,
+        Err(_) => return false,
     };
     if previous == desired {
-        return;
+        return true;
     }
     if let Some(old) = previous {
         let _ = app.global_shortcut().unregister(old);
@@ -879,26 +882,67 @@ fn rebind_shortcut(app: &AppHandle, action: ShortcutAction, chord: &str) {
             }
         },
     };
+    let ok = bound == desired;
     let locked = state.shortcuts.lock();
     if let Ok(mut registered) = locked {
         *registered.slot(action) = bound;
     }
+    ok
+}
+
+/// What Settings hears when macOS would not bind a chord.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShortcutFailure {
+    /// The setting's key, as `toggleCalendarShortcut`.
+    setting: &'static str,
+    chord: String,
 }
 
 /// Binds both chords on a worker thread. During setup the event loop has not
 /// started yet, so a registration made here would wait on a main thread that
 /// is not reading tasks.
-fn apply_shortcuts(app: &AppHandle, settings: &AppSettings) {
+///
+/// With `previous`, a chord macOS refuses is put back in Settings to the one
+/// still bound, and Settings is told why.
+fn apply_shortcuts(app: &AppHandle, settings: &AppSettings, previous: Option<&AppSettings>) {
     let handle = app.clone();
     let toggle = settings.toggle_calendar_shortcut.clone();
     let join = settings.join_meeting_shortcut.clone();
+    let previous = previous.cloned();
     std::thread::spawn(move || {
         let state = handle.state::<AppState>();
         let Ok(_rebinding) = state.shortcut_rebind.lock() else {
             return;
         };
-        rebind_shortcut(&handle, ShortcutAction::ToggleCalendar, &toggle);
-        rebind_shortcut(&handle, ShortcutAction::JoinUpcoming, &join);
+        let toggle_ok = rebind_shortcut(&handle, ShortcutAction::ToggleCalendar, &toggle);
+        let join_ok = rebind_shortcut(&handle, ShortcutAction::JoinUpcoming, &join);
+        let Some(previous) = previous else {
+            return;
+        };
+        let mut failures = Vec::new();
+        let saved = {
+            let Ok(mut store) = state.settings.lock() else {
+                return;
+            };
+            let mut next = store.value();
+            if !toggle_ok && next.toggle_calendar_shortcut == toggle {
+                next.toggle_calendar_shortcut = previous.toggle_calendar_shortcut.clone();
+                failures.push(ShortcutFailure { setting: "toggleCalendarShortcut", chord: toggle });
+            }
+            if !join_ok && next.join_meeting_shortcut == join {
+                next.join_meeting_shortcut = previous.join_meeting_shortcut.clone();
+                failures.push(ShortcutFailure { setting: "joinMeetingShortcut", chord: join });
+            }
+            if failures.is_empty() {
+                return;
+            }
+            store.update(next)
+        };
+        let _ = handle.emit("settings-changed", &saved);
+        for failure in failures {
+            let _ = handle.emit_to(SETTINGS_LABEL, "shortcut-failed", failure);
+        }
     });
 }
 
@@ -1041,9 +1085,6 @@ fn build_calendar_window(app: &AppHandle) -> tauri::Result<()> {
         // paint its subdued state before the window goes away.
         WindowEvent::Focused(false) => {
             let state = handle.state::<AppState>();
-            if state.calendar_pinned.load(Ordering::SeqCst) {
-                return;
-            }
             if state.ignore_calendar_blur.swap(false, Ordering::SeqCst) {
                 return;
             }
@@ -1200,8 +1241,7 @@ fn watch_outside_clicks(app: AppHandle) {
                 .and_then(|window| window.is_visible().ok())
                 .unwrap_or(false)
         };
-        let state = app.state::<AppState>();
-        if visible(CALENDAR_LABEL) && !state.calendar_pinned.load(Ordering::SeqCst) {
+        if visible(CALENDAR_LABEL) {
             close_calendar(&app);
         }
     });
@@ -1310,7 +1350,7 @@ fn update_settings(
     if saved.toggle_calendar_shortcut != previous.toggle_calendar_shortcut
         || saved.join_meeting_shortcut != previous.join_meeting_shortcut
     {
-        apply_shortcuts(&app, &saved);
+        apply_shortcuts(&app, &saved, Some(&previous));
     }
     if saved.auto_update && !previous.auto_update && !cfg!(debug_assertions) {
         let handle = app.clone();
@@ -1320,6 +1360,22 @@ fn update_settings(
     }
     let _ = app.emit("settings-changed", &saved);
     Ok(saved)
+}
+
+/// Longest title the menu bar item takes. The month builds it from the date,
+/// a countdown and a cut-short event name, well under this; the cap only
+/// stops a webview gone wrong from filling the menu bar.
+const TRAY_TITLE_MAX_CHARS: usize = 120;
+/// Largest framed glyph accepted. The month draws an 18pt PNG of a few KB.
+const TRAY_IMAGE_MAX_BYTES: usize = 64 * 1024;
+
+fn tray_title_text(title: Option<&str>) -> String {
+    title
+        .unwrap_or("")
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(TRAY_TITLE_MAX_CHARS)
+        .collect()
 }
 
 /// Paints exactly one menu bar style: plain text or a glyph.
@@ -1341,11 +1397,11 @@ fn set_tray_label(
         };
         // On macOS, set_title(None) leaves the previous native title intact.
         // Always write an explicit value so event status text clears reliably.
-        let text = title.as_deref().unwrap_or("");
-        let _ = tray.set_title(Some(text));
+        let text = tray_title_text(title.as_deref());
+        let _ = tray.set_title(Some(text.as_str()));
         let bytes: Option<&[u8]> = match style.as_str() {
             "none" => None,
-            "framed" => image.as_deref(),
+            "framed" => image.as_deref().filter(|png| png.len() <= TRAY_IMAGE_MAX_BYTES),
             "calendar" => Some(TRAY_CALENDAR),
             _ => icon_day
                 .filter(|day| (1..=31).contains(day))
@@ -1636,11 +1692,6 @@ fn popover_material() -> &'static str {
 }
 
 #[tauri::command]
-fn set_calendar_pinned(state: State<AppState>, pinned: bool) {
-    state.calendar_pinned.store(pinned, Ordering::SeqCst);
-}
-
-#[tauri::command]
 fn open_settings(app: AppHandle) {
     present_settings(&app);
 }
@@ -1709,6 +1760,7 @@ fn dismiss_upcoming_event(
         .lock()
         .map_err(|error| error.to_string())?;
     events::dismiss_occurrence(&mut list, id, end_at, now);
+    events::save_dismissed(&state.dismissed_path, &list);
     drop(list);
     let _ = app.emit("event-dismissed", ());
     Ok(())
@@ -1813,16 +1865,6 @@ async fn request_reminders_access(app: AppHandle) -> Result<bool, String> {
 #[tauri::command]
 async fn get_reminders_access(app: AppHandle) -> Result<bool, String> {
     on_main_async(app, events::has_reminders_access).await
-}
-
-#[tauri::command]
-async fn open_calendar_privacy(app: AppHandle) -> Result<(), String> {
-    on_main_async(app, events::open_calendar_privacy).await?
-}
-
-#[tauri::command]
-async fn open_reminders_privacy(app: AppHandle) -> Result<(), String> {
-    on_main_async(app, events::open_reminders_privacy).await?
 }
 
 #[tauri::command]
@@ -1934,16 +1976,18 @@ pub fn run() {
             let _ = app.set_activation_policy(ActivationPolicy::Accessory);
             let user_data = user_data_dir(app.handle());
             std::fs::create_dir_all(&user_data).ok();
+            let dismissed_path = user_data.join("dismissed.json");
+            let dismissed = events::load_dismissed(&dismissed_path, unix_now_ms());
             let store = SettingsStore::load(user_data);
             let initial = store.value();
             app.manage(AppState {
                 settings: Mutex::new(store),
                 ignore_calendar_blur: AtomicBool::new(false),
-                calendar_pinned: AtomicBool::new(false),
                 calendar_closed_at: Mutex::new(None),
                 calendar_fade: AtomicU64::new(0),
                 reminder_fade: AtomicU64::new(0),
-                dismissed_events: Mutex::new(Vec::new()),
+                dismissed_events: Mutex::new(dismissed),
+                dismissed_path,
                 shortcuts: Mutex::new(RegisteredShortcuts::default()),
                 shortcut_rebind: Mutex::new(()),
                 tray_glyph: Mutex::new(Some(TRAY_ICON.to_vec())),
@@ -1955,7 +1999,7 @@ pub fn run() {
             build_settings_window(app.handle())?;
             apply_app_theme(app.handle(), &initial.theme);
             build_tray(app.handle())?;
-            apply_shortcuts(app.handle(), &initial);
+            apply_shortcuts(app.handle(), &initial, None);
             spawn_clock(app.handle().clone());
             // First launch: Settings opens on the welcome, once the app is
             // running, since a window shown during setup stays behind
@@ -1986,7 +2030,6 @@ pub fn run() {
             set_reminder_height,
             set_calendar_height,
             popover_material,
-            set_calendar_pinned,
             open_settings,
             app_version,
             check_for_updates,
@@ -2002,8 +2045,6 @@ pub fn run() {
             get_calendar_access,
             request_reminders_access,
             get_reminders_access,
-            open_calendar_privacy,
-            open_reminders_privacy,
             join_meeting,
             open_event,
         ])
@@ -2064,6 +2105,15 @@ mod tests {
     }
 
     #[test]
+    fn the_menu_bar_title_is_capped_and_kept_on_one_line() {
+        assert_eq!(super::tray_title_text(None), "");
+        assert_eq!(super::tray_title_text(Some("Fri 6 \u{2022} in 5m")), "Fri 6 \u{2022} in 5m");
+        assert_eq!(super::tray_title_text(Some("a\nb")), "ab");
+        let long = "x".repeat(500);
+        assert_eq!(super::tray_title_text(Some(&long)).chars().count(), super::TRAY_TITLE_MAX_CHARS);
+    }
+
+    #[test]
     fn each_window_has_a_capability_of_its_own() {
         for (label, json) in [
             (CALENDAR_LABEL, include_str!("../capabilities/calendar.json")),
@@ -2072,7 +2122,10 @@ mod tests {
         ] {
             let capability = capability(json);
             assert_eq!(capability["windows"], serde_json::json!([label]));
-            assert!(grants(&capability, "core:event:default"), "{label} cannot listen");
+            assert!(grants(&capability, "core:event:allow-listen"), "{label} cannot listen");
+            assert!(grants(&capability, "core:event:allow-unlisten"), "{label} cannot unlisten");
+            // Windows only hear from the host; none may send events of its own.
+            assert!(!grants(&capability, "core:event:default"), "{label} may emit");
         }
     }
 

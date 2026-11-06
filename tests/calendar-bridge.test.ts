@@ -42,11 +42,3 @@ it("opens About links through their own command, not the meeting one", async () 
   await expect(api.openUrl("https://github.com/zshanansari")).resolves.toBeUndefined();
   expect(invoke).toHaveBeenCalledWith("open_link", { url: "https://github.com/zshanansari" });
 });
-
-it("opens the Calendar and Reminders privacy panes", async () => {
-  invoke.mockResolvedValue(undefined);
-  await expect(api.openCalendarPrivacy()).resolves.toBeUndefined();
-  await expect(api.openRemindersPrivacy()).resolves.toBeUndefined();
-  expect(invoke).toHaveBeenCalledWith("open_calendar_privacy");
-  expect(invoke).toHaveBeenCalledWith("open_reminders_privacy");
-});

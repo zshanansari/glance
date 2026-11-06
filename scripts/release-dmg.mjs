@@ -8,6 +8,11 @@
  * Credentials come from `.env.notarization`, which is gitignored:
  * APPLE_ID, APPLE_TEAM_ID, APPLE_PASSWORD (an app-specific password) and
  * APPLE_SIGNING_IDENTITY. CI can pass them as environment variables instead.
+ * NOTARY_PROFILE names a `xcrun notarytool store-credentials` profile, so the
+ * disk image is submitted with the password kept in the Keychain.
+ *
+ * Secrets go only to the step that needs them: the build gets the Apple and
+ * update-signing secrets, notarytool the Apple ones, and nothing else either.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
@@ -19,6 +24,8 @@ const ENV_FILE = ".env.notarization";
 const DMG_DIR = "src-tauri/target/release/bundle/dmg";
 const MACOS_DIR = "src-tauri/target/release/bundle/macos";
 const REQUIRED = ["APPLE_ID", "APPLE_TEAM_ID", "APPLE_PASSWORD"];
+const APPLE_SECRETS = ["APPLE_ID", "APPLE_TEAM_ID", "APPLE_PASSWORD", "NOTARY_PROFILE"];
+const SIGNING_SECRETS = ["TAURI_SIGNING_PRIVATE_KEY", "TAURI_SIGNING_PRIVATE_KEY_PASSWORD"];
 /// Where the update signing key lives, in order of preference. It sits with
 /// the other macOS signing material rather than in the repository: it cannot
 /// be revoked or rotated, since every installed copy trusts exactly the one
@@ -38,8 +45,17 @@ function loadCredentials() {
   }
 }
 
-function run(command, args, label) {
-  const result = spawnSync(command, args, { stdio: "inherit" });
+/** The environment without any secret, plus the ones a step is handed. */
+function envWith(secrets = []) {
+  const env = { ...process.env };
+  for (const key of [...APPLE_SECRETS, ...SIGNING_SECRETS]) {
+    if (!secrets.includes(key)) delete env[key];
+  }
+  return env;
+}
+
+function run(command, args, label, secrets = []) {
+  const result = spawnSync(command, args, { stdio: "inherit", env: envWith(secrets) });
   if (result.status !== 0) {
     console.error(`\n${label} failed.`);
     process.exit(result.status ?? 1);
@@ -96,17 +112,40 @@ function writeManifest(version) {
   return { manifest: path, payload, signature: `${payload}.sig` };
 }
 
-function newestDmg() {
-  const files = readdirSync(DMG_DIR)
-    .filter((name) => name.endsWith(".dmg"))
-    .map((name) => join(DMG_DIR, name));
-  if (!files.length) {
-    console.error(`No disk image found under ${DMG_DIR}.`);
+/** The disk image this version built, never an older one left beside it. */
+function dmgFor(version) {
+  const files = existsSync(DMG_DIR)
+    ? readdirSync(DMG_DIR).filter(
+        (name) => name.endsWith(".dmg") && name.startsWith(`Glance_${version}_`),
+      )
+    : [];
+  if (files.length !== 1) {
+    console.error(`Expected one Glance_${version}_*.dmg in ${DMG_DIR}, found ${files.length}.`);
     process.exit(1);
   }
-  return files.sort().at(-1);
+  return join(DMG_DIR, files[0]);
 }
 
+/**
+ * The version lives in three files. The app reports Cargo's through Tauri's
+ * config, the manifest takes package.json's, and a mismatch would ship an
+ * update that offers itself again forever.
+ */
+function releaseVersion() {
+  const npm = JSON.parse(readFileSync("package.json", "utf8")).version;
+  const tauri = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8")).version;
+  const cargo = /^version\s*=\s*"([^"]+)"/m.exec(readFileSync("src-tauri/Cargo.toml", "utf8"))?.[1];
+  if (npm !== tauri || npm !== cargo) {
+    console.error(
+      `Versions disagree: package.json ${npm}, tauri.conf.json ${tauri}, Cargo.toml ${cargo}.\n` +
+        `Set all three to the release version, then run again.`,
+    );
+    process.exit(1);
+  }
+  return npm;
+}
+
+const version = releaseVersion();
 loadCredentials();
 loadSigningKey();
 
@@ -126,36 +165,44 @@ if (missing.length) {
 }
 
 // The updater payload is built from the app bundle, so both targets run.
-run("pnpm", ["tauri", "build", "--bundles", "app,dmg"], "Bundling");
+run("pnpm", ["tauri", "build", "--bundles", "app,dmg"], "Bundling", [
+  ...REQUIRED,
+  ...SIGNING_SECRETS,
+]);
 
-const dmg = newestDmg();
+const dmg = dmgFor(version);
 if (unnotarized) {
   console.warn(`\nNot notarizing ${dmg}: first launch will need right-click, Open.`);
 } else {
   console.log(`\nNotarizing ${dmg}`);
-  // The password reaches notarytool as an argument, which is visible to other
-  // processes on this machine for the life of the call.
+  const profile = process.env.NOTARY_PROFILE;
+  if (!profile) {
+    console.warn(
+      "No NOTARY_PROFILE: the password goes to notarytool as an argument, which\n" +
+        "other processes on this Mac can read while it runs. Store it once with\n" +
+        "  xcrun notarytool store-credentials glance-notary\n" +
+        "and set NOTARY_PROFILE=glance-notary in .env.notarization.",
+    );
+  }
+  const credentials = profile
+    ? ["--keychain-profile", profile]
+    : [
+        "--apple-id",
+        process.env.APPLE_ID,
+        "--team-id",
+        process.env.APPLE_TEAM_ID,
+        "--password",
+        process.env.APPLE_PASSWORD,
+      ];
   run(
     "xcrun",
-    [
-      "notarytool",
-      "submit",
-      dmg,
-      "--apple-id",
-      process.env.APPLE_ID,
-      "--team-id",
-      process.env.APPLE_TEAM_ID,
-      "--password",
-      process.env.APPLE_PASSWORD,
-      "--wait",
-    ],
+    ["notarytool", "submit", dmg, ...credentials, "--wait"],
     "Notarizing the disk image",
   );
   run("xcrun", ["stapler", "staple", dmg], "Stapling the disk image");
   run("spctl", ["--assess", "--type", "install", "-vv", dmg], "Gatekeeper assessment");
 }
 
-const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 const update = writeManifest(version);
 
 console.log(`\nReady to publish v${version}. Upload all three:`);

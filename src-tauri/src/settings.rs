@@ -159,8 +159,17 @@ impl AppSettings {
         ) {
             self.upcoming_icon_lead_minutes = base.upcoming_icon_lead_minutes;
         }
-        self.toggle_calendar_shortcut = self.toggle_calendar_shortcut.trim().to_string();
-        self.join_meeting_shortcut = self.join_meeting_shortcut.trim().to_string();
+        self.toggle_calendar_shortcut =
+            usable_shortcut(&self.toggle_calendar_shortcut, &base.toggle_calendar_shortcut);
+        self.join_meeting_shortcut =
+            usable_shortcut(&self.join_meeting_shortcut, &base.join_meeting_shortcut);
+        // One chord cannot do two things; the calendar keeps it.
+        if !self.join_meeting_shortcut.is_empty()
+            && canonical_chord(&self.join_meeting_shortcut)
+                == canonical_chord(&self.toggle_calendar_shortcut)
+        {
+            self.join_meeting_shortcut = String::new();
+        }
         let mut days: Vec<u8> = self
             .highlight_weekdays
             .iter()
@@ -201,6 +210,89 @@ fn lenient_settings(value: &serde_json::Value) -> Option<AppSettings> {
         }
     }
     serde_json::from_value(serde_json::Value::Object(kept)).ok()
+}
+
+/// Chords macOS or nearly every app already answers to, in canonical form.
+/// Taking one system-wide would steal it from them. Keep in step with
+/// `shortcuts.ts`.
+pub const RESERVED_CHORDS: &[&str] = &[
+    "Command+KeyQ",
+    "Command+KeyW",
+    "Command+KeyC",
+    "Command+KeyV",
+    "Command+KeyX",
+    "Command+KeyZ",
+    "Shift+Command+KeyZ",
+    "Command+KeyA",
+    "Command+KeyS",
+    "Command+KeyH",
+    "Command+KeyM",
+    "Command+KeyN",
+    "Command+KeyO",
+    "Command+KeyP",
+    "Command+KeyF",
+    "Command+KeyT",
+    "Command+Comma",
+    "Command+Tab",
+    "Command+Backquote",
+    "Command+Space",
+    "Control+Space",
+    "Alt+Command+Escape",
+    "Shift+Command+Digit3",
+    "Shift+Command+Digit4",
+    "Shift+Command+Digit5",
+];
+
+/// A chord as `Control+Alt+Shift+Command+Key…`, or None when it has no main
+/// key, an unknown token, or only Shift to hold: a chord without Control,
+/// Option or Command would swallow ordinary typing everywhere.
+pub fn canonical_chord(chord: &str) -> Option<String> {
+    let mut tokens: Vec<&str> = chord.split('+').map(str::trim).collect();
+    let key = tokens.pop().filter(|key| !key.is_empty())?;
+    let mut held = [false; 4];
+    for token in tokens {
+        let slot = match token.to_ascii_lowercase().as_str() {
+            "control" | "ctrl" => 0,
+            "alt" | "option" => 1,
+            "shift" => 2,
+            "command" | "cmd" | "super" | "meta" | "commandorcontrol" | "commandorctrl"
+            | "cmdorcontrol" | "cmdorctrl" => 3,
+            _ => return None,
+        };
+        held[slot] = true;
+    }
+    if !held[0] && !held[1] && !held[3] {
+        return None;
+    }
+    let key = match key {
+        single if single.len() == 1 && single.as_bytes()[0].is_ascii_alphabetic() => {
+            format!("Key{}", single.to_ascii_uppercase())
+        }
+        single if single.len() == 1 && single.as_bytes()[0].is_ascii_digit() => {
+            format!("Digit{single}")
+        }
+        code => code.to_string(),
+    };
+    let mut parts: Vec<String> = ["Control", "Alt", "Shift", "Command"]
+        .iter()
+        .zip(held)
+        .filter(|(_, on)| *on)
+        .map(|(name, _)| (*name).to_string())
+        .collect();
+    parts.push(key);
+    Some(parts.join("+"))
+}
+
+/// The chord if it can be bound, empty when cleared, else the fallback.
+fn usable_shortcut(chord: &str, fallback: &str) -> String {
+    let chord = chord.trim();
+    if chord.is_empty() {
+        return String::new();
+    }
+    match canonical_chord(chord) {
+        Some(canonical) if !RESERVED_CHORDS.contains(&canonical.as_str()) => chord.to_string(),
+        _ => fallback.trim().to_string(),
+    }
 }
 
 impl SettingsStore {
@@ -253,7 +345,7 @@ impl SettingsStore {
 /// Writes beside the target and renames over it, so a crash mid-write leaves
 /// the old file rather than a torn one that would load as defaults. The file
 /// is readable only by its owner, since it names the calendars being read.
-fn write_atomically(path: &Path, body: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_atomically(path: &Path, body: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
 
@@ -470,6 +562,37 @@ mod tests {
         let settings = input.normalize(&base);
         assert_eq!(settings.toggle_calendar_shortcut, "Control+Command+J");
         assert!(settings.join_meeting_shortcut.is_empty());
+    }
+
+    #[test]
+    fn refuses_chords_that_belong_to_macos_or_need_no_modifier() {
+        let base = AppSettings::default();
+        for chord in ["Command+KeyQ", "Cmd+C", "Command+Space", "Shift+KeyK", "KeyK", "Command+", "Hyper+KeyK"] {
+            let mut input = base.clone();
+            input.toggle_calendar_shortcut = chord.into();
+            input.join_meeting_shortcut = chord.into();
+            let settings = input.normalize(&base);
+            assert_eq!(settings.toggle_calendar_shortcut, base.toggle_calendar_shortcut, "{chord}");
+            assert_eq!(settings.join_meeting_shortcut, base.join_meeting_shortcut, "{chord}");
+        }
+    }
+
+    #[test]
+    fn one_chord_cannot_do_both_jobs() {
+        let base = AppSettings::default();
+        let mut input = base.clone();
+        input.toggle_calendar_shortcut = "Control+Command+KeyJ".into();
+        input.join_meeting_shortcut = "Command+Control+J".into();
+        let settings = input.normalize(&base);
+        assert_eq!(settings.toggle_calendar_shortcut, "Control+Command+KeyJ");
+        assert!(settings.join_meeting_shortcut.is_empty());
+    }
+
+    #[test]
+    fn spells_chords_one_way() {
+        assert_eq!(super::canonical_chord("cmd+ctrl+k").as_deref(), Some("Control+Command+KeyK"));
+        assert_eq!(super::canonical_chord("Option+Shift+5").as_deref(), Some("Alt+Shift+Digit5"));
+        assert_eq!(super::canonical_chord("Shift+KeyK"), None);
     }
 
     #[test]

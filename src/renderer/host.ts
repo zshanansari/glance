@@ -24,8 +24,6 @@ export type DesktopApi = {
   getCalendarAccess: () => Promise<boolean>;
   requestRemindersAccess: () => Promise<boolean>;
   getRemindersAccess: () => Promise<boolean>;
-  openCalendarPrivacy: () => Promise<void>;
-  openRemindersPrivacy: () => Promise<void>;
   joinMeeting: (url: string) => Promise<void>;
   openEvent: (id: string) => Promise<void>;
   checkForUpdates: () => Promise<UpdateOffer>;
@@ -48,10 +46,12 @@ export type DesktopApi = {
   setReminderHeight: (height: number) => Promise<void>;
   setCalendarHeight: (height: number) => Promise<void>;
   getPopoverMaterial: () => Promise<string>;
-  setCalendarPinned: (pinned: boolean) => Promise<void>;
   openSettings: () => Promise<void>;
   getAppVersion: () => Promise<string>;
   onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void;
+  onShortcutFailed: (
+    listener: (failure: { setting: "toggleCalendarShortcut" | "joinMeetingShortcut"; chord: string }) => void,
+  ) => () => void;
   onCalendarShown: (listener: () => void) => () => void;
   onCalendarHidden: (listener: () => void) => () => void;
   onReminderHidden: (listener: () => void) => () => void;
@@ -92,8 +92,6 @@ export const api: DesktopApi = {
   getCalendarAccess: () => invoke<boolean>("get_calendar_access"),
   requestRemindersAccess: () => invoke<boolean>("request_reminders_access"),
   getRemindersAccess: () => invoke<boolean>("get_reminders_access"),
-  openCalendarPrivacy: () => invoke<void>("open_calendar_privacy"),
-  openRemindersPrivacy: () => invoke<void>("open_reminders_privacy"),
   joinMeeting: (url) => invoke<void>("join_meeting", { url }),
   openEvent: (id) => invoke<void>("open_event", { id }),
   checkForUpdates: () => invoke<UpdateOffer>("check_for_updates"),
@@ -116,10 +114,10 @@ export const api: DesktopApi = {
   setReminderHeight: (height) => invoke<void>("set_reminder_height", { height }),
   setCalendarHeight: (height) => invoke<void>("set_calendar_height", { height }),
   getPopoverMaterial: () => invoke<string>("popover_material"),
-  setCalendarPinned: (pinned) => invoke<void>("set_calendar_pinned", { pinned }),
   openSettings: () => invoke<void>("open_settings"),
   getAppVersion: () => invoke<string>("app_version"),
   onSettingsChanged: (listener) => subscribe<AppSettings>("settings-changed", listener),
+  onShortcutFailed: (listener) => subscribe("shortcut-failed", listener),
   onCalendarShown: (listener) => subscribe<void>("calendar-shown", listener),
   onCalendarHidden: (listener) => subscribe<void>("calendar-hidden", listener),
   onReminderHidden: (listener) => subscribe<void>("reminder-hidden", listener),

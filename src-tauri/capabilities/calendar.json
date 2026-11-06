@@ -6,7 +6,8 @@
     "calendar"
   ],
   "permissions": [
-    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "allow-get-settings",
     "allow-get-calendar-events",
     "allow-get-dismissed-events",
