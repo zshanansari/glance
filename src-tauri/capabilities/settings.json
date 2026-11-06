@@ -21,6 +21,7 @@
     "allow-app-version",
     "allow-check-for-updates",
     "allow-update-available",
+    "allow-update-status",
     "allow-install-update",
     "allow-open-repository",
     "allow-open-link",

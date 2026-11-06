@@ -1990,6 +1990,12 @@ async fn check_for_updates(app: AppHandle) -> Result<UpdateOffer, String> {
     })
 }
 
+/// What the last check said, for a Settings window that opened after it.
+#[tauri::command]
+fn update_status() -> updates::UpdateStatus {
+    updates::status()
+}
+
 /// The version a background check found and nobody has installed yet, for a
 /// Settings window that opened after the event saying so.
 #[tauri::command]
@@ -2128,6 +2134,7 @@ pub fn run() {
             get_calendar_events,
             get_dismissed_events,
             suspend_shortcuts,
+            update_status,
             dismiss_upcoming_event,
             list_calendars,
             request_calendar_access,

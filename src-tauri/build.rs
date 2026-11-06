@@ -19,6 +19,7 @@ const COMMANDS: &[&str] = &[
     "app_version",
     "check_for_updates",
     "update_available",
+    "update_status",
     "install_update",
     "open_repository",
     "open_link",

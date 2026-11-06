@@ -86,10 +86,14 @@
         <img class="welcome-icon" src="icon.png" alt="" />
         <h1 id="welcome-title">Welcome to Glance</h1>
         <p class="welcome-lead">Your month and your next meeting, a glance away in the menu bar.</p>
+        <p class="welcome-where">
+          Glance lives in the menu bar at the top right of your screen, showing today&rsquo;s
+          date. Click it to open your month.
+        </p>
         <div class="card welcome-steps">
           <div class="row">
             <div class="copy">
-              <label>Calendar access</label>
+              <label for="welcome-access">Calendar access</label>
               <p>To show your events. Nothing leaves this Mac.</p>
             </div>
             <button type="button" class="action" id="welcome-access">Allow Access…</button>
@@ -103,10 +107,22 @@
           </div>
           <div class="row">
             <div class="copy">
-              <label>Show the calendar from anywhere</label>
+              <label for="welcome-countdown">Count down to meetings</label>
+              <p>Adds &ldquo;&bull; in 25m&rdquo; after the date before your next one.</p>
+            </div>
+            <input id="welcome-countdown" type="checkbox" switch />
+          </div>
+          <div class="row">
+            <div class="copy">
+              <label id="welcome-shortcut-label">Show the calendar from anywhere</label>
               <p>Change it any time in Settings.</p>
             </div>
-            <kbd class="welcome-key" id="welcome-shortcut"></kbd>
+            <kbd
+              class="welcome-key"
+              id="welcome-shortcut"
+              role="img"
+              aria-labelledby="welcome-shortcut-label welcome-shortcut"
+            ></kbd>
           </div>
         </div>
         <button type="button" class="action primary" id="welcome-done">Get Started</button>
@@ -464,9 +480,14 @@
                 menu bar. Glance reads Calendar and Reminders on this Mac and never sends
                 them anywhere.
               </p>
-              <button type="button" class="action" id="check-updates" aria-live="polite">
+              <button type="button" class="action" id="check-updates">
                 Check for Updates
               </button>
+              <p class="update-status" id="update-status" aria-live="polite"></p>
+              <details class="update-notes" id="update-notes" hidden>
+                <summary id="update-notes-title">What&rsquo;s new</summary>
+                <div class="update-notes-body" id="update-notes-body"></div>
+              </details>
             </div>
             <div class="about-links" role="group" aria-label="Glance online">
               <button type="button" id="open-release-notes">

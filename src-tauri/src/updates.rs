@@ -33,6 +33,61 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 /// so: the event announcing it is gone by the time either asks.
 static AVAILABLE: Mutex<Option<String>> = Mutex::new(None);
 
+/// What the last check said, for the line under Check for Updates: when it
+/// ran, why it failed if it did, and what it found.
+#[derive(Clone, Debug, Default, serde::Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateStatus {
+    /// When the last check finished, in Unix milliseconds.
+    pub checked_at: Option<i64>,
+    /// Why it failed, in the updater's words; None when it got an answer.
+    pub error: Option<String>,
+    /// The newer version it found, if any.
+    pub version: Option<String>,
+    /// That version's release notes, as plain text.
+    pub notes: Option<String>,
+}
+
+static STATUS: Mutex<UpdateStatus> = Mutex::new(UpdateStatus {
+    checked_at: None,
+    error: None,
+    version: None,
+    notes: None,
+});
+
+/// What the last check said.
+pub fn status() -> UpdateStatus {
+    STATUS.lock().map(|status| status.clone()).unwrap_or_default()
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Records a check's outcome and tells Settings. A failure keeps what an
+/// earlier check found, as `check` does.
+fn record(app: &AppHandle, outcome: Result<Option<(String, Option<String>)>, &str>) {
+    let next = {
+        let Ok(mut status) = STATUS.lock() else {
+            return;
+        };
+        status.checked_at = Some(now_ms());
+        match outcome {
+            Ok(found) => {
+                status.error = None;
+                status.version = found.as_ref().map(|(version, _)| version.clone());
+                status.notes = found.and_then(|(_, notes)| notes).filter(|notes| !notes.trim().is_empty());
+            }
+            Err(error) => status.error = Some(error.to_string()),
+        }
+        status.clone()
+    };
+    let _ = app.emit("update-status", next);
+}
+
 /// Set while an install runs, so a second press cannot start a second
 /// download over the first.
 static INSTALLING: AtomicBool = AtomicBool::new(false);
@@ -105,12 +160,23 @@ async fn check_then_maybe_install(app: &AppHandle) -> Result<(), String> {
 /// The returned update downloads with the same client settings, so the
 /// connect limit covers the install too.
 pub async fn check(app: &AppHandle) -> Result<Option<Update>, String> {
-    let updater = app
-        .updater_builder()
-        .configure_client(|client| client.connect_timeout(CONNECT_TIMEOUT))
-        .build()
-        .map_err(|error| error.to_string())?;
-    let found = updater.check().await.map_err(|error| error.to_string())?;
+    let outcome = async {
+        let updater = app
+            .updater_builder()
+            .configure_client(|client| client.connect_timeout(CONNECT_TIMEOUT))
+            .build()
+            .map_err(|error| error.to_string())?;
+        updater.check().await.map_err(|error| error.to_string())
+    }
+    .await;
+    match &outcome {
+        Ok(found) => record(
+            app,
+            Ok(found.as_ref().map(|update| (update.version.clone(), update.body.clone()))),
+        ),
+        Err(error) => record(app, Err(error)),
+    }
+    let found = outcome?;
     set_available(app, found.as_ref().map(|update| update.version.clone()));
     Ok(found)
 }

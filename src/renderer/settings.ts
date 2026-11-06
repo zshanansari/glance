@@ -41,6 +41,7 @@ const TAB_ICONS: Record<string, { symbol: SymbolName; color: string }> = {
 import { bindCalendarAccess } from "./calendar-access";
 import { chordFromKeyboard, chordLabel, chordProblem } from "../shared/shortcuts";
 import { rovingTarget } from "../shared/roving";
+import { updateStatusLine, type UpdateStatus } from "../shared/updates";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -217,6 +218,10 @@ function startSettings(api: DesktopApi): void {
   };
   const version = requireElement<HTMLSpanElement>("version");
   const checkUpdates = requireElement<HTMLButtonElement>("check-updates");
+  const updateStatus = requireElement<HTMLElement>("update-status");
+  const updateNotes = requireElement<HTMLDetailsElement>("update-notes");
+  const updateNotesTitle = requireElement<HTMLElement>("update-notes-title");
+  const updateNotesBody = requireElement<HTMLElement>("update-notes-body");
   const updatePill = requireElement<HTMLButtonElement>("update-pill");
   const updatePillTitle = requireElement<HTMLElement>("update-pill-title");
   const updatePillAction = requireElement<HTMLElement>("update-pill-action");
@@ -782,31 +787,41 @@ function startSettings(api: DesktopApi): void {
     });
   };
 
-  const checkForUpdates = async (installIfFound = false): Promise<void> => {
+  /** The line under the button, and the notes of a version waiting. */
+  const paintUpdateStatus = (status: UpdateStatus): void => {
+    updateStatus.textContent = updateStatusLine(status, Date.now());
+    updateStatus.classList.toggle("is-failure", Boolean(status.error));
+    const notes = status.version ? status.notes?.trim() : "";
+    updateNotes.hidden = !notes;
+    if (notes) {
+      updateNotesTitle.textContent = `What’s new in ${status.version}`;
+      // Text, never markup: the notes come from the release, not from us.
+      updateNotesBody.textContent = notes;
+    }
+  };
+
+  // Checking from here only looks. What it finds waits on the button, so
+  // a restart never comes as a surprise, whatever the automatic setting.
+  const checkForUpdates = async (): Promise<void> => {
     setUpdateButton("Checking…", { busy: true });
     try {
       const offer = await api.checkForUpdates();
-      if (!offer.version) {
-        setUpdateButton("Up to date");
-        return;
-      }
-      if (installIfFound) {
-        install();
-        return;
-      }
-      showWaiting(offer.version);
-    } catch (error) {
-      const detail = typeof error === "string" ? error : "Could not reach update server";
-      setUpdateButton("Could not check", { detail });
+      if (!offer.version) setUpdateButton("Check for Updates");
+      else showWaiting(offer.version);
+    } catch {
+      setUpdateButton("Check Again");
     }
+    void api.getUpdateStatus().then(paintUpdateStatus);
   };
   checkUpdates.addEventListener("click", () => {
     if (updateAction === "install") {
       install();
       return;
     }
-    void checkForUpdates(autoUpdate.checked);
+    void checkForUpdates();
   });
+  void api.getUpdateStatus().then(paintUpdateStatus);
+  api.onUpdateStatus(paintUpdateStatus);
   updatePill.addEventListener("click", install);
   api.onUpdateAvailable(showWaiting);
   api.onUpdateFailed(showInstallFailure);
@@ -841,6 +856,7 @@ function startSettings(api: DesktopApi): void {
   const welcome = requireElement<HTMLElement>("welcome");
   const welcomeAccess = requireElement<HTMLButtonElement>("welcome-access");
   const welcomeLogin = requireElement<HTMLInputElement>("welcome-login");
+  const welcomeCountdown = requireElement<HTMLInputElement>("welcome-countdown");
   const welcomeShortcut = requireElement<HTMLElement>("welcome-shortcut");
   const welcomeDone = requireElement<HTMLButtonElement>("welcome-done");
   const paintWelcomeAccess = (granted: boolean): void => {
@@ -851,6 +867,7 @@ function startSettings(api: DesktopApi): void {
     welcome.hidden = false;
     page?.classList.add("is-welcome");
     welcomeLogin.checked = settings.launchAtLogin;
+    welcomeCountdown.checked = settings.showUpcomingEvent;
     welcomeShortcut.textContent = chordLabel(settings.toggleCalendarShortcut) || "Not set";
     void api.getCalendarAccess().then(paintWelcomeAccess, () => paintWelcomeAccess(false));
   };
@@ -863,6 +880,9 @@ function startSettings(api: DesktopApi): void {
   });
   welcomeLogin.addEventListener("change", () => {
     void api.updateSettings({ launchAtLogin: welcomeLogin.checked });
+  });
+  welcomeCountdown.addEventListener("change", () => {
+    void api.updateSettings({ showUpcomingEvent: welcomeCountdown.checked });
   });
   welcomeDone.addEventListener("click", () => {
     void api.updateSettings({ onboarded: true }).then(() => {

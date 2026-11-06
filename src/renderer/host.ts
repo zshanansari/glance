@@ -1,3 +1,4 @@
+import type { UpdateStatus } from "../shared/updates";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AppSettings, CalendarInfo } from "../shared/settings";
@@ -31,6 +32,8 @@ export type DesktopApi = {
   installUpdate: () => Promise<void>;
   /** The version a background check found and nobody has installed yet. */
   getUpdateAvailable: () => Promise<string | null>;
+  getUpdateStatus: () => Promise<UpdateStatus>;
+  onUpdateStatus: (listener: (status: UpdateStatus) => void) => () => void;
   onUpdateAvailable: (listener: (version: string | null) => void) => () => void;
   /** An install started from the menu bar failed; carries the reason. */
   onUpdateFailed: (listener: (message: string) => void) => () => void;
@@ -99,6 +102,8 @@ export const api: DesktopApi = {
   checkForUpdates: () => invoke<UpdateOffer>("check_for_updates"),
   installUpdate: () => invoke<void>("install_update"),
   getUpdateAvailable: () => invoke<string | null>("update_available"),
+  getUpdateStatus: () => invoke<UpdateStatus>("update_status"),
+  onUpdateStatus: (listener) => subscribe<UpdateStatus>("update-status", listener),
   onUpdateAvailable: (listener) => subscribe<string | null>("update-available", listener),
   onUpdateFailed: (listener) => subscribe<string>("update-failed", listener),
   openRepository: () => invoke<void>("open_repository"),

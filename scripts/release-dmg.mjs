@@ -95,15 +95,30 @@ function findOne(directory, suffix, label) {
   return join(directory, files[0]);
 }
 
+/// What Settings shows under "What's new": the file given with --notes, as
+/// written, or else a pointer to the release page.
+function releaseNotes(tag) {
+  const flag = process.argv.indexOf("--notes");
+  const file = flag === -1 ? null : process.argv[flag + 1];
+  if (file) {
+    if (!existsSync(file)) {
+      console.error(`No release notes at ${file}.`);
+      process.exit(1);
+    }
+    return readFileSync(file, "utf8").trim();
+  }
+  return `See https://github.com/${REPOSITORY}/releases/tag/${tag}`;
+}
+
 /// Writes the manifest the app fetches, pointing at the payload this tag will
 /// publish. The version comes from the build, so the two cannot drift.
-function writeManifest(version) {
+function writeManifest(version, notes) {
   const payload = findOne(MACOS_DIR, ".app.tar.gz", "update payload");
   const signature = readFileSync(`${payload}.sig`, "utf8").trim();
   const tag = `v${version}`;
   const manifest = updaterManifest({
     version,
-    notes: `See https://github.com/${REPOSITORY}/releases/tag/${tag}`,
+    notes,
     signature,
     url: payloadUrl({ repository: REPOSITORY, tag, file: payload.split("/").pop() }),
   });
@@ -146,6 +161,8 @@ function releaseVersion() {
 }
 
 const version = releaseVersion();
+// Read before the long build, so a wrong --notes path fails at once.
+const notes = releaseNotes(`v${version}`);
 loadCredentials();
 loadSigningKey();
 
@@ -203,7 +220,7 @@ if (unnotarized) {
   run("spctl", ["--assess", "--type", "install", "-vv", dmg], "Gatekeeper assessment");
 }
 
-const update = writeManifest(version);
+const update = writeManifest(version, notes);
 
 console.log(`\nReady to publish v${version}. Upload all three:`);
 for (const file of [dmg, update.payload, update.manifest]) {

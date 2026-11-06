@@ -280,9 +280,17 @@ input {
 }
 
 .welcome-lead {
-  margin: 0 0 24px;
+  margin: 0 0 8px;
   color: var(--secondary);
   font-size: 13px;
+}
+
+.welcome-where {
+  max-width: 360px;
+  margin: 0 0 20px;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .welcome-steps {
@@ -989,4 +997,45 @@ button:focus-visible {
   color: var(--secondary);
   font-size: 11px;
   line-height: 14px;
+}
+
+/* The line under Check for Updates: when it last looked, or why it could
+   not, or what it found. */
+.update-status {
+  max-width: 380px;
+  min-height: 14px;
+  margin: 8px 0 0;
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* A waiting version's release notes, as plain text, folded until asked. */
+.update-notes {
+  width: min(380px, 100%);
+  margin-top: 8px;
+  text-align: left;
+}
+
+.update-notes summary {
+  color: var(--accent);
+  font-size: 12px;
+  text-align: center;
+  cursor: default;
+}
+
+.update-notes-body {
+  overflow-y: auto;
+  max-height: 140px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--control-fill);
+  font-size: 12px;
+  line-height: 17px;
+  white-space: pre-wrap;
+}
+
+.update-status.is-failure {
+  color: var(--calendar);
 }
