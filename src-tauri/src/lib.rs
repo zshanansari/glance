@@ -321,6 +321,31 @@ fn align_status_item_content(tray: &tauri::tray::TrayIcon) {
     });
 }
 
+/// Names the status item for VoiceOver, which otherwise reads only its
+/// title, the short date, or nothing at all for a glyph-only style.
+#[cfg(target_os = "macos")]
+fn describe_status_item(tray: &tauri::tray::TrayIcon, text: &str) {
+    use objc2::msg_send;
+    use objc2_foundation::{MainThreadMarker, NSString};
+
+    let text = text.to_string();
+    let _ = tray.with_inner_tray_icon(move |inner| {
+        let Some(item) = inner.ns_status_item() else {
+            return;
+        };
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
+        let Some(button) = item.button(mtm) else {
+            return;
+        };
+        let label = (!text.is_empty()).then(|| NSString::from_str(&text));
+        unsafe {
+            let _: () = msg_send![&*button, setAccessibilityLabel: label.as_deref()];
+        }
+    });
+}
+
 /// What a status-item click should do. Split out so the left/right split can
 /// be tested without standing up a menu bar extra.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1416,13 +1441,19 @@ const TRAY_TITLE_MAX_CHARS: usize = 120;
 /// Largest framed glyph accepted. The month draws an 18pt PNG of a few KB.
 const TRAY_IMAGE_MAX_BYTES: usize = 64 * 1024;
 
-fn tray_title_text(title: Option<&str>) -> String {
-    title
-        .unwrap_or("")
+/// Longest spoken description: the full date and a meeting's whole name.
+const TRAY_DESCRIPTION_MAX_CHARS: usize = 300;
+
+fn capped_line(text: Option<&str>, limit: usize) -> String {
+    text.unwrap_or("")
         .chars()
         .filter(|character| !character.is_control())
-        .take(TRAY_TITLE_MAX_CHARS)
+        .take(limit)
         .collect()
+}
+
+fn tray_title_text(title: Option<&str>) -> String {
+    capped_line(title, TRAY_TITLE_MAX_CHARS)
 }
 
 /// Paints exactly one menu bar style: plain text or a glyph.
@@ -1437,6 +1468,7 @@ fn set_tray_label(
     icon_day: Option<u8>,
     style: String,
     image: Option<Vec<u8>>,
+    description: Option<String>,
 ) {
     let _ = app.clone().run_on_main_thread(move || {
         let Some(tray) = app.tray_by_id(TRAY_ID) else {
@@ -1458,6 +1490,12 @@ fn set_tray_label(
             *glyph = bytes.map(<[u8]>::to_vec);
         }
         paint_tray_glyph(&tray, bytes);
+        // The item shows a short date and countdown; VoiceOver and the
+        // tooltip get them in full.
+        let spoken = capped_line(description.as_deref(), TRAY_DESCRIPTION_MAX_CHARS);
+        let _ = tray.set_tooltip((!spoken.is_empty()).then_some(spoken.as_str()));
+        #[cfg(target_os = "macos")]
+        describe_status_item(&tray, &spoken);
         follow_status_item(&app);
     });
 }

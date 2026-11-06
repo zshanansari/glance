@@ -582,9 +582,11 @@ select:hover {
 .icon-styles button {
   display: inline-grid;
   flex: 1;
+  grid-template-rows: 18px auto;
+  gap: 4px;
   place-items: center;
-  height: 36px;
-  padding: 0;
+  min-width: 0;
+  padding: 7px 4px 6px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -597,6 +599,20 @@ select:hover {
 .icon-styles button[aria-checked="true"] {
   background: var(--accent);
   color: var(--on-accent);
+}
+
+.mb-name {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--secondary);
+  font-size: 10px;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-styles button[aria-checked="true"] .mb-name {
+  color: inherit;
 }
 
 .mb-icon {
@@ -795,7 +811,7 @@ select:hover {
   align-items: baseline;
   justify-content: center;
   margin: auto 0 0;
-  color: var(--tertiary);
+  color: var(--secondary);
   font-size: 11px;
   line-height: 14px;
   white-space: nowrap;

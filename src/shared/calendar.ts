@@ -83,9 +83,10 @@ export function weekdayIndex(date: Date, weekStartsOn: WeekStartsOn): number {
   return (date.getDay() - weekStartsOn + WEEKDAY_COUNT) % WEEKDAY_COUNT;
 }
 
+/** "November 2026", in full, for the grid's caption and VoiceOver. */
 export function monthTitle(year: number, month: number, locale?: string): string {
   return new Intl.DateTimeFormat(locale, {
-    month: "short",
+    month: "long",
     year: "numeric",
   }).format(atNoon(year, month, 1));
 }

@@ -35,6 +35,7 @@ const TAB_ICONS: Record<string, { symbol: SymbolName; color: string }> = {
   about: { symbol: "info.circle.fill", color: "#8e8e93" },
 };import { bindCalendarAccess } from "./calendar-access";
 import { chordFromKeyboard, chordLabel, chordProblem } from "../shared/shortcuts";
+import { rovingTarget } from "../shared/roving";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -78,7 +79,7 @@ function buildIconStyles(picker: HTMLElement, date = new Date()): void {
       button.setAttribute("role", "radio");
       button.dataset.style = item.id;
       button.setAttribute("aria-checked", "false");
-      button.setAttribute("aria-label", item.label);
+      button.tabIndex = -1;
 
       const glyph = document.createElement("span");
       glyph.className = item.id === "none" ? "mb-icon none" : "mb-icon";
@@ -86,7 +87,11 @@ function buildIconStyles(picker: HTMLElement, date = new Date()): void {
       const mask = trayGlyphUrl(item.id, date);
       if (mask) glyph.style.setProperty("--tray-glyph", mask);
       else glyph.textContent = String(date.getDate());
-      button.append(glyph);
+      // Named under the glyph, so the choice does not rest on the picture.
+      const name = document.createElement("span");
+      name.className = "mb-name";
+      name.textContent = item.label;
+      button.append(glyph, name);
       return button;
     }),
   );
@@ -94,7 +99,10 @@ function buildIconStyles(picker: HTMLElement, date = new Date()): void {
 
 function paintIconStyle(picker: HTMLElement, id: MenuBarIconStyle): void {
   for (const button of Array.from(picker.querySelectorAll<HTMLButtonElement>("button"))) {
-    button.setAttribute("aria-checked", button.dataset.style === id ? "true" : "false");
+    const checked = button.dataset.style === id;
+    button.setAttribute("aria-checked", checked ? "true" : "false");
+    // One Tab stop for the group, on the chosen style; arrows move within.
+    button.tabIndex = checked ? 0 : -1;
   }
 }
 
@@ -104,6 +112,8 @@ function showTab(name: string): void {
   )) {
     const selected = button.dataset.tab === name;
     button.setAttribute("aria-selected", selected ? "true" : "false");
+    // One Tab stop for the sidebar, on the open pane; arrows move within.
+    button.tabIndex = selected ? 0 : -1;
     // The toolbar names the pane, as System Settings does.
     if (selected) {
       const title = document.getElementById("pane-title");
@@ -571,6 +581,11 @@ function startSettings(api: DesktopApi): void {
     dayHighlight: chosenHighlight(),
   });
 
+  // Sets the sidebar's single Tab stop on the pane that opens first.
+  showTab(
+    tabs.querySelector<HTMLElement>("[role='tab'][aria-selected='true']")?.dataset.tab ?? "general",
+  );
+
   tabs.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest("button");
     if (!button?.dataset.tab || !tabs.contains(button)) return;
@@ -578,11 +593,11 @@ function startSettings(api: DesktopApi): void {
   });
 
   tabs.addEventListener("keydown", (event) => {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    // The sidebar runs top to bottom, so Up and Down lead; Left and Right
+    // still work, and Home and End jump to either end.
     const buttons = Array.from(tabs.querySelectorAll<HTMLButtonElement>("[role='tab']"));
     const current = buttons.findIndex((button) => button.getAttribute("aria-selected") === "true");
-    const delta = event.key === "ArrowRight" ? 1 : -1;
-    const next = buttons[(Math.max(current, 0) + delta + buttons.length) % buttons.length];
+    const next = rovingTarget(buttons, Math.max(current, 0), event.key);
     if (!next?.dataset.tab) return;
     event.preventDefault();
     showTab(next.dataset.tab);
@@ -649,6 +664,17 @@ function startSettings(api: DesktopApi): void {
     if (document.hidden) return;
     void refreshCalendarAccess();
     void refreshRemindersAccess();
+  });
+
+  iconStyles.addEventListener("keydown", (event) => {
+    const buttons = Array.from(iconStyles.querySelectorAll<HTMLButtonElement>("button"));
+    const current = buttons.findIndex((button) => button.getAttribute("aria-checked") === "true");
+    const next = rovingTarget(buttons, Math.max(current, 0), event.key);
+    if (!next?.dataset.style) return;
+    event.preventDefault();
+    // Moving through a radio group chooses as it goes, as macOS does.
+    next.focus();
+    next.click();
   });
 
   iconStyles.addEventListener("click", (event) => {

@@ -21,6 +21,8 @@ import {
   type UpcomingEvent,
   eventsOnDay,
   countdownEvents,
+  spokenStatus,
+  trayDescription,
 } from "../src/shared/events";
 import { ICON_LEAD_ALWAYS, ICON_LEAD_AT_START } from "../src/shared/settings";
 
@@ -572,5 +574,30 @@ describe("unanswered invitations", () => {
   it("an earlier invitation is not skipped for a later answered meeting", () => {
     const later = { ...real, startAt: start + 60 * 60_000, endAt: start + 90 * 60_000 };
     expect(meetingToJoin([stranger, later], start - 10 * 60_000)?.id).toBe("1");
+  });
+});
+
+describe("the menu bar item for VoiceOver", () => {
+  const start = new Date(2026, 10, 6, 19, 0).getTime();
+  const call = { ...event, title: "Mini-Scrum", startAt: start, endAt: start + 30 * 60_000 };
+
+  it("spells the countdown out", () => {
+    expect(spokenStatus(call, start - 70 * 60_000)).toBe("starts in 1 hour 10 minutes");
+    expect(spokenStatus(call, start - 60 * 60_000)).toBe("starts in 1 hour");
+    expect(spokenStatus(call, start - 60_000)).toBe("starts in 1 minute");
+    expect(spokenStatus(call, start + 60_000)).toBe("has just started");
+    expect(spokenStatus(call, start + 25 * 60_000)).toBe("ends in 5 minutes");
+  });
+
+  it("gives the full date, then the meeting", () => {
+    const now = start - 25 * 60_000;
+    expect(trayDescription(now, call, "en-GB")).toBe(
+      "Friday, 6 November 2026. Mini-Scrum starts in 25 minutes",
+    );
+    expect(trayDescription(now, null, "en-US")).toBe("Friday, November 6, 2026");
+  });
+
+  it("drops a meeting that is over", () => {
+    expect(trayDescription(start + 31 * 60_000, call, "en-US")).toBe("Friday, November 6, 2026");
   });
 });

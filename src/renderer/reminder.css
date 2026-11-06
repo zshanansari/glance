@@ -184,3 +184,32 @@ body {
 .detail-row.muted .label {
   color: var(--secondary);
 }
+
+.visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+}
+
+/* The card never takes focus by itself; once someone tabs into it, the
+   keyboard gets the same highlight the pointer does. */
+.event:focus,
+.detail-row:focus {
+  outline: none;
+}
+
+.event.interactive:focus-visible,
+.detail-row.interactive:focus-visible {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.event:focus-visible .dot {
+  box-shadow: 0 0 0 1px var(--on-accent);
+}
+
+.event:focus-visible .time {
+  color: inherit;
+}

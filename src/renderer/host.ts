@@ -14,6 +14,7 @@ export type DesktopApi = {
     iconDay: number | null,
     style: AppSettings["menuBarIcon"],
     image: number[] | null,
+    description: string,
   ) => Promise<void>;
   beep: () => Promise<void>;
   getCalendarEvents: (startAt: number, endAt: number) => Promise<UpcomingEvent[]>;
@@ -80,8 +81,8 @@ function subscribe<T>(event: string, handler: (payload: T) => void): () => void 
 export const api: DesktopApi = {
   getSettings: () => invoke<AppSettings>("get_settings"),
   updateSettings: (patch) => invoke<AppSettings>("update_settings", { patch }),
-  setTrayLabel: (title, iconDay, style, image) =>
-    invoke<void>("set_tray_label", { title, iconDay, style, image }),
+  setTrayLabel: (title, iconDay, style, image, description) =>
+    invoke<void>("set_tray_label", { title, iconDay, style, image, description }),
   beep: () => invoke<void>("beep"),
   getCalendarEvents: (startAt, endAt) =>
     invoke<UpcomingEvent[]>("get_calendar_events", { startAt, endAt }),

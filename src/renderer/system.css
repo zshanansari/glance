@@ -98,6 +98,16 @@
   }
 }
 
+/* Increase Contrast: the faintest labels step up to secondary everywhere.
+   Translucency needs nothing here: the windows' material is AppKit's own,
+   and it turns opaque by itself under Reduce Transparency. */
+@media (prefers-contrast: more) {
+  :root,
+  :root[data-theme] {
+    --tertiary: var(--secondary);
+  }
+}
+
 /* SF Symbols (icons.ts): the glyph is a mask, so it takes the text color. */
 .sf-symbol {
   display: inline-block;

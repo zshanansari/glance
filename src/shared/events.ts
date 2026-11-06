@@ -272,6 +272,51 @@ export function eventStatus(
   };
 }
 
+function spokenDuration(milliseconds: number): string {
+  const minutes = roundedMinutes(milliseconds);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const unit = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  if (!hours) return unit(rest, "minute");
+  return rest ? `${unit(hours, "hour")} ${unit(rest, "minute")}` : unit(hours, "hour");
+}
+
+/**
+ * The countdown in words, for VoiceOver and the tooltip: "starts in 1 hour
+ * 10 minutes" where the menu bar shows "in 1h 10m".
+ */
+export function spokenStatus(
+  event: Pick<UpcomingEvent, "startAt" | "endAt">,
+  now: number,
+): string {
+  if (now >= event.endAt) return "has ended";
+  if (now >= event.startAt) {
+    if (now - event.startAt < NOW_WINDOW_MS) return "has just started";
+    return `ends in ${spokenDuration(event.endAt - now)}`;
+  }
+  return `starts in ${spokenDuration(event.startAt - now)}`;
+}
+
+/**
+ * What the menu bar item says to VoiceOver and in its tooltip: the full
+ * date, then the meeting being counted down, which the item itself only
+ * shows as a short countdown.
+ */
+export function trayDescription(
+  now: number,
+  event: Pick<UpcomingEvent, "startAt" | "endAt" | "title"> | null,
+  locale?: string,
+): string {
+  const date = new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(now));
+  if (!event || now >= event.endAt) return date;
+  return `${date}. ${event.title.trim() || "Untitled event"} ${spokenStatus(event, now)}`;
+}
+
 /** Longest event name the menu bar item carries before it is cut short. */
 export const TRAY_TITLE_LIMIT = 24;
 

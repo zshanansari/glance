@@ -14,6 +14,7 @@ import {
   endOfToday,
   eventsOnDay,
   countdownEvents,
+  trayDescription,
   eventStatus,
   meetingToJoin,
   needsCalendarAccess,
@@ -42,6 +43,30 @@ function applyTheme(theme: AppSettings["theme"]): void {
 
 function announce(message: string): void {
   requireElement("live").textContent = message;
+}
+
+/**
+ * Rebuilds part of the window without losing the keyboard or VoiceOver
+ * where they were. Focusable things carry a `data-focus-key`; after the
+ * rebuild, the element with the same key takes focus back, or `fallback`'s
+ * key when that one is gone (a dismiss button that went with its click).
+ */
+function keepingFocus(
+  container: HTMLElement,
+  rebuild: () => void,
+  fallback: (key: string) => string | null = () => null,
+): void {
+  const active = document.activeElement;
+  const key =
+    active instanceof HTMLElement && container.contains(active)
+      ? active.dataset.focusKey
+      : undefined;
+  rebuild();
+  if (!key) return;
+  const find = (wanted: string) =>
+    container.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(wanted)}"]`);
+  const backup = fallback(key);
+  (find(key) ?? (backup ? find(backup) : null))?.focus();
 }
 
 function paintColumnHighlights(
@@ -120,6 +145,9 @@ function startCalendar(api: DesktopApi): void {
   // opening the popover redraws nothing that is already right on screen.
   let renderedDay = "";
   let eventsKey = "";
+  // What the day list last drew, so a minute that changes nothing leaves it,
+  // and whatever has focus in it, alone.
+  let dayEventsKey = "";
 
   // The month's events always load, for the dots and the day list. The
   // menu bar preview is the part the Upcoming setting turns on.
@@ -226,6 +254,8 @@ function startCalendar(api: DesktopApi): void {
     open.type = "button";
     open.className = "day-event-open";
     open.title = "Open in Calendar";
+    const occurrence = `${event.id}@${event.startAt}`;
+    open.dataset.focusKey = `open:${occurrence}`;
     const dot = document.createElement("span");
     dot.className = "day-event-dot";
     dot.setAttribute("aria-hidden", "true");
@@ -253,6 +283,7 @@ function startCalendar(api: DesktopApi): void {
       const join = document.createElement("button");
       join.type = "button";
       join.className = "day-event-join";
+      join.dataset.focusKey = `join:${occurrence}`;
       join.setAttribute("aria-label", `Join ${event.title}`);
       join.title = "Join meeting";
       join.textContent = "Join";
@@ -272,6 +303,7 @@ function startCalendar(api: DesktopApi): void {
       const dismiss = document.createElement("button");
       dismiss.type = "button";
       dismiss.className = "day-event-dismiss";
+      dismiss.dataset.focusKey = `dismiss:${occurrence}`;
       dismiss.setAttribute("aria-label", `Stop counting down to ${event.title}`);
       dismiss.title = "Stop counting down";
       dismiss.append(sfSymbol("eye.slash", 13));
@@ -288,12 +320,45 @@ function startCalendar(api: DesktopApi): void {
   const paintDayEvents = (): void => {
     dayEvents.hidden = false;
     const selectedDate = fromIso(focusIso);
+    const now = Date.now();
+    const listed = eventsOnDay(calendarEvents, selectedDate);
+    const counting = new Set(
+      focusIso === toIso(new Date(now)) ? countdownEvents(listed, now) : [],
+    );
+    const key = JSON.stringify([
+      focusIso,
+      eventError,
+      upcomingEvent && [upcomingEvent.id, upcomingEvent.endAt],
+      listed.map((event) => [
+        event.id,
+        event.startAt,
+        event.endAt,
+        event.title,
+        event.joinUrl,
+        event.color,
+        event.endAt <= now,
+        counting.has(event) ? eventStatus(event, now).label : "",
+      ]),
+    ]);
+    if (key === dayEventsKey) return;
+    dayEventsKey = key;
+    keepingFocus(dayEventsList, () => paintDayEventRows(selectedDate, listed, counting, now), (lost) =>
+      lost.startsWith("dismiss:") ? `open:${lost.slice("dismiss:".length)}` : null,
+    );
+    syncHeight();
+  };
+
+  const paintDayEventRows = (
+    selectedDate: Date,
+    selectedEvents: UpcomingEvent[],
+    next: Set<UpcomingEvent>,
+    now: number,
+  ): void => {
     dayEventsTitle.textContent = new Intl.DateTimeFormat(undefined, {
       weekday: "long",
       month: "long",
       day: "numeric",
     }).format(selectedDate);
-    const selectedEvents = eventsOnDay(calendarEvents, selectedDate);
     dayEventsCount.textContent = selectedEvents.length
       ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
       : "";
@@ -315,17 +380,12 @@ function startCalendar(api: DesktopApi): void {
       empty.textContent = "No Events";
       dayEventsList.replaceChildren(empty);
     } else {
-      const now = Date.now();
       // On today, the meeting that is on or comes next says how soon, and so
       // does every other one at that same moment.
-      const next = new Set(
-        focusIso === toIso(new Date(now)) ? countdownEvents(selectedEvents, now) : [],
-      );
       dayEventsList.replaceChildren(
         ...selectedEvents.map((event) => dayEventRow(event, now, next.has(event))),
       );
     }
-    syncHeight();
   };
 
   const refreshTray = (): void => {
@@ -354,7 +414,8 @@ function startCalendar(api: DesktopApi): void {
       .filter(Boolean)
       .join(" ");
     const trayStyle = label.style;
-    const signature = `${trayLabelKey(label)}|${title}`;
+    const description = trayDescription(now.getTime(), countdown ? upcomingEvent : null);
+    const signature = `${trayLabelKey(label)}|${title}|${description}`;
     if (signature === lastTrayLabel) return;
     lastTrayLabel = signature;
     // The cutout style draws its date into the glyph instead of the title.
@@ -364,6 +425,7 @@ function startCalendar(api: DesktopApi): void {
       label.day,
       trayStyle,
       framed === null ? null : framedGlyphPng(framed),
+      description,
     );
   };
 
@@ -437,6 +499,7 @@ function startCalendar(api: DesktopApi): void {
         button.type = "button";
         button.className = "day";
         button.dataset.iso = day.iso;
+        button.dataset.focusKey = `day:${day.iso}`;
         const number = document.createElement("span");
         number.className = "day-number";
         number.textContent = String(day.day);
@@ -466,7 +529,8 @@ function startCalendar(api: DesktopApi): void {
           day.iso === focusIso && (day.inMonth || day.iso === pinnedOutsideIso);
         if (focused) button.classList.add("is-selected");
         button.tabIndex = focused ? 0 : -1;
-        button.setAttribute("aria-selected", focused ? "true" : "false");
+        // Selection belongs to the grid cell, not the button inside it.
+        cell.setAttribute("aria-selected", focused ? "true" : "false");
         button.addEventListener("click", () => {
           focusIso = day.iso;
           pinnedOutsideIso = day.inMonth ? null : day.iso;
@@ -488,6 +552,9 @@ function startCalendar(api: DesktopApi): void {
     wrap.append(bands, table);
     if (slide) wrap.classList.add(slide > 0 ? "slide-next" : "slide-prev");
     slide = 0;
+    // A redraw while a day has focus (new events, a new day) hands focus to
+    // the selected day rather than dropping it on the window.
+    const hadFocus = grid.contains(document.activeElement);
     grid.replaceChildren(wrap);
     // Only offered once there is somewhere to go back from.
     const todayIso = toIso(today);
@@ -497,9 +564,12 @@ function startCalendar(api: DesktopApi): void {
     );
     paintColumnHighlights(table, wrap, settings);
     renderedDay = todayIso;
+    // The month can gain or lose a week row (a new first weekday), and the
+    // day list may not repaint to size the window for it.
+    syncHeight();
 
     if (opts?.announceMonth) announce(month.label);
-    if (opts?.focusGrid) {
+    if (opts?.focusGrid || hadFocus) {
       const selector = pinnedOutsideIso
         ? `[data-iso="${focusIso}"]`
         : `[data-iso="${focusIso}"].is-in-month`;
@@ -686,9 +756,12 @@ function startCalendar(api: DesktopApi): void {
     const now = new Date();
     if (settings?.beepOnTheHour && chimeDue(lastHour, now)) void api.beep();
     lastHour = now.getHours();
+    // The month only changes with the day; redrawing it every minute would
+    // take keyboard and VoiceOver focus away each time.
+    const newDay = toIso(now) !== renderedDay;
     followToday();
     refreshTray();
-    render();
+    if (newDay) render();
     void refreshUpcoming();
   });
   api.onEventDismissed(() => {

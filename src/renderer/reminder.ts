@@ -38,7 +38,11 @@ function occurrenceKey(event: Pick<UpcomingEvent, "id" | "startAt">): string {
   return `${event.id}@${event.startAt}`;
 }
 
-export function startReminder(api: DesktopApi, list: HTMLElement): void {
+export function startReminder(
+  api: DesktopApi,
+  list: HTMLElement,
+  announcer: HTMLElement | null = null,
+): void {
   let enabled = false;
   let showing: UpcomingEvent | null = null;
   // Each occurrence is offered once: a dismissed or ignored card stays gone.
@@ -47,13 +51,19 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
 
   const hide = (): void => {
     showing = null;
+    if (announcer) announcer.textContent = "";
     void api.hideReminder();
   };
 
+  // Escape puts the card away without dismissing the meeting.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && showing) hide();
+  });
+
   const row = (event: UpcomingEvent): HTMLElement => {
-    const element = document.createElement("div");
+    const element = document.createElement("button");
+    element.type = "button";
     element.className = "event interactive";
-    element.setAttribute("role", "button");
     element.addEventListener("click", () => {
       void api.openEvent(event.id);
       hide();
@@ -68,12 +78,14 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
     when.textContent = timeFormat.format(new Date(event.startAt));
     title.append(when, ` ${event.title}`);
     element.title = `${when.textContent} · ${event.title}`;
+    element.setAttribute("aria-label", `Open ${event.title} in Calendar`);
     element.append(dot, title);
     return element;
   };
 
   const action = (icon: Element | null, text: string, onClick: () => void): HTMLElement => {
     const button = document.createElement("button");
+    button.type = "button";
     button.className = "detail-row interactive";
     const glyph = document.createElement("span");
     glyph.className = "glyph";
@@ -86,8 +98,16 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
     return button;
   };
 
+  let heading: HTMLElement | null = null;
+
+  /** A later minute only rewords the heading: the card is not rebuilt. */
+  const refreshHeading = (event: UpcomingEvent, now: number): void => {
+    const text = reminderHeading(event, now);
+    if (heading && heading.textContent !== text) heading.textContent = text;
+  };
+
   const paint = (event: UpcomingEvent, now: number): void => {
-    const heading = document.createElement("p");
+    heading = document.createElement("p");
     heading.className = "section-label";
     heading.textContent = reminderHeading(event, now);
     const nodes: HTMLElement[] = [heading, row(event)];
@@ -117,7 +137,7 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
     const now = Date.now();
     if (showing) {
       if (!enabled || !reminderStillDue(showing, now)) hide();
-      else paint(showing, now);
+      else refreshHeading(showing, now);
       return;
     }
     if (!enabled) return;
@@ -137,6 +157,8 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
       if (await api.showReminder()) {
         offered.add(occurrenceKey(event));
         showing = event;
+        // Said once, when the card arrives, not again on every minute.
+        if (announcer) announcer.textContent = `${reminderHeading(event, now)}: ${event.title}`;
       }
     } catch {
       // No calendar access yet, or a failed read: try again next minute.
@@ -163,5 +185,9 @@ export function startReminder(api: DesktopApi, list: HTMLElement): void {
 }
 
 if (typeof document !== "undefined" && document.getElementById("list")) {
-  startReminder(installTauriBridge(), document.getElementById("list")!);
+  startReminder(
+    installTauriBridge(),
+    document.getElementById("list")!,
+    document.getElementById("announce"),
+  );
 }

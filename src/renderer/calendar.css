@@ -237,7 +237,7 @@ button:focus {
 }
 
 .weeknum {
-  color: var(--tertiary);
+  color: var(--secondary);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
@@ -255,11 +255,35 @@ button:focus {
 }
 
 /* Today and the chosen day: red by default, as Calendar marks today, or the
-   accent or another system color. Yellow is too light for white, so its chosen day is set in
-   dark ink, as macOS sets text on yellow. */
+   accent or another system color. Yellow, orange and green are too light for
+   white, so their chosen day is set in dark ink, as macOS sets text on
+   yellow. */
 :root {
   --day: var(--calendar);
   --on-day: #fff;
+  /* Today's outlined number. On a light background the bright colors are
+     too pale to read, so they take the darker shades macOS itself uses when
+     Increase Contrast is on. */
+  --day-ink: var(--day);
+}
+
+:root[data-day-highlight="orange"] { --day-ink-light: #c93400; }
+:root[data-day-highlight="yellow"] { --day-ink-light: #b25000; }
+:root[data-day-highlight="green"] { --day-ink-light: #248a3d; }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --day-ink: var(--day-ink-light, var(--day));
+  }
+}
+
+:root[data-theme="light"] {
+  --day-ink: var(--day-ink-light, var(--day));
+}
+
+:root[data-day-highlight="orange"],
+:root[data-day-highlight="green"] {
+  --on-day: rgb(0 0 0 / 85%);
 }
 
 :root[data-day-highlight="accent"] { --day: var(--accent); }
@@ -299,8 +323,8 @@ button:focus {
 
 /* Today: an outline, so it reads at a glance without looking chosen. */
 .day.is-today .day-number {
-  box-shadow: inset 0 0 0 1.5px var(--day);
-  color: var(--day);
+  box-shadow: inset 0 0 0 1.5px var(--day-ink);
+  color: var(--day-ink);
   font-weight: 600;
 }
 
@@ -368,7 +392,7 @@ button:focus {
 
 .day-events-heading span {
   flex: 0 0 auto;
-  color: var(--tertiary);
+  color: var(--secondary);
   font-size: 11px;
   line-height: 14px;
 }
@@ -468,7 +492,8 @@ button:focus {
   background: color-mix(in srgb, var(--on-accent) 20%, transparent);
 }
 
-:root:not([data-pointer-away]) .day-event:hover .day-event-dismiss {
+:root:not([data-pointer-away]) .day-event:hover .day-event-dismiss,
+:root[data-keyboard] .day-event:has(.day-event-open:focus) .day-event-dismiss {
   color: var(--on-accent);
 }
 
@@ -477,23 +502,30 @@ button:focus {
   outline-offset: 1px;
 }
 
-/* The menu highlight: the row takes the accent, its text turns white. */
-:root:not([data-pointer-away]) .day-event:hover {
+/* The menu highlight: the row takes the accent, its text turns white. The
+   keyboard gets the same highlight on the row it is on, as a menu does. */
+:root:not([data-pointer-away]) .day-event:hover,
+:root[data-keyboard] .day-event:has(.day-event-open:focus) {
   background: var(--accent);
   color: var(--on-accent);
 }
 
 :root:not([data-pointer-away]) .day-event:hover .day-event-time,
 :root:not([data-pointer-away]) .day-event:hover .day-event-when,
-:root:not([data-pointer-away]) .day-event.is-past:hover .day-event-title {
+:root:not([data-pointer-away]) .day-event.is-past:hover .day-event-title,
+:root[data-keyboard] .day-event:has(.day-event-open:focus) .day-event-time,
+:root[data-keyboard] .day-event:has(.day-event-open:focus) .day-event-when,
+:root[data-keyboard] .day-event.is-past:has(.day-event-open:focus) .day-event-title {
   color: var(--on-accent);
 }
 
-:root:not([data-pointer-away]) .day-event:hover .day-event-dot {
+:root:not([data-pointer-away]) .day-event:hover .day-event-dot,
+:root[data-keyboard] .day-event:has(.day-event-open:focus) .day-event-dot {
   box-shadow: 0 0 0 1px var(--on-accent);
 }
 
-:root:not([data-pointer-away]) .day-event:hover .day-event-join {
+:root:not([data-pointer-away]) .day-event:hover .day-event-join,
+:root[data-keyboard] .day-event:has(.day-event-open:focus) .day-event-join {
   background: var(--on-accent);
   color: var(--accent);
 }
@@ -501,7 +533,7 @@ button:focus {
 .day-events-empty {
   margin: 0;
   padding: 3px 14px 4px;
-  color: var(--tertiary);
+  color: var(--secondary);
   font-size: 13px;
   line-height: 16px;
 }
@@ -547,5 +579,18 @@ button:focus {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Increase Contrast: the faintest text steps up to secondary, and today's
+   outline thickens, as AppKit draws controls in that mode. */
+@media (prefers-contrast: more) {
+  .day.is-outside .day-number,
+  .menu-row kbd {
+    color: var(--secondary);
+  }
+
+  .day.is-today .day-number {
+    box-shadow: inset 0 0 0 2px var(--day-ink);
   }
 }
