@@ -95,7 +95,7 @@ pub(crate) fn show_calendar(app: &AppHandle, tray_rect: tauri::Rect) {
     cancel_fade(app, CALENDAR_LABEL);
     position_calendar(app, tray_rect);
     if let Some(window) = app.get_webview_window(CALENDAR_LABEL) {
-        glass::present(&window);
+        popover::present(&window);
         // Showing can let AppKit park the window on the previous screen.
         position_calendar(app, tray_rect);
     }
@@ -182,12 +182,17 @@ pub(crate) fn build_calendar_window(app: &AppHandle) -> tauri::Result<()> {
             .build()?;
 
     glass::apply_calendar_glass(&window);
+    popover::as_nonactivating_panel(&window);
 
     let handle = app.clone();
     window.on_window_event(move |event| match event {
-        // Closing on the spot, rather than after a delay, keeps the popover
-        // from being left visible but inactive — long enough for the glass to
-        // paint its subdued state before the window goes away.
+        // The panel holds key while Glance stays inactive, so it resigns key
+        // the moment the user turns to anything else — a click into another
+        // app's window, or ⌘Tab — and that is this event. Clicks that move
+        // no focus are `watch_outside_clicks`'s. Closing on the spot, rather
+        // than after a delay, keeps the popover from being left visible but
+        // inactive — long enough for the glass to paint its subdued state
+        // before the window goes away.
         WindowEvent::Focused(false) => {
             let state = handle.state::<AppState>();
             if state.ignore_calendar_blur.swap(false, Ordering::SeqCst) {
@@ -264,11 +269,13 @@ pub(crate) fn build_settings_window(app: &AppHandle) -> tauri::Result<()> {
 /// Closes an open popover when the mouse goes down anywhere outside Glance,
 /// the way a status item's menu does.
 ///
-/// Blur alone misses clicks that move no focus: the empty menu bar, another
-/// app's status item, or anywhere at all when the popover opened while
-/// another app kept focus. A global monitor sees only events bound for other
-/// apps, so clicks on our own status items and popovers never reach it and
-/// the tray toggle keeps working. Mouse monitors need no Accessibility grant.
+/// The popover is a nonactivating panel, so the app in front stays in front
+/// and a click back into its window only resigns the panel's key status —
+/// which closes it — but clicks that move no focus at all are missed: the
+/// empty menu bar, another app's status item, the desktop. A global monitor
+/// catches those. It sees only events bound for other apps, so clicks on our
+/// own status items and popovers never reach it and the tray toggle keeps
+/// working. Mouse monitors need no Accessibility grant.
 #[cfg(target_os = "macos")]
 pub(crate) fn watch_outside_clicks(app: AppHandle) {
     use block2::RcBlock;

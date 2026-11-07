@@ -8,6 +8,7 @@ mod clock;
 mod events;
 mod glass;
 mod placement;
+mod popover;
 mod quick_add;
 mod region;
 mod settings;
