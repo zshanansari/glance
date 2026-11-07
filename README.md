@@ -120,7 +120,9 @@ and [Releasing](docs/release.md) to ship.
 Installed copies update themselves from Settings → About, which also says
 when Glance last checked and what’s new in a waiting release. Glance checks
 GitHub shortly after launch and every twelve hours after that. Automatic
-updates are on by default; switched off, Glance still checks and puts a dot on
+updates are on by default, and an automatic install waits until the calendar,
+the reminder card and Settings are all closed, so a relaunch never cuts off
+an event you are typing. Switched off, Glance still checks and puts a dot on
 its menu bar icon when a release is ready, with **Update and Restart** in the
 menu bar item's menu. Checking by hand always asks before it installs.
 

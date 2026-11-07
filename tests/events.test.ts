@@ -820,8 +820,12 @@ describe("what comes after an empty day", () => {
     expect(nextAfterToday(events, now)?.id).toBe("standup");
   });
 
-  it("says tomorrow, or the weekday further out", () => {
+  it("says tomorrow, the weekday within the week, or the date past it", () => {
     expect(nextEventWhen({ startAt: at(8, 11, 45) }, now, "en-US")).toMatch(/^Tomorrow, 11:45/);
     expect(nextEventWhen({ startAt: at(9, 11, 45) }, now, "en-US")).toMatch(/^Mon, 11:45/);
+    // Six days out is still this coming Friday; nine days out would read
+    // as this coming Monday without the date.
+    expect(nextEventWhen({ startAt: at(13, 11, 45) }, now, "en-US")).toMatch(/^Fri, 11:45/);
+    expect(nextEventWhen({ startAt: at(16, 11, 45) }, now, "en-US")).toMatch(/^Mon, Nov 16, 11:45/);
   });
 });

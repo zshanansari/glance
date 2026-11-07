@@ -204,6 +204,25 @@ function startSettings(api: DesktopApi): void {
   let calendarsLoaded = false;
   let savedSecondZone = "";
   let savedMeetingLink = "";
+  const saveProblem = requireElement<HTMLElement>("save-problem");
+  /**
+   * Sends a patch to the host. The change is in force either way; a
+   * rejection means the settings file did not take it (a full disk, a
+   * folder that cannot be written), so the window says so rather than let
+   * the toggle look saved. Null for the caller when that happens.
+   */
+  const saveSettings = (patch: Partial<AppSettings>): Promise<AppSettings | null> =>
+    api.updateSettings(patch).then(
+      (saved) => {
+        saveProblem.hidden = true;
+        return saved;
+      },
+      (error: unknown) => {
+        saveProblem.textContent = String(error);
+        saveProblem.hidden = false;
+        return null;
+      },
+    );
   meetingLink.addEventListener("input", () => {
     rejectedLink = null;
     meetingLinkHint.textContent = MEETING_LINK_HINT;
@@ -572,13 +591,13 @@ function startSettings(api: DesktopApi): void {
       if (refused) return;
       endRecording();
       paintShortcut(field, chord);
-      void api.updateSettings({ [key]: chord });
+      void saveSettings({ [key]: chord });
     });
     clear.addEventListener("click", () => {
       if (field.dataset.recording === "true") endRecording();
       showShortcutProblem(problem, null);
       paintShortcut(field, "");
-      void api.updateSettings({ [key]: "" });
+      void saveSettings({ [key]: "" });
     });
   };
 
@@ -735,10 +754,10 @@ function startSettings(api: DesktopApi): void {
       patch.showUpcomingEvent ?? false,
       patch.upcomingIconLeadMinutes ?? ICON_LEAD_ALWAYS,
     );
-    void api.updateSettings(patch).then((saved) => {
+    void saveSettings(patch).then((saved) => {
       // The host keeps only links Join would open; say so instead of
       // quietly emptying the field.
-      if (patch.meetingLink && saved.meetingLink !== patch.meetingLink) {
+      if (saved && patch.meetingLink && saved.meetingLink !== patch.meetingLink) {
         rejectedLink = patch.meetingLink;
         meetingLink.value = rejectedLink;
         meetingLinkHint.textContent =
@@ -760,7 +779,7 @@ function startSettings(api: DesktopApi): void {
       else hidden.add(id);
     }
     hiddenCalendarIds = [...hidden].sort();
-    void api.updateSettings({ hiddenCalendarIds });
+    void saveSettings({ hiddenCalendarIds });
   };
   calendarSources.addEventListener("change", syncHiddenSources);
   reminderSources.addEventListener("change", syncHiddenSources);
@@ -818,7 +837,7 @@ function startSettings(api: DesktopApi): void {
     if (!button || !iconStyles.contains(button) || !button.dataset.style) return;
     const id = button.dataset.style as MenuBarIconStyle;
     paintIconStyle(iconStyles, id);
-    void api.updateSettings({ menuBarIcon: id });
+    void saveSettings({ menuBarIcon: id });
   });
 
   highlightDays.addEventListener("click", (event) => {
@@ -827,7 +846,7 @@ function startSettings(api: DesktopApi): void {
     if (!button || !highlightDays.contains(button)) return;
     const pressed = button.getAttribute("aria-pressed") === "true";
     button.setAttribute("aria-pressed", pressed ? "false" : "true");
-    void api.updateSettings({ highlightWeekdays: selectedWeekdays() });
+    void saveSettings({ highlightWeekdays: selectedWeekdays() });
   });
 
   beepPreview.addEventListener("click", (event) => {
@@ -990,13 +1009,13 @@ function startSettings(api: DesktopApi): void {
       .then(() => refreshCalendarAccess());
   });
   welcomeLogin.addEventListener("change", () => {
-    void api.updateSettings({ launchAtLogin: welcomeLogin.checked });
+    void saveSettings({ launchAtLogin: welcomeLogin.checked });
   });
   welcomeCountdown.addEventListener("change", () => {
-    void api.updateSettings({ showUpcomingEvent: welcomeCountdown.checked });
+    void saveSettings({ showUpcomingEvent: welcomeCountdown.checked });
   });
   welcomeDone.addEventListener("click", () => {
-    void api.updateSettings({ onboarded: true }).then(() => {
+    void saveSettings({ onboarded: true }).then(() => {
       welcome.hidden = true;
       page?.classList.remove("is-welcome");
       void api.hideSettings();

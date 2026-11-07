@@ -488,27 +488,45 @@ async fn request_calendar_access(app: AppHandle) -> Result<bool, String> {
         on_main(&waiting, move || events::finish_access_request(granted))?;
         if events::should_open_privacy_after_prompt(&Ok(granted)) {
             let _ = on_main(&waiting, events::open_calendar_privacy);
-        } else if granted {
-            let (sender, receiver) = std::sync::mpsc::sync_channel(1);
-            waiting
-                .run_on_main_thread(move || {
-                    events::begin_reminders_access_request(move |result| {
-                        let _ = sender.send(result);
-                    });
-                })
-                .ok();
-            if let Ok(Ok(reminder_granted)) = receiver.recv_timeout(Duration::from_secs(180)) {
-                let _ = on_main(&waiting, move || {
-                    events::finish_reminders_access_request(reminder_granted)
-                });
-            }
         }
         Ok(granted)
     })
     .await
     .map_err(|error| error.to_string());
-    settle_after_access_prompt(&app);
+    // A grant goes on to ask for Reminders, but on its own: this reply is
+    // what Settings is waiting on, and the second sheet can sit unanswered
+    // for minutes. The Dock icon stays up until that sheet is done with.
+    if matches!(result, Ok(Ok(true))) {
+        prompt_for_reminders_after_calendar(app);
+    } else {
+        settle_after_access_prompt(&app);
+    }
     result?
+}
+
+/// Asks for Reminders access once Calendar access has just been granted,
+/// without anyone waiting on the answer. Reminders are optional, and the
+/// prompt is only ever shown once by macOS, so a sheet left unanswered
+/// costs nothing but the Dock icon while it waits.
+fn prompt_for_reminders_after_calendar(app: AppHandle) {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let asked = app
+            .run_on_main_thread(move || {
+                events::begin_reminders_access_request(move |result| {
+                    let _ = sender.send(result);
+                });
+            })
+            .is_ok();
+        if asked {
+            if let Ok(Ok(granted)) = receiver.recv_timeout(Duration::from_secs(180)) {
+                let _ = on_main(&app, move || {
+                    events::finish_reminders_access_request(granted)
+                });
+            }
+        }
+        settle_after_access_prompt(&app);
+    });
 }
 
 #[tauri::command]

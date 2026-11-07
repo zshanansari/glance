@@ -147,9 +147,43 @@ pub fn spawn_checks(app: AppHandle) {
     });
 }
 
+/// How often to look again when an install is waiting for the user to
+/// finish with a window.
+const WHILE_IN_USE: Duration = Duration::from_secs(2 * 60);
+
+/// Whether the user is in the middle of something a relaunch would cut
+/// short: an event being typed into the month, a reminder card on screen, or
+/// Settings open.
+fn windows_in_use(app: &AppHandle) -> bool {
+    [
+        crate::CALENDAR_LABEL,
+        crate::REMINDER_LABEL,
+        crate::SETTINGS_LABEL,
+    ]
+    .iter()
+    .any(|label| {
+        app.get_webview_window(label)
+            .and_then(|window| window.is_visible().ok())
+            .unwrap_or(false)
+    })
+}
+
+/// Installs what a check finds, once no window is in use. An install
+/// relaunches the app, which would throw away a half-typed quick add or
+/// take a reminder card off the screen before it was read, so it waits for
+/// the windows to close and looks again every couple of minutes. Switching
+/// automatic updates off in the meantime calls the install off; the dot on
+/// the menu bar icon says the update is still there.
 async fn check_then_maybe_install(app: &AppHandle) -> Result<(), String> {
-    if check(app).await?.is_some() && auto_update_enabled(app) {
-        install(app).await?;
+    if check(app).await?.is_none() {
+        return Ok(());
+    }
+    while auto_update_enabled(app) {
+        if !windows_in_use(app) {
+            install(app).await?;
+            return Ok(());
+        }
+        std::thread::sleep(WHILE_IN_USE);
     }
     Ok(())
 }

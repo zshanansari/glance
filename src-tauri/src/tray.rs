@@ -159,17 +159,15 @@ pub(crate) fn tray_click_intent(button: MouseButton, state: MouseButtonState) ->
     }
 }
 
-/// The NSMenu stolen off the status item. AppKit objects are main-thread
-/// only; this is only read from tray click handlers and setup, both of which
+/// The NSMenu stolen off the status item, as a bare pointer. The menu is
+/// retained once for the life of the process (there is one, and it is never
+/// replaced), so the pointer stays valid, and a pointer crosses threads where
+/// a `Retained<NSMenu>` must not: AppKit objects are main-thread only, and
+/// the menu is only ever touched from tray click handlers and setup, which
 /// run there.
 #[cfg(target_os = "macos")]
-#[derive(Clone)]
-pub(crate) struct TrayMenu(objc2::rc::Retained<objc2_app_kit::NSMenu>);
-
-#[cfg(target_os = "macos")]
-unsafe impl Send for TrayMenu {}
-#[cfg(target_os = "macos")]
-unsafe impl Sync for TrayMenu {}
+#[derive(Clone, Copy)]
+pub(crate) struct TrayMenu(usize);
 
 #[cfg(target_os = "macos")]
 pub(crate) type TrayMenuShare = Arc<Mutex<Option<TrayMenu>>>;
@@ -191,7 +189,11 @@ pub(crate) fn remember_status_item_menu(tray: &tauri::tray::TrayIcon, share: &Tr
             return;
         };
         if let Ok(mut slot) = share.lock() {
-            *slot = item.menu(mtm).map(TrayMenu);
+            // Kept for the life of the process: the retain is handed over
+            // to the raw pointer and never given back.
+            *slot = item
+                .menu(mtm)
+                .map(|menu| TrayMenu(objc2::rc::Retained::into_raw(menu) as usize));
         }
         item.setMenu(None);
     });
@@ -199,15 +201,15 @@ pub(crate) fn remember_status_item_menu(tray: &tauri::tray::TrayIcon, share: &Tr
 
 #[cfg(target_os = "macos")]
 pub(crate) fn present_status_item_menu(tray: &tauri::tray::TrayIcon, menu: &TrayMenu) {
-    // `NSMenu` is not Send, and `with_inner_tray_icon` requires a Send
-    // closure, so the retained menu stays here and only a pointer crosses.
-    let menu_ptr = objc2::rc::Retained::as_ptr(&menu.0) as usize;
+    let menu_ptr = menu.0;
     let _ = tray.with_inner_tray_icon(move |inner| {
         let Some(item) = inner.ns_status_item() else {
             return;
         };
-        // SAFETY: `menu` is retained in TrayMenuShare for the process
-        // lifetime, and this closure runs on the main thread.
+        // SAFETY: the pointer came from `Retained::into_raw` in
+        // `remember_status_item_menu` and that retain is never released, so
+        // it is valid for the process lifetime; this closure runs on the
+        // main thread, where AppKit expects the menu to be used.
         let menu = unsafe { &*(menu_ptr as *const objc2_app_kit::NSMenu) };
         #[allow(deprecated)]
         item.popUpStatusItemMenu(menu);
@@ -236,7 +238,7 @@ pub(crate) fn handle_tray_click(
         TrayClickIntent::Menu => {
             #[cfg(target_os = "macos")]
             {
-                let menu = menu.lock().ok().and_then(|guard| guard.clone());
+                let menu = menu.lock().ok().and_then(|guard| *guard);
                 if let Some(menu) = menu {
                     present_status_item_menu(tray, &menu);
                 }

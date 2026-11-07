@@ -234,15 +234,16 @@ pub(crate) fn reminder_show_url(id: &str) -> String {
     )
 }
 
-/// Date-only reminders occupy the due day. Timed ones get a short slot so they
-/// can sit in the same countdown as meetings.
-pub(crate) fn reminder_span(due_ms: i64, all_day: bool) -> (i64, i64) {
-    let length = if all_day {
-        24 * 60 * 60 * 1000
-    } else {
-        15 * 60 * 1000
-    };
-    (due_ms, due_ms.saturating_add(length))
+/// Date-only reminders occupy the due day, ending where the next day starts:
+/// `day_end` is that local midnight, which the calendar works out, since a
+/// flat 24 hours runs an hour into the next day when the clocks go forward.
+/// Timed ones get a short slot so they can sit in the same countdown as
+/// meetings.
+pub(crate) fn reminder_span(due_ms: i64, day_end: Option<i64>) -> (i64, i64) {
+    match day_end {
+        Some(end) => (due_ms, end.max(due_ms)),
+        None => (due_ms, due_ms.saturating_add(15 * 60 * 1000)),
+    }
 }
 
 /// The first URL must be the Ventura+ Privacy & Security extension. A bare
@@ -702,8 +703,8 @@ mod macos {
                 );
             }
         }
-        // EventKit copies escaping completion handlers; keep our retain until then.
-        std::mem::forget(completion);
+        // EventKit copies the escaping completion handler, so our retain
+        // can go now, as it does for the fetch below.
     }
 
     pub fn begin_access_request(reply: impl FnOnce(Result<bool, String>) + Send + 'static) {
@@ -764,7 +765,6 @@ mod macos {
                 );
             }
         }
-        std::mem::forget(completion);
     }
 
     pub fn begin_reminders_access_request(
@@ -1028,7 +1028,12 @@ mod macos {
         })
     }
 
-    fn reminder_due(components: &NSDateComponents) -> Option<(i64, bool)> {
+    /// When a reminder is due and, for one with a date but no time, where
+    /// that day ends: the next local midnight by the calendar's own count,
+    /// so the day is as long as the clocks make it.
+    fn reminder_due(components: &NSDateComponents) -> Option<(i64, Option<i64>)> {
+        use objc2_foundation::{NSCalendarOptions, NSCalendarUnit};
+
         if components.year() == NSDateComponentUndefined
             || components.month() == NSDateComponentUndefined
             || components.day() == NSDateComponentUndefined
@@ -1038,7 +1043,20 @@ mod macos {
         let all_day = components.hour() == NSDateComponentUndefined;
         let calendar = NSCalendar::currentCalendar();
         let date = calendar.dateFromComponents(components)?;
-        Some(((date.timeIntervalSince1970() * 1000.0) as i64, all_day))
+        let ms = |date: &NSDate| (date.timeIntervalSince1970() * 1000.0) as i64;
+        let day_end = all_day.then(|| {
+            calendar
+                .dateByAddingUnit_value_toDate_options(
+                    NSCalendarUnit::Day,
+                    1,
+                    &date,
+                    NSCalendarOptions::empty(),
+                )
+                .map(|next| ms(&next))
+                // A calendar that cannot add a day: fall back to the flat day.
+                .unwrap_or_else(|| ms(&date).saturating_add(24 * 60 * 60 * 1000))
+        });
+        Some((ms(&date), day_end))
     }
 
     /// Asks EventKit for the range's reminders and returns where they will
@@ -1073,7 +1091,7 @@ mod macos {
                         let Some(components) = (unsafe { reminder.dueDateComponents() }) else {
                             continue;
                         };
-                        let Some((due_ms, all_day)) = reminder_due(&components) else {
+                        let Some((due_ms, day_end)) = reminder_due(&components) else {
                             continue;
                         };
                         let raw_calendar: Option<Retained<EKCalendar>> =
@@ -1089,7 +1107,8 @@ mod macos {
                         let title = ns_string(&title_obj);
                         let id_obj = unsafe { reminder.calendarItemIdentifier() };
                         let id = ns_string(&id_obj);
-                        let (start_at, end_at) = super::reminder_span(due_ms, all_day);
+                        let all_day = day_end.is_some();
+                        let (start_at, end_at) = super::reminder_span(due_ms, day_end);
                         let color = raw_calendar.as_deref().and_then(calendar_hex);
                         found.push(UpcomingEvent {
                             id: format!("{}{id}", super::REMINDER_ID_PREFIX),
@@ -1543,11 +1562,16 @@ mod tests {
 
     #[test]
     fn reminder_slots_cover_a_day_or_a_short_timed_window() {
-        assert_eq!(reminder_span(1_000, false), (1_000, 1_000 + 15 * 60 * 1000));
+        assert_eq!(reminder_span(1_000, None), (1_000, 1_000 + 15 * 60 * 1000));
+        // A 23-hour day, as when the clocks go forward: the slot ends where
+        // the calendar says the next day starts, not a flat day later.
+        let short_day = 23 * 60 * 60 * 1000;
         assert_eq!(
-            reminder_span(1_000, true),
-            (1_000, 1_000 + 24 * 60 * 60 * 1000)
+            reminder_span(1_000, Some(1_000 + short_day)),
+            (1_000, 1_000 + short_day)
         );
+        // A day end before the due time cannot make a negative slot.
+        assert_eq!(reminder_span(5_000, Some(1_000)), (5_000, 5_000));
     }
 
     #[test]

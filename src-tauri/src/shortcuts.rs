@@ -63,9 +63,14 @@ pub(crate) fn run_shortcut(app: &AppHandle, action: ShortcutAction) {
 /// False when the chord could not be bound.
 ///
 /// macOS may hand a chord to another app first, or ask for Accessibility
-/// before it will deliver one at all. The previous binding is left alone,
-/// and the caller tells Settings so the field does not claim a chord that
-/// does nothing.
+/// before it will deliver one at all. The new chord is bound before the old
+/// one is let go, so a refusal leaves the working one exactly as it was and
+/// never both unbound; the caller tells Settings so the field does not claim
+/// a chord that does nothing.
+///
+/// While Settings is recording, every chord is set aside. A chord saved then
+/// is tried and let go again at once, so it is known to bind but does not
+/// fire into the recorder; unsuspending binds what is recorded here.
 ///
 /// Registering blocks on the main thread, so this must run off it and must
 /// not hold `shortcuts` while it waits: the main thread may be inside the
@@ -89,17 +94,31 @@ pub(crate) fn rebind_shortcut(app: &AppHandle, action: ShortcutAction, chord: &s
     if previous == desired {
         return true;
     }
-    if let Some(old) = previous {
-        let _ = app.global_shortcut().unregister(old);
-    }
+    let suspended = state.shortcuts_suspended.load(Ordering::SeqCst);
     let bound = match desired {
-        None => None,
+        None => {
+            if let Some(old) = previous {
+                let _ = app.global_shortcut().unregister(old);
+            }
+            None
+        }
         Some(shortcut) => match app.global_shortcut().register(shortcut) {
-            Ok(()) => Some(shortcut),
+            Ok(()) => {
+                // The old chord, if any, is still bound; the suspended set
+                // has already been let go, so only an unsuspended one needs
+                // releasing. Set aside again when recording: it is only known
+                // to bind, not meant to fire yet.
+                if suspended {
+                    let _ = app.global_shortcut().unregister(shortcut);
+                } else if let Some(old) = previous {
+                    let _ = app.global_shortcut().unregister(old);
+                }
+                Some(shortcut)
+            }
             Err(error) => {
                 eprintln!("Could not register {chord:?}: {error}");
-                // Put the working chord back so the app is not left with nothing.
-                previous.filter(|old| app.global_shortcut().register(*old).is_ok())
+                // The working chord was never let go.
+                previous
             }
         },
     };

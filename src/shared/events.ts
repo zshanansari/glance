@@ -505,7 +505,9 @@ export function nextAfterToday(
 
 /**
  * When that next event is, for the line under an empty day: "Tomorrow,
- * 11:45 AM", or the weekday and time ("Mon, 11:45 AM") further out.
+ * 11:45 AM", the weekday and time ("Mon, 11:45 AM") within the week, and
+ * the date as well past it ("Tue 17 Nov, 11:45 AM"): a bare "Tue" nine days
+ * out reads as this coming Tuesday.
  */
 export function nextEventWhen(
   event: Pick<UpcomingEvent, "startAt">,
@@ -514,9 +516,12 @@ export function nextEventWhen(
 ): string {
   const start = new Date(event.startAt);
   const time = dateFormat(locale, { hour: "numeric", minute: "2-digit" }).format(start);
-  const day = start.getTime() < endOfDay(now, 2)
-    ? "Tomorrow"
-    : dateFormat(locale, { weekday: "short" }).format(start);
+  const day =
+    start.getTime() < endOfDay(now, 2)
+      ? "Tomorrow"
+      : start.getTime() < endOfDay(now, 7)
+        ? dateFormat(locale, { weekday: "short" }).format(start)
+        : comingDayTitle(start, now, locale);
   return `${day}, ${time}`;
 }
 

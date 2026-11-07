@@ -29,6 +29,13 @@ const DAY_HIGHLIGHTS: &[&str] = &[
     "accent", "blue", "purple", "pink", "red", "orange", "yellow", "green", "graphite",
 ];
 
+/// An EventKit calendar identifier is a UUID-like string of a few dozen
+/// characters; anything longer is not one.
+const MAX_CALENDAR_ID_LEN: usize = 256;
+/// More hidden calendars than any Mac has. The cap only stops a webview gone
+/// wrong from growing the file without end.
+const MAX_HIDDEN_CALENDARS: usize = 256;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AppSettings {
@@ -227,13 +234,18 @@ impl AppSettings {
         days.sort_unstable();
         days.dedup();
         self.highlight_weekdays = days;
+        // An EventKit identifier is a short UUID-like string, and a Mac has
+        // a few dozen calendars at most. Anything past that is not a choice
+        // the user made, and would be written, broadcast and cloned on every
+        // read.
         let mut calendars: Vec<String> = self
             .hidden_calendar_ids
             .into_iter()
-            .filter(|id| !id.is_empty())
+            .filter(|id| !id.is_empty() && id.len() <= MAX_CALENDAR_ID_LEN)
             .collect();
         calendars.sort();
         calendars.dedup();
+        calendars.truncate(MAX_HIDDEN_CALENDARS);
         self.hidden_calendar_ids = calendars;
         self
     }
@@ -697,6 +709,19 @@ mod tests {
             input.normalize(&base).hidden_calendar_ids,
             vec!["home".to_string(), "work".to_string()]
         );
+    }
+
+    #[test]
+    fn caps_hidden_calendars_in_length_and_number() {
+        let base = AppSettings::default();
+        let mut input = base.clone();
+        input.hidden_calendar_ids = (0..300).map(|n| format!("cal-{n:04}")).collect();
+        input
+            .hidden_calendar_ids
+            .push("x".repeat(MAX_CALENDAR_ID_LEN + 1));
+        let kept = input.normalize(&base).hidden_calendar_ids;
+        assert_eq!(kept.len(), MAX_HIDDEN_CALENDARS);
+        assert!(kept.iter().all(|id| id.starts_with("cal-")));
     }
 
     #[test]
