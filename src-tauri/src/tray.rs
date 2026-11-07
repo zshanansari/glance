@@ -499,17 +499,6 @@ pub(crate) fn paint_tray_glyph(tray: &tauri::tray::TrayIcon, base: Option<&[u8]>
     fit_status_item_to_menu_bar(tray);
 }
 
-/// The glyph's height in the menu bar. The PNGs are drawn at 18pt with
-/// their ink filling most of it, which stood taller than the system's own
-/// items; at 15pt the ink matches Control Centre and Spotlight.
-#[cfg(target_os = "macos")]
-const GLYPH_HEIGHT: f64 = 15.0;
-
-/// The cutout badge carries the date as text inside it, so it keeps the
-/// height that lets that text read at the size of the title beside it.
-#[cfg(target_os = "macos")]
-const BADGE_HEIGHT: f64 = 18.0;
-
 /// The title's size: what macOS gives the battery percentage, a step under
 /// the clock, so the item reads as a status beside the clock rather than a
 /// second one.
@@ -521,9 +510,9 @@ const TITLE_SIZE_DROP: f64 = 2.0;
 #[cfg(target_os = "macos")]
 const TITLE_BASELINE_RAISE: f64 = 0.5;
 
-/// Sizes the glyph like the system's own items and sets the title in the
-/// system font at the battery percentage's size, regular weight, with digits
-/// of one width so a countdown does not shift sideways as it ticks.
+/// Sets the title in the system font at the battery percentage's size,
+/// regular weight, with digits of one width so a countdown does not shift
+/// sideways as it ticks. The glyph keeps the size it is drawn at.
 #[cfg(target_os = "macos")]
 pub(crate) fn fit_status_item_to_menu_bar(tray: &tauri::tray::TrayIcon) {
     use objc2::runtime::AnyObject;
@@ -531,7 +520,7 @@ pub(crate) fn fit_status_item_to_menu_bar(tray: &tauri::tray::TrayIcon) {
     use objc2_app_kit::{
         NSBaselineOffsetAttributeName, NSFont, NSFontAttributeName, NSFontWeightRegular,
     };
-    use objc2_foundation::{MainThreadMarker, NSAttributedString, NSDictionary, NSNumber, NSSize};
+    use objc2_foundation::{MainThreadMarker, NSAttributedString, NSDictionary, NSNumber};
 
     let _ = tray.with_inner_tray_icon(|inner| {
         let Some(item) = inner.ns_status_item() else {
@@ -543,20 +532,6 @@ pub(crate) fn fit_status_item_to_menu_bar(tray: &tauri::tray::TrayIcon) {
         let Some(button) = item.button(mtm) else {
             return;
         };
-        if let Some(image) = button.image() {
-            let current = image.size();
-            // Square glyphs are icons; a wide one is the cutout badge.
-            let height = if current.width > current.height * 1.25 {
-                BADGE_HEIGHT
-            } else {
-                GLYPH_HEIGHT
-            };
-            if current.height > 0.0 && (current.height - height).abs() > 0.01 {
-                let width = current.width * height / current.height;
-                image.setSize(NSSize::new(width, height));
-                button.setImage(Some(&image));
-            }
-        }
         let title = button.title();
         if title.length() == 0 {
             return;
