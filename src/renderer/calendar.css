@@ -144,9 +144,9 @@ button:focus {
   background: var(--tertiary);
 }
 
-/* Kept in the row so the arrows never jump when it comes and goes. */
+/* Takes no room while hidden. The row is right-aligned: the arrows stay put. */
 .today-button.is-hidden {
-  visibility: hidden;
+  display: none;
 }
 
 /* Rings only once the keyboard is in use: WebKit focuses the first button
@@ -684,6 +684,49 @@ button:focus {
   display: none;
 }
 
+/* Quick add: what Return will do, before it does it. */
+.quick-add-preview {
+  display: grid;
+  gap: 1px;
+  min-height: 30px;
+  padding: 2px 14px 4px;
+}
+
+.quick-add-title {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-add-detail,
+/* Wraps rather than cuts off: the hint says what Return will do. */
+.quick-add-hint {
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.quick-add-hint.is-failure {
+  color: var(--calendar);
+}
+
+/* "Added · Undo" beside the day it went to. */
+.day-events-undo {
+  margin-left: 4px;
+  padding: 0 2px;
+  border-radius: 4px;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+}
+
+:root[data-keyboard] .day-events-undo:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .search-results {
   max-height: 320px;
   overflow-y: auto;
@@ -732,6 +775,43 @@ button:focus {
   margin-top: auto;
 }
 
+/* The footer's tools: new event and search on the left, settings on the
+   right, and between them the name and shortcut of the one pointed at. */
+.tool-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  padding: 0 9px;
+}
+
+.tool-bar .icon-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.tool-bar .icon-button[aria-expanded="true"] {
+  background: var(--quaternary);
+  color: var(--label);
+}
+
+.tool-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tertiary);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tool-hint kbd {
+  margin-left: 5px;
+  font: inherit;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -745,7 +825,8 @@ button:focus {
    outline thickens, as AppKit draws controls in that mode. */
 @media (prefers-contrast: more) {
   .day.is-outside .day-number,
-  .menu-row kbd {
+  .menu-row kbd,
+  .tool-hint {
     color: var(--secondary);
   }
 

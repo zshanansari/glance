@@ -18,9 +18,6 @@
         <header class="header">
           <h1 id="month-label"></h1>
           <div class="nav">
-            <button type="button" class="icon-button" id="open-search" title="Search events (⌘F)" aria-controls="search" aria-expanded="false">
-              <span class="visually-hidden">Search events</span>
-            </button>
             <button type="button" class="today-button" id="today-month" title="Go to today">Today</button>
             <button type="button" class="icon-button" id="prev-month" title="Previous month">
               <span class="visually-hidden">Previous month</span>
@@ -35,6 +32,21 @@
         <div id="grid"></div>
 
         <hr class="separator" />
+
+        <section class="search quick-add" id="quick-add" aria-label="New event" hidden>
+          <input
+            type="text"
+            id="quick-add-input"
+            class="search-input"
+            placeholder="Lunch with Sam tomorrow 1pm at Blue Tokai"
+            aria-label="New event, in your own words"
+            aria-describedby="quick-add-preview"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="300"
+          />
+          <div class="quick-add-preview" id="quick-add-preview" aria-live="polite"></div>
+        </section>
 
         <section class="search" id="search" aria-label="Search events" hidden>
           <input
@@ -60,10 +72,16 @@
 
         <hr class="separator" />
 
-        <footer class="calendar-footer">
-          <button type="button" class="menu-row" id="open-settings">
-            <span>Settings…</span>
-            <kbd>⌘,</kbd>
+        <footer class="calendar-footer tool-bar">
+          <button type="button" class="icon-button" id="open-quick-add" title="New event (⌘N)" data-hint="New event" data-key="⌘N" aria-controls="quick-add" aria-expanded="false">
+            <span class="visually-hidden">New event</span>
+          </button>
+          <button type="button" class="icon-button" id="open-search" title="Search events (⌘F)" data-hint="Search events" data-key="⌘F" aria-controls="search" aria-expanded="false">
+            <span class="visually-hidden">Search events</span>
+          </button>
+          <span class="tool-hint" id="tool-hint" aria-hidden="true"></span>
+          <button type="button" class="icon-button" id="open-settings" title="Settings (⌘,)" data-hint="Settings" data-key="⌘,">
+            <span class="visually-hidden">Settings</span>
           </button>
         </footer>
       </div>

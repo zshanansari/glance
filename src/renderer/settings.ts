@@ -190,6 +190,19 @@ function startSettings(api: DesktopApi): void {
   const upcomingIconLead = requireElement<HTMLSelectElement>("upcoming-icon-lead");
   const remindBeforeMeetings = requireElement<HTMLInputElement>("remind-before-meetings");
   const remindInPerson = requireElement<HTMLInputElement>("remind-in-person");
+  const quickAddCalendar = requireElement<HTMLSelectElement>("quick-add-calendar");
+  const meetingLink = requireElement<HTMLInputElement>("meeting-link");
+  const meetingLinkHint = requireElement<HTMLElement>("meeting-link-hint");
+  const MEETING_LINK_HINT = meetingLinkHint.textContent ?? "";
+  // A link the host turned down stays in the field, with the reason, until
+  // it is edited.
+  let rejectedLink: string | null = null;
+  let savedCalendarId = "";
+  meetingLink.addEventListener("input", () => {
+    rejectedLink = null;
+    meetingLinkHint.textContent = MEETING_LINK_HINT;
+    meetingLinkHint.classList.remove("is-failure");
+  });
   /** In-person reminders ride on the reminder being on. */
   const paintInPerson = (on: boolean): void => {
     remindInPerson.disabled = !on;
@@ -439,6 +452,20 @@ function startSettings(api: DesktopApi): void {
     }
     try {
       const calendars = calendarsOfKind(await api.listCalendars(), "event");
+      // Quick add can only write where events can be added.
+      const writable = calendars.filter((calendar) => calendar.writable);
+      quickAddCalendar.replaceChildren(
+        new Option("Default calendar", ""),
+        ...writable.map(
+          (calendar) =>
+            new Option(
+              calendar.source ? `${calendar.title} (${calendar.source})` : calendar.title,
+              calendar.id,
+            ),
+        ),
+      );
+      quickAddCalendar.value = savedCalendarId;
+      if (quickAddCalendar.value !== savedCalendarId) quickAddCalendar.value = "";
       paintSourceList(calendarSources, calendars, {
         empty: "No calendars available.",
         heading: "Calendars",
@@ -597,6 +624,12 @@ function startSettings(api: DesktopApi): void {
     upcomingIconLead.value = String(settings.upcomingIconLeadMinutes);
     remindBeforeMeetings.checked = settings.remindBeforeMeetings;
     remindInPerson.checked = settings.remindInPerson;
+    savedCalendarId = settings.quickAddCalendarId;
+    quickAddCalendar.value = savedCalendarId;
+    if (quickAddCalendar.value !== savedCalendarId) quickAddCalendar.value = "";
+    if (document.activeElement !== meetingLink) {
+      meetingLink.value = rejectedLink ?? settings.meetingLink;
+    }
     paintInPerson(settings.remindBeforeMeetings);
     includeWithoutParticipants.checked = settings.includeEventsWithoutParticipants;
     includeWithoutLocation.checked = settings.includeEventsWithoutLocation;
@@ -632,6 +665,8 @@ function startSettings(api: DesktopApi): void {
     upcomingIconLeadMinutes: Number(upcomingIconLead.value) as UpcomingIconLeadMinutes,
     remindBeforeMeetings: remindBeforeMeetings.checked,
     remindInPerson: remindInPerson.checked,
+    quickAddCalendarId: quickAddCalendar.value,
+    meetingLink: meetingLink.value.trim(),
     includeEventsWithoutParticipants: includeWithoutParticipants.checked,
     includeEventsWithoutLocation: includeWithoutLocation.checked,
     showEventTitleInMenuBar: showEventTitle.checked,
@@ -683,7 +718,17 @@ function startSettings(api: DesktopApi): void {
       patch.showUpcomingEvent ?? false,
       patch.upcomingIconLeadMinutes ?? ICON_LEAD_ALWAYS,
     );
-    void api.updateSettings(patch);
+    void api.updateSettings(patch).then((saved) => {
+      // The host keeps only links Join would open; say so instead of
+      // quietly emptying the field.
+      if (patch.meetingLink && saved.meetingLink !== patch.meetingLink) {
+        rejectedLink = patch.meetingLink;
+        meetingLink.value = rejectedLink;
+        meetingLinkHint.textContent =
+          "That isn’t a Zoom, Meet, Teams, Webex, Jitsi, GoTo or FaceTime link.";
+        meetingLinkHint.classList.add("is-failure");
+      }
+    });
   });
 
   const syncHiddenSources = (event: Event): void => {

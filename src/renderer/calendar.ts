@@ -41,6 +41,13 @@ import {
 import { sfSymbol } from "./icons";
 import { meetingBrand } from "../shared/meetings";
 import { isTimeZone, zoneCity, zoneShort, zoneTime } from "../shared/zones";
+import {
+  googleDates,
+  parseQuickEvent,
+  quickAddAction,
+  quickWhen,
+  type QuickDraft,
+} from "../shared/quick-add";
 import { meetingIcon } from "./brand-icons";
 import { framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
@@ -144,7 +151,34 @@ function startCalendar(api: DesktopApi): void {
   const search = requireElement<HTMLElement>("search");
   const searchInput = requireElement<HTMLInputElement>("search-input");
   const searchResults = requireElement<HTMLElement>("search-results");
-  openSearch.append(sfSymbol("magnifyingglass", 12));
+  openSearch.append(sfSymbol("magnifyingglass", 13));
+  const openQuickAdd = requireElement<HTMLButtonElement>("open-quick-add");
+  const quickAdd = requireElement<HTMLElement>("quick-add");
+  const quickAddInput = requireElement<HTMLInputElement>("quick-add-input");
+  const quickAddPreview = requireElement<HTMLElement>("quick-add-preview");
+  openQuickAdd.append(sfSymbol("plus", 13));
+  openSettings.append(sfSymbol("gearshape", 14));
+  const toolHint = requireElement<HTMLElement>("tool-hint");
+  const tools = [openQuickAdd, openSearch, openSettings];
+  // The middle of the footer names the tool pointed at, with its shortcut;
+  // otherwise, while a panel is open, how to close it.
+  const paintToolHint = (tool?: HTMLButtonElement): void => {
+    if (tool?.dataset.hint) {
+      const key = document.createElement("kbd");
+      key.textContent = tool.dataset.key ?? "";
+      toolHint.replaceChildren(tool.dataset.hint, key);
+    } else {
+      toolHint.textContent = search.hidden && quickAdd.hidden ? "" : "esc to close";
+    }
+  };
+  for (const tool of tools) {
+    tool.addEventListener("pointerenter", () => paintToolHint(tool));
+    tool.addEventListener("pointerleave", () => paintToolHint());
+    tool.addEventListener("focus", () => {
+      if (document.documentElement.hasAttribute("data-keyboard")) paintToolHint(tool);
+    });
+    tool.addEventListener("blur", () => paintToolHint());
+  }
   prev.append(sfSymbol("chevron.left", 12));
   next.append(sfSymbol("chevron.right", 12));
 
@@ -174,6 +208,15 @@ function startCalendar(api: DesktopApi): void {
   // Today's finished meetings fold into one line until it is opened; the
   // fold closes again with the popover.
   let pastOpen = false;
+  // Quick add reads the line as you type; Return acts on the latest read.
+  let quickDraft: QuickDraft | null = null;
+  let quickRequest = 0;
+  let quickBusy = false;
+  // The event quick add just made, offered for Undo for a few seconds.
+  let added: { id: string; day: string; title: string } | null = null;
+  let addedTimer = 0;
+  /** How long "Added · Undo" stays beside the day an event went to. */
+  const UNDO_MS = 30_000;
   // Search reads its window once when it opens, then filters as you type.
   let searchPool: UpcomingEvent[] | null = null;
   let searchRequest = 0;
@@ -400,7 +443,7 @@ function startCalendar(api: DesktopApi): void {
   };
 
   const paintDayEvents = (): void => {
-    dayEvents.hidden = !search.hidden;
+    dayEvents.hidden = !search.hidden || !quickAdd.hidden;
     const selectedDate = fromIso(focusIso);
     const now = Date.now();
     const listed = eventsOnDay(calendarEvents, selectedDate);
@@ -425,6 +468,7 @@ function startCalendar(api: DesktopApi): void {
         group.events.map((event) => [event.id, event.startAt, event.endAt, event.title, event.joinUrl]),
       ]),
       failure,
+      added && added.day === focusIso && added.id,
       folded.length,
       upcomingEvent && [upcomingEvent.id, upcomingEvent.endAt],
       listed.map((event) => [
@@ -477,6 +521,16 @@ function startCalendar(api: DesktopApi): void {
       (selectedEvents.length
         ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
         : "");
+    if (!failure && added && added.day === toIso(selectedDate)) {
+      const undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "day-events-undo";
+      undo.textContent = "Undo";
+      undo.dataset.focusKey = "undo";
+      undo.setAttribute("aria-label", `Undo adding ${added.title}`);
+      undo.addEventListener("click", () => void undoAdded());
+      dayEventsCount.replaceChildren("Added ·", undo);
+    }
     if (eventError) {
       // Only a missing permission is fixed by asking for one; any other
       // failure is offered again instead of a prompt that would not help.
@@ -620,9 +674,11 @@ function startCalendar(api: DesktopApi): void {
       searchInput.select();
       return;
     }
+    closeQuickAdd(false);
     search.hidden = false;
     dayEvents.hidden = true;
     openSearch.setAttribute("aria-expanded", "true");
+    paintToolHint();
     searchInput.value = "";
     searchPool = null;
     paintSearch();
@@ -649,13 +705,170 @@ function startCalendar(api: DesktopApi): void {
     );
   };
 
+  const quickAddIsOpen = (): boolean => !quickAdd.hidden;
+
+  const quickLine = (className: string, text: string): HTMLElement => {
+    const line = document.createElement("span");
+    line.className = className;
+    line.textContent = text;
+    return line;
+  };
+
+  /** What Return will do: the event as read, and where it will go. */
+  const paintQuickAdd = (message?: { text: string; failure?: boolean }): void => {
+    const lines: HTMLElement[] = [];
+    if (message) {
+      lines.push(quickLine(`quick-add-hint${message.failure ? " is-failure" : ""}`, message.text));
+    } else if (!quickAddInput.value.trim()) {
+      lines.push(quickLine("quick-add-hint", "Type what and when; Return adds it."));
+    } else if (!quickDraft) {
+      lines.push(quickLine("quick-add-hint", "Add a day or time, like “tomorrow 3pm”."));
+    } else {
+      const draft = quickDraft;
+      const action = quickAddAction(draft, settings?.meetingLink ?? "");
+      lines.push(quickLine("quick-add-title", draft.title));
+      const where = [quickWhen(draft), draft.location].filter(Boolean).join(" · ");
+      lines.push(quickLine("quick-add-detail", where));
+      if (action.kind === "google") {
+        const who = draft.guests.length
+          ? `${draft.guests.length} guest${draft.guests.length === 1 ? "" : "s"}`
+          : "Google Meet";
+        lines.push(quickLine("quick-add-hint", `${who} · Return opens it in Google Calendar to send`));
+      } else if (action.url) {
+        lines.push(quickLine("quick-add-hint", `With your ${meetingBrand(action.url).label.replace(/^Join /, "")} link · Return adds it`));
+      } else if (draft.call) {
+        lines.push(quickLine("quick-add-hint", "Add your meeting link in Settings to attach it · Return adds it"));
+      } else {
+        lines.push(quickLine("quick-add-hint", "Return adds it to your calendar"));
+      }
+    }
+    quickAddPreview.replaceChildren(...lines);
+    syncHeight();
+  };
+
+  /** Reads the line: macOS finds the date, the rest is read here. */
+  const readQuickAdd = async (): Promise<void> => {
+    const request = ++quickRequest;
+    const text = quickAddInput.value;
+    if (!text.trim()) {
+      quickDraft = null;
+      paintQuickAdd();
+      return;
+    }
+    const dates = await api.detectDates(text).catch(() => []);
+    if (request !== quickRequest) return;
+    quickDraft = parseQuickEvent(text, dates, Date.now());
+    paintQuickAdd();
+  };
+
+  const openQuickAddPanel = (): void => {
+    closeSearch(false);
+    if (quickAddIsOpen()) {
+      quickAddInput.focus();
+      quickAddInput.select();
+      return;
+    }
+    quickAdd.hidden = false;
+    dayEvents.hidden = true;
+    openQuickAdd.setAttribute("aria-expanded", "true");
+    paintToolHint();
+    quickAddInput.value = "";
+    quickDraft = null;
+    paintQuickAdd();
+    quickAddInput.focus();
+  };
+
+  const closeQuickAdd = (refocus: boolean): void => {
+    if (!quickAddIsOpen()) return;
+    quickRequest++;
+    quickAdd.hidden = true;
+    dayEvents.hidden = !search.hidden;
+    openQuickAdd.setAttribute("aria-expanded", "false");
+    paintToolHint();
+    quickDraft = null;
+    paintDayEvents();
+    syncHeight();
+    if (refocus) openQuickAdd.focus();
+  };
+
+  /** Return: add the event here, or hand a meeting to Google Calendar. */
+  const submitQuickAdd = async (): Promise<void> => {
+    if (quickBusy) return;
+    // The latest keystroke may still be being read.
+    await readQuickAdd();
+    const draft = quickDraft;
+    if (!draft) return;
+    const action = quickAddAction(draft, settings?.meetingLink ?? "");
+    quickBusy = true;
+    try {
+      if (action.kind === "google") {
+        await api.openGoogleEvent({
+          title: draft.title,
+          dates: googleDates(draft),
+          location: draft.location,
+          guests: draft.guests,
+        });
+        closeQuickAdd(false);
+        void api.hideCalendar();
+        return;
+      }
+      const id = await api.createEvent({
+        title: draft.title,
+        startAt: draft.startAt,
+        endAt: draft.endAt,
+        allDay: draft.allDay,
+        location: draft.location,
+        url: action.url,
+      });
+      closeQuickAdd(false);
+      const day = new Date(draft.startAt);
+      added = { id, day: toIso(day), title: draft.title };
+      window.clearTimeout(addedTimer);
+      addedTimer = window.setTimeout(() => {
+        added = null;
+        paintDayEvents();
+      }, UNDO_MS);
+      announce(`Added ${draft.title}, ${quickWhen(draft)}`);
+      showDay(day);
+    } catch (error) {
+      paintQuickAdd({
+        text: error instanceof Error ? error.message : String(error),
+        failure: true,
+      });
+    } finally {
+      quickBusy = false;
+    }
+  };
+
+  /** Removes the event just added, while its Undo is still showing. */
+  const undoAdded = async (): Promise<void> => {
+    const last = added;
+    if (!last) return;
+    added = null;
+    window.clearTimeout(addedTimer);
+    try {
+      await api.undoCreatedEvent(last.id);
+      announce(`Removed ${last.title}`);
+    } catch {
+      failure = "Couldn’t undo";
+      window.clearTimeout(failureTimer);
+      failureTimer = window.setTimeout(() => {
+        failure = null;
+        paintDayEvents();
+      }, 4_000);
+    }
+    void refreshUpcoming();
+    paintDayEvents();
+  };
+
   /** Back to the day list; the search button takes focus when asked. */
   const closeSearch = (refocus: boolean): void => {
     if (!searchIsOpen()) return;
     searchRequest++;
     search.hidden = true;
-    dayEvents.hidden = false;
+    dayEvents.hidden = !quickAdd.hidden;
     openSearch.setAttribute("aria-expanded", "false");
+    paintToolHint();
     searchPool = null;
     searchResults.replaceChildren();
     paintDayEvents();
@@ -841,6 +1054,7 @@ function startCalendar(api: DesktopApi): void {
           pinnedOutsideIso = day.inMonth ? null : day.iso;
           // Picking a day means its list, so search makes way for it.
           closeSearch(false);
+          closeQuickAdd(false);
           render({ focusGrid: true });
           paintDayEvents();
         });
@@ -956,14 +1170,20 @@ function startCalendar(api: DesktopApi): void {
     else openSearchPanel();
   });
   searchInput.addEventListener("input", () => paintSearch());
+  openQuickAdd.addEventListener("click", () => {
+    if (quickAddIsOpen()) closeQuickAdd(true);
+    else openQuickAddPanel();
+  });
+  quickAddInput.addEventListener("input", () => void readQuickAdd());
 
   // Focus rings follow the keyboard: on after a key, off after the mouse.
   document.addEventListener("mousedown", () => {
     delete document.documentElement.dataset.keyboard;
   });
   api.onCalendarHidden(() => {
-    // Search closes with the popover; a reopen shows the day.
+    // Search and quick add close with the popover; a reopen shows the day.
     closeSearch(false);
+    closeQuickAdd(false);
     // The fold closes with the popover; a reopen shows today's meetings tidy.
     if (pastOpen) {
       pastOpen = false;
@@ -982,9 +1202,22 @@ function startCalendar(api: DesktopApi): void {
     // Escape leaves search first, and the popover only after.
     if (event.key === "Escape") {
       event.preventDefault();
-      if (searchIsOpen()) closeSearch(true);
+      if (quickAddIsOpen()) closeQuickAdd(true);
+      else if (searchIsOpen()) closeSearch(true);
       else void api.hideCalendar();
       return;
+    }
+    if ((event.key === "n" || event.key === "N") && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      openQuickAddPanel();
+      return;
+    }
+    if (event.target === quickAddInput) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void submitQuickAdd();
+      }
+      if (!(event.key === "," && (event.metaKey || event.ctrlKey))) return;
     }
     if ((event.key === "f" || event.key === "F") && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();

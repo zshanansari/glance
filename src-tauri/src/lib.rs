@@ -8,6 +8,7 @@ mod clock;
 mod events;
 mod glass;
 mod placement;
+mod quick_add;
 mod region;
 mod settings;
 mod shortcuts;
@@ -70,6 +71,8 @@ struct AppState {
     calendar_fade: AtomicU64,
     reminder_fade: AtomicU64,
     dismissed_events: Mutex<Vec<events::DismissedOccurrence>>,
+    /// Events quick add made this run: only these can be undone.
+    created_events: Mutex<Vec<String>>,
     /// Where dismissals are kept between runs.
     dismissed_path: PathBuf,
     /// The chords currently registered with the system, so a failed rebind
@@ -536,6 +539,55 @@ fn join_meeting(url: String) -> Result<(), String> {
     events::open_meeting(&url)
 }
 
+/// The dates macOS reads in quick add's text.
+#[tauri::command]
+fn detect_dates(text: String) -> Vec<quick_add::DetectedDate> {
+    quick_add::detect_dates(&text)
+}
+
+/// Adds a quick add event to the chosen calendar and remembers it for Undo.
+#[tauri::command]
+async fn create_event(app: AppHandle, event: events::NewEvent) -> Result<String, String> {
+    let event = event.checked()?;
+    let calendar_id = app
+        .state::<AppState>()
+        .settings
+        .lock()
+        .map(|store| store.value().quick_add_calendar_id.clone())
+        .unwrap_or_default();
+    let worker = app.clone();
+    let id = on_main_async(worker, move || events::create_event(&event, &calendar_id)).await??;
+    if let Ok(mut created) = app.state::<AppState>().created_events.lock() {
+        created.push(id.clone());
+        let extra = created.len().saturating_sub(20);
+        created.drain(..extra);
+    }
+    Ok(id)
+}
+
+/// Undo for quick add: removes an event it made this run, and nothing else.
+#[tauri::command]
+async fn undo_created_event(app: AppHandle, id: String) -> Result<(), String> {
+    {
+        let state = app.state::<AppState>();
+        let mut created = state
+            .created_events
+            .lock()
+            .map_err(|error| error.to_string())?;
+        let Some(at) = created.iter().position(|item| *item == id) else {
+            return Err("Only an event just added can be undone".into());
+        };
+        created.remove(at);
+    }
+    on_main_async(app, move || events::remove_event(&id)).await?
+}
+
+/// Hands a meeting with guests to Google Calendar's new-event page.
+#[tauri::command]
+fn open_google_event(draft: quick_add::GoogleDraft) -> Result<(), String> {
+    events::open_https(&quick_add::google_event_url(&draft)?)
+}
+
 /// Shows a meeting's place in Maps.
 #[tauri::command]
 fn open_in_maps(place: String) -> Result<(), String> {
@@ -675,6 +727,7 @@ pub fn run() {
                 calendar_fade: AtomicU64::new(0),
                 reminder_fade: AtomicU64::new(0),
                 dismissed_events: Mutex::new(dismissed),
+                created_events: Mutex::new(Vec::new()),
                 dismissed_path,
                 shortcuts: Mutex::new(RegisteredShortcuts::default()),
                 shortcut_rebind: Mutex::new(()),
@@ -739,6 +792,10 @@ pub fn run() {
             get_reminders_access,
             join_meeting,
             open_in_maps,
+            detect_dates,
+            create_event,
+            undo_created_event,
+            open_google_event,
             open_event,
         ])
         .run(tauri::generate_context!())

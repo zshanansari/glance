@@ -23,6 +23,8 @@
   "showEventTimeInMenuBar": false,
   "remindBeforeMeetings": true,
   "remindInPerson": false,
+  "meetingLink": "",
+  "quickAddCalendarId": "",
   "toggleCalendarShortcut": "Control+Command+K",
   "joinMeetingShortcut": "",
   "hiddenCalendarIds": [],

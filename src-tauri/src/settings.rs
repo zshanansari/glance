@@ -46,6 +46,11 @@ pub struct AppSettings {
     pub second_time_zone: String,
     /// Whether that zone's time shows in the menu bar too.
     pub second_time_zone_in_menu_bar: bool,
+    /// Your own meeting room (Zoom, Meet, Teams…); quick add attaches it to
+    /// an event typed with "zoom" or "meet". Empty when not set.
+    pub meeting_link: String,
+    /// The calendar quick add writes to; empty for the system default.
+    pub quick_add_calendar_id: String,
     pub highlight_weekdays: Vec<u8>,
     /// Read only so files from before icon styles can be migrated.
     #[serde(default, skip_serializing)]
@@ -93,6 +98,8 @@ impl Default for AppSettings {
             coming_days: 3,
             second_time_zone: String::new(),
             second_time_zone_in_menu_bar: false,
+            meeting_link: String::new(),
+            quick_add_calendar_id: String::new(),
             highlight_weekdays: vec![0, 6],
             menu_bar_format: String::new(),
             launch_at_login: false,
@@ -153,6 +160,15 @@ impl AppSettings {
                 .all(|c| c.is_ascii_alphanumeric() || "/_+-".contains(c))
         {
             self.second_time_zone = String::new();
+        }
+        // Only a link Join would open is kept, so quick add never attaches
+        // anything else to an event.
+        self.meeting_link = self.meeting_link.trim().to_string();
+        if self.meeting_link.len() > 512 || !crate::events::is_meeting_url(&self.meeting_link) {
+            self.meeting_link = String::new();
+        }
+        if self.quick_add_calendar_id.len() > 256 {
+            self.quick_add_calendar_id = String::new();
         }
         if !matches!(self.coming_days, 0 | 1 | 2 | 3 | 5 | 7) {
             self.coming_days = base.coming_days;

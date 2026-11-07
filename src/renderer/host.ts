@@ -1,5 +1,6 @@
 import type { UpdateStatus } from "../shared/updates";
 import type { SystemRegion } from "../shared/region";
+import type { DetectedDate } from "../shared/quick-add";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AppSettings, CalendarInfo } from "../shared/settings";
@@ -29,6 +30,22 @@ export type DesktopApi = {
   getRemindersAccess: () => Promise<boolean>;
   joinMeeting: (url: string) => Promise<void>;
   openInMaps: (place: string) => Promise<void>;
+  detectDates: (text: string) => Promise<DetectedDate[]>;
+  createEvent: (event: {
+    title: string;
+    startAt: number;
+    endAt: number;
+    allDay: boolean;
+    location: string | null;
+    url: string | null;
+  }) => Promise<string>;
+  undoCreatedEvent: (id: string) => Promise<void>;
+  openGoogleEvent: (draft: {
+    title: string;
+    dates: string;
+    location: string | null;
+    guests: string[];
+  }) => Promise<void>;
   openEvent: (id: string) => Promise<void>;
   checkForUpdates: () => Promise<UpdateOffer>;
   installUpdate: () => Promise<void>;
@@ -102,6 +119,10 @@ export const api: DesktopApi = {
   getRemindersAccess: () => invoke<boolean>("get_reminders_access"),
   joinMeeting: (url) => invoke<void>("join_meeting", { url }),
   openInMaps: (place) => invoke<void>("open_in_maps", { place }),
+  detectDates: (text) => invoke<DetectedDate[]>("detect_dates", { text }),
+  createEvent: (event) => invoke<string>("create_event", { event }),
+  undoCreatedEvent: (id) => invoke<void>("undo_created_event", { id }),
+  openGoogleEvent: (draft) => invoke<void>("open_google_event", { draft }),
   openEvent: (id) => invoke<void>("open_event", { id }),
   checkForUpdates: () => invoke<UpdateOffer>("check_for_updates"),
   installUpdate: () => invoke<void>("install_update"),

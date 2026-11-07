@@ -18,6 +18,8 @@ export type SymbolName =
   | "arrow.up.right"
   | "clock"
   | "magnifyingglass"
+  | "plus"
+  | "gearshape"
   | "map";
 
 /** Without a size, the stylesheet sizes the glyph. */

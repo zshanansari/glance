@@ -74,6 +74,10 @@ export type AppSettings = {
   remindBeforeMeetings: boolean;
   /** The card also comes ten minutes before a meeting with a place and no link. */
   remindInPerson: boolean;
+  /** Your own Zoom, Meet or Teams room; quick add attaches it for "zoom" or "meet". */
+  meetingLink: string;
+  /** The calendar quick add writes to; "" for the system default. */
+  quickAddCalendarId: string;
   /** System-wide chord that toggles the month popover. Empty is unset. */
   toggleCalendarShortcut: string;
   /** System-wide chord that joins the meeting under way or next today. Empty is unset. */
@@ -115,6 +119,8 @@ export type CalendarInfo = {
   source: string | null;
   color: string | null;
   kind?: CalendarKind;
+  /** Whether events can be added to it; subscribed calendars cannot. */
+  writable?: boolean;
 };
 
 export type MenuBarPart = "weekday" | "day" | "month";
@@ -186,6 +192,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showEventTimeInMenuBar: false,
   remindBeforeMeetings: true,
   remindInPerson: false,
+  meetingLink: "",
+  quickAddCalendarId: "",
   toggleCalendarShortcut: "Control+Command+K",
   joinMeetingShortcut: "",
   hiddenCalendarIds: [],

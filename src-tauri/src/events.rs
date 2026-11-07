@@ -114,6 +114,47 @@ pub struct CalendarInfo {
     pub source: Option<String>,
     pub color: Option<String>,
     pub kind: String,
+    /// Whether events can be added to it; subscribed calendars cannot.
+    pub writable: bool,
+}
+
+/// An event typed into quick add, checked by the host before it is saved.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewEvent {
+    pub title: String,
+    pub start_at: i64,
+    pub end_at: i64,
+    pub all_day: bool,
+    pub location: Option<String>,
+    pub url: Option<String>,
+}
+
+/// The longest event quick add will create.
+const NEW_EVENT_MAX_MS: i64 = 14 * 24 * 60 * 60 * 1000;
+
+impl NewEvent {
+    /// A title, a sensible span, and at most a meeting link as its address:
+    /// nothing else the webview sends reaches the calendar.
+    pub fn checked(mut self) -> Result<Self, String> {
+        self.title = self.title.trim().chars().take(200).collect();
+        if self.title.is_empty() {
+            return Err("The event needs a title".into());
+        }
+        if self.end_at <= self.start_at || self.end_at - self.start_at > NEW_EVENT_MAX_MS {
+            return Err("The event needs an end after its start".into());
+        }
+        self.location = self
+            .location
+            .map(|place| place.trim().chars().take(500).collect::<String>())
+            .filter(|place| !place.is_empty());
+        if let Some(url) = &self.url {
+            if !is_meeting_url(url) {
+                return Err("Only a meeting link can be attached".into());
+            }
+        }
+        Ok(self)
+    }
 }
 
 /// Missing identifiers stay visible so a calendar EventKit cannot name is not dropped.
@@ -300,7 +341,7 @@ fn meeting_place(host: &str, path: &str) -> bool {
 }
 
 /// A link Join may open: https, no credentials or odd port, on a meeting host.
-fn is_meeting_url(raw: &str) -> bool {
+pub(crate) fn is_meeting_url(raw: &str) -> bool {
     let Ok(url) = url::Url::parse(raw) else {
         return false;
     };
@@ -489,7 +530,9 @@ mod macos {
     use objc2::runtime::Bool;
     use objc2::{available, AnyThread};
     use objc2_app_kit::{NSApplication, NSColorSpace, NSWorkspace};
-    use objc2_event_kit::{EKCalendar, EKEntityType, EKEventStore, EKReminder, EKSource};
+    use objc2_event_kit::{
+        EKCalendar, EKEntityType, EKEvent, EKEventStore, EKReminder, EKSource, EKSpan,
+    };
     use objc2_foundation::{
         MainThreadMarker, NSCalendar, NSDate, NSDateComponentUndefined, NSDateComponents, NSString,
         NSURL,
@@ -821,6 +864,7 @@ mod macos {
                 source: calendar_source_title(unsafe { calendar.source() }),
                 color: calendar_hex(&calendar),
                 kind: kind.into(),
+                writable: unsafe { calendar.allowsContentModifications() },
             });
         }
         found
@@ -1078,6 +1122,69 @@ mod macos {
         }
     }
 
+    /// Saves a new event to the chosen calendar, or the default one, and
+    /// returns its identifier.
+    pub fn create_event(new: &super::NewEvent, calendar_id: &str) -> Result<String, String> {
+        require_main_thread();
+        if !can_fetch_events(status_code(), granted_this_session()) {
+            return Err("Calendar access is needed to add events".into());
+        }
+        autoreleasepool(|_| {
+            let store = event_store();
+            let chosen = if calendar_id.is_empty() {
+                None
+            } else {
+                unsafe { store.calendarWithIdentifier(&NSString::from_str(calendar_id)) }
+            };
+            let Some(calendar) = chosen.or_else(|| unsafe { store.defaultCalendarForNewEvents() })
+            else {
+                return Err("There is no calendar to add events to".into());
+            };
+            if !unsafe { calendar.allowsContentModifications() } {
+                return Err("That calendar can’t take new events".into());
+            }
+            let event = unsafe { EKEvent::eventWithEventStore(&store) };
+            unsafe {
+                event.setCalendar(Some(&calendar));
+                event.setTitle(Some(&NSString::from_str(&new.title)));
+                event.setAllDay(new.all_day);
+                event.setStartDate(Some(&NSDate::dateWithTimeIntervalSince1970(
+                    new.start_at as f64 / 1000.0,
+                )));
+                event.setEndDate(Some(&NSDate::dateWithTimeIntervalSince1970(
+                    new.end_at as f64 / 1000.0,
+                )));
+                if let Some(place) = &new.location {
+                    event.setLocation(Some(&NSString::from_str(place)));
+                }
+                if let Some(link) = new.url.as_deref() {
+                    event.setURL(NSURL::URLWithString(&NSString::from_str(link)).as_deref());
+                }
+                store
+                    .saveEvent_span_commit_error(&event, EKSpan::ThisEvent, true)
+                    .map_err(|error| ns_string(&error.localizedDescription()))?;
+            }
+            unsafe { event.eventIdentifier() }
+                .map(|id| ns_string(&id))
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| "The event was saved without an identifier".to_string())
+        })
+    }
+
+    /// Removes an event quick add just created, for Undo.
+    pub fn remove_event(id: &str) -> Result<(), String> {
+        require_main_thread();
+        autoreleasepool(|_| {
+            let store = event_store();
+            let Some(event) = (unsafe { store.eventWithIdentifier(&NSString::from_str(id)) })
+            else {
+                return Ok(());
+            };
+            unsafe { store.removeEvent_span_commit_error(&event, EKSpan::ThisEvent, true) }
+                .map_err(|error| ns_string(&error.localizedDescription()))
+        })
+    }
+
     pub fn open_event(id: &str) -> Result<(), String> {
         let string = NSString::from_str(&event_show_url(id));
         let Some(url) = NSURL::URLWithString(&string) else {
@@ -1255,6 +1362,30 @@ pub fn start_range(start_ms: i64, end_ms: i64, hidden: &[String]) -> Result<Pend
             events: Vec::new(),
             reminders: None,
         })
+    }
+}
+
+pub fn create_event(new: &NewEvent, calendar_id: &str) -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        macos::create_event(new, calendar_id)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (new, calendar_id);
+        Err("Adding events is only supported on macOS".into())
+    }
+}
+
+pub fn remove_event(id: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        macos::remove_event(id)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = id;
+        Err("Removing events is only supported on macOS".into())
     }
 }
 

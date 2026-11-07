@@ -30,6 +30,8 @@ let symbols: [(String, NSFont.Weight)] = [
     ("arrow.up.right", .semibold),
     ("clock", .regular),
     ("magnifyingglass", .regular),
+    ("plus", .regular),
+    ("gearshape", .regular),
     ("map", .regular),
 ]
 

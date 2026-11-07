@@ -34,6 +34,10 @@ const COMMANDS: &[&str] = &[
     "get_reminders_access",
     "join_meeting",
     "open_in_maps",
+    "detect_dates",
+    "create_event",
+    "undo_created_event",
+    "open_google_event",
     "open_event",
 ];
 

@@ -1051,3 +1051,26 @@ button:focus-visible {
 .update-status.is-failure {
   color: var(--calendar);
 }
+
+/* A one-line text entry, such as Your meeting link. */
+.text-field {
+  flex: 0 1 220px;
+  width: 220px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--control-fill);
+  cursor: text;
+  font-size: 13px;
+}
+
+.text-field:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 0;
+}
+
+.copy p.is-failure {
+  color: var(--calendar);
+}

@@ -516,6 +516,37 @@
               </div>
             </div>
           </div>
+          <div class="group">
+            <h2 id="quick-add-heading">Quick add</h2>
+            <div class="card">
+              <div class="row">
+                <div class="copy">
+                  <label for="quick-add-calendar">Add events to</label>
+                  <p>Where + and ⌘N in the month put a new event.</p>
+                </div>
+                <select id="quick-add-calendar" name="quickAddCalendarId">
+                  <option value="">Default calendar</option>
+                </select>
+              </div>
+              <div class="row">
+                <div class="copy">
+                  <label for="meeting-link">Your meeting link</label>
+                  <p id="meeting-link-hint">Your own Zoom, Meet or Teams room. Type “zoom” or “meet” in a new event to attach it.</p>
+                </div>
+                <input
+                  id="meeting-link"
+                  name="meetingLink"
+                  type="url"
+                  class="text-field"
+                  placeholder="https://zoom.us/j/…"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="512"
+                  aria-describedby="meeting-link-hint"
+                />
+              </div>
+            </div>
+          </div>
         </section>
 
         <section

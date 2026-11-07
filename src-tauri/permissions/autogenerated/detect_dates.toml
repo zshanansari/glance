@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-detect-dates"
+description = "Enables the detect_dates command without any pre-configured scope."
+commands.allow = ["detect_dates"]
+
+[[permission]]
+identifier = "deny-detect-dates"
+description = "Denies the detect_dates command without any pre-configured scope."
+commands.deny = ["detect_dates"]
