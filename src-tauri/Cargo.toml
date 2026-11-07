@@ -1,6 +1,6 @@
 [package]
 name = "glance"
-version = "0.9.2"
+version = "0.9.3"
 description = "A menu bar calendar for macOS"
 authors = ["Zishan Ansari", "Vipin Yadav"]
 license = "MIT"
