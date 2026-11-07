@@ -198,6 +198,12 @@ function startSettings(api: DesktopApi): void {
   // it is edited.
   let rejectedLink: string | null = null;
   let savedCalendarId = "";
+  // What the host holds for the controls that can be out of step with it:
+  // the calendar list may not have loaded, the saved zone may be one the
+  // list no longer offers, and a link is judged only once typing ends.
+  let calendarsLoaded = false;
+  let savedSecondZone = "";
+  let savedMeetingLink = "";
   meetingLink.addEventListener("input", () => {
     rejectedLink = null;
     meetingLinkHint.textContent = MEETING_LINK_HINT;
@@ -466,6 +472,7 @@ function startSettings(api: DesktopApi): void {
       );
       quickAddCalendar.value = savedCalendarId;
       if (quickAddCalendar.value !== savedCalendarId) quickAddCalendar.value = "";
+      calendarsLoaded = true;
       paintSourceList(calendarSources, calendars, {
         empty: "No calendars available.",
         heading: "Calendars",
@@ -610,6 +617,7 @@ function startSettings(api: DesktopApi): void {
     weekNumbers.checked = settings.showWeekNumbers;
     weekNumbering.value = settings.weekNumbering;
     comingDays.value = String(settings.comingDays);
+    savedSecondZone = settings.secondTimeZone;
     secondTimeZone.value = settings.secondTimeZone;
     secondTimeZoneInMenuBar.checked = settings.secondTimeZoneInMenuBar;
     paintSecondZone(settings.secondTimeZone);
@@ -627,6 +635,7 @@ function startSettings(api: DesktopApi): void {
     savedCalendarId = settings.quickAddCalendarId;
     quickAddCalendar.value = savedCalendarId;
     if (quickAddCalendar.value !== savedCalendarId) quickAddCalendar.value = "";
+    savedMeetingLink = settings.meetingLink;
     if (document.activeElement !== meetingLink) {
       meetingLink.value = rejectedLink ?? settings.meetingLink;
     }
@@ -707,8 +716,16 @@ function startSettings(api: DesktopApi): void {
     next.focus();
   });
 
-  form.addEventListener("change", () => {
+  form.addEventListener("change", (event) => {
     const patch = patchFromForm();
+    // The whole form goes up on any change, so a control that is not the
+    // one changed must not overwrite a saved value it cannot show: an empty
+    // calendar list, a zone missing from the list, or a link mid-edit.
+    if (!calendarsLoaded) patch.quickAddCalendarId = savedCalendarId;
+    if (event.target !== secondTimeZone && secondTimeZone.value !== savedSecondZone) {
+      patch.secondTimeZone = savedSecondZone;
+    }
+    if (event.target !== meetingLink) patch.meetingLink = savedMeetingLink;
     paintWeekNumbering(patch.showWeekNumbers ?? false);
     paintSecondZone(patch.secondTimeZone ?? "");
     paintInPerson(patch.remindBeforeMeetings ?? false);

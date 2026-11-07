@@ -35,8 +35,13 @@ APPLE_SIGNING_IDENTITY="Glance Development" pnpm app
 Launch the bundle (with `open` or from Finder), not the executable inside it:
 started from a terminal, macOS checks the terminal's permissions instead.
 
-`pnpm dev` runs the unbundled executable with file watching for UI development.
-Use `pnpm app` when testing Calendar permissions.
+`pnpm dev` builds the UI once and runs the unbundled executable, with the
+web inspector available. Rust changes rebuild on save; a UI change needs
+`pnpm dev` run again. Use `pnpm app` when testing Calendar permissions.
+
+Debug builds keep the TypeScript source maps next to the bundles so the
+inspector shows the original source. `pnpm dmg` leaves them out of the
+shipped app.
 
 For an unnotarized local disk image that is not for shipping:
 

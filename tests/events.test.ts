@@ -536,6 +536,16 @@ describe("meetings at the same moment", () => {
     expect(countdownEvents(day, at(20))).toEqual([]);
   });
 
+  it("never counts down to a declined meeting", () => {
+    // The menu bar skips declines, so the list does too: at 2:45 the
+    // accepted 4 pm call is next, not the declined 3 pm one.
+    const declined = { ...event, id: "declined", startAt: at(15), endAt: at(16), response: "declined" as const };
+    const accepted = { ...event, id: "accepted", startAt: at(16), endAt: at(17) };
+    expect(countdownEvents([declined, accepted], at(14, 45)).map((item) => item.id)).toEqual(["accepted"]);
+    expect(dayCountdownEvents([declined, accepted], at(14, 45), null).map((item) => item.id)).toEqual(["accepted"]);
+    expect(countdownEvents([declined], at(14, 45))).toEqual([]);
+  });
+
   it("menu bar picks the same tied meeting whatever order Calendar returns", () => {
     const options = {
       upcomingHorizonDays: 1,

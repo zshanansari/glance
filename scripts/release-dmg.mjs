@@ -231,6 +231,8 @@ if (missing.length) {
   process.exit(1);
 }
 
+// Tells copy-static.mjs to leave the source maps out of the bundle.
+process.env.GLANCE_RELEASE = "1";
 // The updater payload is built from the app bundle, so both targets run.
 run("pnpm", ["tauri", "build", "--bundles", "app,dmg"], "Bundling", [
   ...REQUIRED,

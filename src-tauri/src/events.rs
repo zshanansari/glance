@@ -85,10 +85,9 @@ pub fn load_dismissed(path: &std::path::Path, now: i64) -> Vec<DismissedOccurren
 }
 
 /// Keeps dismissals across a restart, so a skipped meeting stays skipped.
-pub fn save_dismissed(path: &std::path::Path, list: &[DismissedOccurrence]) {
-    if let Ok(body) = serde_json::to_string(list) {
-        let _ = crate::settings::write_atomically(path, body.as_bytes());
-    }
+pub fn save_dismissed(path: &std::path::Path, list: &[DismissedOccurrence]) -> std::io::Result<()> {
+    let body = serde_json::to_string(list)?;
+    crate::settings::write_atomically(path, body.as_bytes())
 }
 
 pub fn dismiss_occurrence(list: &mut Vec<DismissedOccurrence>, id: String, end_at: i64, now: i64) {
@@ -309,10 +308,32 @@ fn subdomain_of<'a>(host: &'a str, domain: &str) -> Option<&'a str> {
     host.strip_suffix(domain)?.strip_suffix('.')
 }
 
-/// Whether a host and path belong to a meeting on a known service.
+/// A Meet room code, `abc-defg-hij`, as the first path segment.
+fn meet_room_code(path: &str) -> bool {
+    let code = path.trim_start_matches('/');
+    let code = code.split('/').next().unwrap_or("");
+    let parts: Vec<&str> = code.split('-').collect();
+    parts.len() == 3
+        && parts
+            .iter()
+            .zip([3, 4, 3])
+            .all(|(part, len)| part.len() == len && part.bytes().all(|b| b.is_ascii_lowercase()))
+}
+
+/// Whether a host and path belong to a meeting on a known service. The
+/// path matters on hosts that also serve help and landing pages, so that a
+/// link to one of those in an invite's notes does not become a Join button.
 fn meeting_place(host: &str, path: &str) -> bool {
-    if host == "meet.google.com" || host == "teams.microsoft.com" || host == "teams.live.com" {
-        return true;
+    if host == "meet.google.com" {
+        return meet_room_code(path) || path.starts_with("/lookup/");
+    }
+    if host == "teams.microsoft.com" {
+        return path.starts_with("/l/meetup-join/")
+            || path.starts_with("/meet/")
+            || path.starts_with("/dl/launcher/");
+    }
+    if host == "teams.live.com" {
+        return path.starts_with("/meet/");
     }
     if host == "facetime.apple.com" {
         return path.starts_with("/join");
@@ -1689,7 +1710,7 @@ mod tests {
 
         let dir = std::env::temp_dir().join(format!("glance-dismissed-{}", std::process::id()));
         let path = dir.join("dismissed.json");
-        save_dismissed(&path, &list);
+        save_dismissed(&path, &list).expect("the list is written");
         assert_eq!(load_dismissed(&path, now), list);
         // Once their meetings end, they are gone on the next load.
         assert!(load_dismissed(&path, 6_000).is_empty());
@@ -1727,11 +1748,21 @@ mod tests {
             "https://global.gotomeeting.com/join/123",
             "https://meet.goto.com/123",
             "https://facetime.apple.com/join#v=1",
-            "https://MEET.GOOGLE.COM./abc",
+            "https://MEET.GOOGLE.COM./abc-defg-hij",
+            "https://meet.google.com/abc-defg-hij?authuser=1",
+            "https://meet.google.com/lookup/team-standup",
+            "https://teams.microsoft.com/meet/9876543210?p=abc",
+            "https://teams.live.com/meet/9876543210",
         ] {
             assert!(is_meeting_url(good), "{good} should be joinable");
         }
         for bad in [
+            "https://meet.google.com/",
+            "https://meet.google.com/landing",
+            "https://meet.google.com/abc-defg-hi",
+            "https://teams.microsoft.com/",
+            "https://teams.microsoft.com/downloads",
+            "https://teams.live.com/",
             "https://zoom.us/pricing",
             "https://community.zoom.com/j/1",
             "https://support.zoom.us/j/1",

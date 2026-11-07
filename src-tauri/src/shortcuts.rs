@@ -219,7 +219,13 @@ pub(crate) fn apply_shortcuts(
             if failures.is_empty() {
                 return;
             }
-            (store.update(next), failures)
+            // The chord put back is in force either way; the file matters
+            // only for the next launch.
+            let saved = store.update(next).unwrap_or_else(|error| {
+                eprintln!("Could not save the shortcut put back: {error}");
+                store.value()
+            });
+            (saved, failures)
         };
         let _ = handle.emit("settings-changed", &saved);
         for failure in failures {

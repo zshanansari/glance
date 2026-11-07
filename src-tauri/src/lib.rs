@@ -152,7 +152,12 @@ fn update_settings(
     let mut store = state.settings.lock().map_err(|error| error.to_string())?;
     let previous = store.value();
     let next = merge_settings(&previous, &patch)?;
-    let saved = store.update(next);
+    // In force for this run whether or not the file took it; the error is
+    // reported after the change is applied, so nothing shows stale.
+    let (saved, write_error) = match store.update(next) {
+        Ok(saved) => (saved, None),
+        Err(error) => (store.value(), Some(error)),
+    };
     drop(store);
     if saved.launch_at_login != previous.launch_at_login {
         set_launch_at_login(&app, saved.launch_at_login);
@@ -180,7 +185,13 @@ fn update_settings(
         });
     }
     let _ = app.emit("settings-changed", &saved);
-    Ok(saved)
+    match write_error {
+        Some(error) => {
+            eprintln!("Could not save settings: {error}");
+            Err(format!("Settings could not be saved: {error}"))
+        }
+        None => Ok(saved),
+    }
 }
 
 /// Paints exactly one menu bar style: plain text or a glyph.
@@ -427,10 +438,15 @@ fn dismiss_upcoming_event(
         .lock()
         .map_err(|error| error.to_string())?;
     events::dismiss_occurrence(&mut list, id, end_at, now);
-    events::save_dismissed(&state.dismissed_path, &list);
+    let saved = events::save_dismissed(&state.dismissed_path, &list);
     drop(list);
+    // Skipped for this run either way; the file only carries it across a
+    // restart.
     let _ = app.emit("event-dismissed", ());
-    Ok(())
+    saved.map_err(|error| {
+        eprintln!("Could not save the skipped meeting: {error}");
+        format!("The skipped meeting could not be saved: {error}")
+    })
 }
 
 #[tauri::command]

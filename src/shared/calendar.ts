@@ -134,13 +134,16 @@ export function usWeekNumber(date: Date): number {
 
 /**
  * The US week a row belongs to. A row holding 1 January is week 1 of the new
- * year; any other row takes the week of its Sunday, which is how a US
- * calendar counts even when the month starts its weeks on another day.
+ * year; any other row takes the week of its first day. On a Sunday-first
+ * month that is the week's own Sunday. On a Monday-first month the row's
+ * Sunday is its last day and already belongs to the next US week, so
+ * numbering by it would skip a week: January 2026 would read 1, 3, 4, 5.
+ * Six of the row's seven days are in the first day's week, so that is the
+ * one the row is labelled with.
  */
 export function rowUsWeekNumber(row: readonly CalendarDay[]): number | null {
   if (row.some((day) => day.month === 0 && day.day === 1)) return 1;
-  const sunday = row.find((day) => new Date(day.year, day.month, day.day).getDay() === 0);
-  const pick = sunday ?? row[0];
+  const pick = row[0];
   return pick ? usWeekNumber(new Date(pick.year, pick.month, pick.day)) : null;
 }
 

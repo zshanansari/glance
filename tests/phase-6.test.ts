@@ -14,7 +14,7 @@ import {
 } from "../src/shared/events";
 import { dateFormat, setRegion } from "../src/shared/region";
 import { isTimeZone, knownTimeZones, zoneCity, zoneShort, zoneTime } from "../src/shared/zones";
-import { reminderStep, SNOOZE_MS, takeDueSnooze } from "../src/renderer/reminder";
+import { reminderStep, SNOOZE_MS, takeDueSnooze, validSnoozes } from "../src/renderer/reminder";
 
 const MINUTE = 60_000;
 
@@ -91,11 +91,18 @@ describe("US week numbers", () => {
     expect(rowWeekNumber(last, "iso")).toBe(53);
   });
 
-  it("follow the Sunday on a Monday-first month too", () => {
+  it("never skip a week on a Monday-first month", () => {
     const month = buildMonth(2026, 0, 1, atNoon(2026, 0, 15));
+    // Mon 5 – Sun 11: six of its days are in US week 2; only Sunday 11 is
+    // in week 3. Numbering by the Sunday would print 1, 3, 4, 5 down the
+    // month, and week 2 would never appear.
+    const numbers = month.weeks
+      .map((week) => rowWeekNumber(week, "us"))
+      .filter((week): week is number => week !== null);
+    // Six rows, Mon 29 December to Sun 8 February, numbered without a gap.
+    expect(numbers).toEqual([1, 2, 3, 4, 5, 6]);
     const row = month.weeks.find((week) => week.some((day) => day.iso === "2026-01-05"))!;
-    // Mon 5 – Sun 11: the US counts it by Sunday 11, week 3.
-    expect(rowWeekNumber(row, "us")).toBe(3);
+    expect(rowWeekNumber(row, "us")).toBe(2);
   });
 });
 
@@ -120,6 +127,25 @@ describe("snoozing the reminder", () => {
     expect(reminderStep(call, true, start + 6 * MINUTE, shownAt)).toBe("refresh");
     expect(reminderStep(call, true, shownAt + 5 * MINUTE, shownAt)).toBe("hide");
     expect(reminderStep(call, false, start + 6 * MINUTE, shownAt)).toBe("hide");
+  });
+
+  it("keeps only whole snoozes from storage", () => {
+    const whole = { event: call, until: start + SNOOZE_MS };
+    // One stray entry must not take every later check down with it.
+    const stored = [whole, { until: 1 }, { event: { id: "x" }, until: 2 }, null, "junk", { event: call }];
+    expect(validSnoozes(stored)).toEqual([whole]);
+    expect(validSnoozes("not a list")).toEqual([]);
+    expect(validSnoozes(undefined)).toEqual([]);
+    // The one that survives still works as a snooze.
+    expect(takeDueSnooze(validSnoozes(stored), start + SNOOZE_MS).due).toEqual(whole);
+  });
+
+  it("keeps at most twenty snoozes", () => {
+    const many = Array.from({ length: 30 }, (_, index) => ({
+      event: { ...call, id: `call-${index}` },
+      until: start + index,
+    }));
+    expect(validSnoozes(many)).toHaveLength(20);
   });
 });
 

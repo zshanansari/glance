@@ -1,5 +1,7 @@
 [
   { "url": "https://meet.google.com/abc-defg-hij", "joinable": true, "brand": "meet" },
+  { "url": "https://meet.google.com/lookup/team-standup", "joinable": true, "brand": "meet" },
+  { "url": "https://teams.microsoft.com/meet/9876543210?p=abc", "joinable": true, "brand": "teams" },
   { "url": "https://zoom.us/j/123?pwd=x", "joinable": true, "brand": "zoom" },
   { "url": "https://us02web.zoom.us/j/123", "joinable": true, "brand": "zoom" },
   { "url": "https://acme.zoom.us/my/room", "joinable": true, "brand": "zoom" },
@@ -11,6 +13,8 @@
   { "url": "https://global.gotomeeting.com/join/123", "joinable": true, "brand": "gotomeeting" },
   { "url": "https://meet.goto.com/123", "joinable": true, "brand": "gotomeeting" },
   { "url": "https://facetime.apple.com/join#v=1", "joinable": true, "brand": "facetime" },
+  { "url": "https://meet.google.com/landing", "joinable": false },
+  { "url": "https://teams.microsoft.com/downloads", "joinable": false },
   { "url": "https://zoom.us/pricing", "joinable": false },
   { "url": "https://community.zoom.com/j/1", "joinable": false },
   { "url": "https://www.webex.com/pricing", "joinable": false },

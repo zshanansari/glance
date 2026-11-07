@@ -90,7 +90,7 @@ export function countdownEvents(
   now: number,
 ): UpcomingEvent[] {
   const live = events
-    .filter((event) => !event.allDay && event.endAt > now)
+    .filter((event) => !event.allDay && event.endAt > now && event.response !== "declined")
     .sort(compareEvents);
   const lead = leadEvent(live, now);
   if (!lead) return [];
@@ -111,8 +111,10 @@ export function pastToFold(events: readonly UpcomingEvent[], now: number): Upcom
 /**
  * The rows of a day's list that say how soon, matching the menu bar: the
  * meeting it counts down to and any that read the same. A dismissed meeting
- * says nothing. When the menu bar counts to nothing on this list (it is off,
- * or its meeting is on another day), the list finds its own.
+ * says nothing, and neither does a declined one: the menu bar never counts
+ * to a meeting the user is not going to. When the menu bar counts to nothing
+ * on this list (it is off, or its meeting is on another day), the list
+ * finds its own.
  */
 export function dayCountdownEvents(
   events: readonly UpcomingEvent[],
@@ -122,7 +124,10 @@ export function dayCountdownEvents(
 ): UpcomingEvent[] {
   const live = events.filter(
     (event) =>
-      !event.allDay && event.endAt > now && !occurrenceIsDismissed(event, dismissed, now),
+      !event.allDay &&
+      event.endAt > now &&
+      event.response !== "declined" &&
+      !occurrenceIsDismissed(event, dismissed, now),
   );
   if (tracked && tracked.endAt > now) {
     const label = eventStatus(tracked, now).label;

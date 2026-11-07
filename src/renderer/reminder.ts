@@ -7,6 +7,7 @@
 import {
   IN_PERSON_LEAD_MS,
   isInPerson,
+  occurrenceIsDismissed,
   REMINDER_LEAD_MS,
   REMINDER_LINGER_MS,
   reminderEvent,
@@ -84,12 +85,36 @@ export function takeDueSnooze(
 
 const SNOOZE_STORE = "glance.snoozed";
 
+/** Most snoozes kept at once; a real day never has more than a few. */
+const MAX_SNOOZES = 20;
+
+/**
+ * The snoozes in a stored value that are whole enough to use. Storage is
+ * written by this window alone, but a stray or truncated entry would make
+ * every later check throw, and the check swallows its errors: no card would
+ * ever show again until the store was cleared by hand.
+ */
+export function validSnoozes(parsed: unknown): Snooze[] {
+  if (!Array.isArray(parsed)) return [];
+  const valid: Snooze[] = [];
+  for (const item of parsed) {
+    if (typeof item !== "object" || item === null) continue;
+    const { event, until } = item as { event?: unknown; until?: unknown };
+    if (typeof until !== "number" || !Number.isFinite(until)) continue;
+    if (typeof event !== "object" || event === null) continue;
+    const { id, startAt, endAt, title } = event as Partial<UpcomingEvent>;
+    if (typeof id !== "string" || typeof title !== "string") continue;
+    if (typeof startAt !== "number" || typeof endAt !== "number") continue;
+    valid.push({ event: event as UpcomingEvent, until });
+  }
+  return valid.slice(0, MAX_SNOOZES);
+}
+
 /** Snoozes survive a restart in the card's own storage. */
 function loadSnoozes(): Snooze[] {
   try {
     const raw = localStorage.getItem(SNOOZE_STORE);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? (parsed as Snooze[]).slice(0, 20) : [];
+    return validSnoozes(raw ? JSON.parse(raw) : []);
   } catch {
     return [];
   }
@@ -271,13 +296,18 @@ export function startReminder(
       // actually appeared, since the host holds cards back while the month
       // is open.
       const { due, keep } = takeDueSnooze(snoozes, now);
-      const pruned = due ? [...keep, due] : keep;
+      // A snooze holds the meeting as it was. Skipped from the month since,
+      // it stays away; still on, it comes back as Calendar has it now.
+      const returning = due && !occurrenceIsDismissed(due.event, dismissed, now)
+        ? (events.find((item) => occurrenceKey(item) === occurrenceKey(due.event)) ?? due.event)
+        : null;
+      const pruned = due && returning ? [...keep, due] : keep;
       if (pruned.length !== snoozes.length) {
         snoozes = pruned;
         saveSnoozes(snoozes);
       }
       const event =
-        due?.event ??
+        returning ??
         reminderEvent(
           events,
           now,
@@ -294,7 +324,7 @@ export function startReminder(
         offered.add(occurrenceKey(event));
         showing = event;
         shownAt = now;
-        if (due) {
+        if (returning) {
           snoozes = snoozes.filter((snooze) => snooze !== due);
           saveSnoozes(snoozes);
         }

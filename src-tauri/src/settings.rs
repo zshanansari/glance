@@ -389,7 +389,9 @@ impl SettingsStore {
         let mut next = self.current.clone();
         next.week_starts_on = first_weekday;
         next.week_numbering = if us_weeks { "us" } else { "iso" }.into();
-        self.update(next);
+        if let Err(error) = self.update(next) {
+            eprintln!("Could not save the region's defaults: {error}");
+        }
         self.fresh = false;
     }
 
@@ -397,16 +399,18 @@ impl SettingsStore {
         self.current.clone()
     }
 
-    pub fn update(&mut self, patch: AppSettings) -> AppSettings {
+    /// Takes the patch for this run and writes it for the next. The new
+    /// value is in force either way; the error says the file did not take
+    /// it, so the caller can say so rather than let a full disk or an
+    /// unwritable folder pass as saved.
+    pub fn update(&mut self, patch: AppSettings) -> std::io::Result<AppSettings> {
         self.current = patch.normalize(&self.current);
-        self.write();
-        self.current.clone()
+        self.write().map(|()| self.current.clone())
     }
 
-    fn write(&self) {
-        if let Ok(body) = serde_json::to_string_pretty(&self.current) {
-            let _ = write_atomically(&self.path, format!("{body}\n").as_bytes());
-        }
+    fn write(&self) -> std::io::Result<()> {
+        let body = serde_json::to_string_pretty(&self.current)?;
+        write_atomically(&self.path, format!("{body}\n").as_bytes())
     }
 }
 

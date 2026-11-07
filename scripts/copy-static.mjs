@@ -1,6 +1,11 @@
 import { cp, mkdir, rm } from "node:fs/promises";
 import { build } from "esbuild";
 
+// A release carries no source maps: Tauri embeds everything under
+// dist/renderer, and the maps hold the whole TypeScript source. Debug builds
+// keep them for the web inspector.
+const sourcemap = !process.env.GLANCE_RELEASE;
+
 const bundle = (entry, outfile) =>
   build({
     entryPoints: [entry],
@@ -8,10 +13,16 @@ const bundle = (entry, outfile) =>
     bundle: true,
     platform: "browser",
     format: "iife",
-    sourcemap: true,
+    sourcemap,
   });
 
 await mkdir("dist/renderer", { recursive: true });
+// A map left by an earlier debug build would be embedded all the same.
+if (!sourcemap) {
+  for (const page of ["calendar", "reminder", "settings"]) {
+    await rm(`dist/renderer/${page}.js.map`, { force: true });
+  }
+}
 await rm("dist/renderer/tray", { recursive: true, force: true });
 await rm("dist/renderer/brands", { recursive: true, force: true });
 await rm("dist/renderer/symbols", { recursive: true, force: true });

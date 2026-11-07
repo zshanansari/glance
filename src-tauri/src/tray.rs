@@ -391,6 +391,11 @@ pub(crate) const TRAY_TITLE_MAX_CHARS: usize = 120;
 /// Largest framed glyph accepted. The month draws an 18pt PNG of a few KB.
 pub(crate) const TRAY_IMAGE_MAX_BYTES: usize = 64 * 1024;
 
+/// Widest or tallest a framed glyph may decode to. The month draws 36px
+/// tall and a few dozen wide; the byte cap alone would let a tiny PNG
+/// inflate to hundreds of megabytes, copied on the main thread every minute.
+pub(crate) const TRAY_IMAGE_MAX_SIDE: u32 = 512;
+
 /// Longest spoken description: the full date and a meeting's whole name.
 pub(crate) const TRAY_DESCRIPTION_MAX_CHARS: usize = 300;
 
@@ -465,7 +470,11 @@ pub(crate) fn with_update_dot(rgba: &[u8], width: u32, height: u32) -> Vec<u8> {
 /// A text-only style has no glyph to mark, so the dot stands by itself
 /// ahead of the text.
 pub(crate) fn paint_tray_glyph(tray: &tauri::tray::TrayIcon, base: Option<&[u8]>) {
-    let base = base.and_then(|data| tauri::image::Image::from_bytes(data).ok());
+    let base = base
+        .and_then(|data| tauri::image::Image::from_bytes(data).ok())
+        .filter(|image| {
+            image.width() <= TRAY_IMAGE_MAX_SIDE && image.height() <= TRAY_IMAGE_MAX_SIDE
+        });
     let glyph = match (base, updates::available().is_some()) {
         (Some(image), false) => Some(image),
         (Some(image), true) => {
