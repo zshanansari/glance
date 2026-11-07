@@ -1,6 +1,6 @@
 {
   "menuBarIcon": "filled",
-  "showWeekday": true,
+  "showWeekday": false,
   "showMonth": false,
   "weekStartsOn": 0,
   "showWeekNumbers": false,

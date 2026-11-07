@@ -73,7 +73,8 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             menu_bar_icon: "filled".into(),
-            show_weekday: true,
+            // The system clock already shows the date: glyph alone by default.
+            show_weekday: false,
             show_month: false,
             week_starts_on: 0,
             show_week_numbers: false,

@@ -149,7 +149,9 @@ export const DEFAULT_HIGHLIGHT_WEEKDAYS: Weekday[] = [0, 6];
 
 export const DEFAULT_SETTINGS: AppSettings = {
   menuBarIcon: "filled",
-  showWeekday: true,
+  // The system clock already shows the date, so a new menu bar item starts
+  // as the glyph alone; the weekday and month are there to switch on.
+  showWeekday: false,
   showMonth: false,
   weekStartsOn: 0,
   showWeekNumbers: false,
