@@ -22,7 +22,7 @@ Apple Silicon Macs on macOS 13 or newer. Intel Macs can build it from source.
   the day you pick take red, your accent, or any of the system colors.
   Settings is laid out like System Settings, with SF Symbols.
 - **What’s next.** Optionally, the menu bar item counts down to the next
-  calendar event or scheduled reminder after the date, as in “· in 25m”. A
+  calendar event or scheduled reminder after the date, as in “• in 25m”. A
   meeting about to start takes over from a long block still running, and the
   day’s list marks the same meeting. Done with one early? Stop its countdown
   from the list.
@@ -46,7 +46,7 @@ the first time a system-wide shortcut fires.
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/countdown.png" alt="The menu bar item counting down to the next meeting: “· in 6m” after the calendar icon" width="110">
+  <img src="docs/screenshots/countdown.png" alt="The menu bar item counting down to the next meeting: “• in 6m” after the calendar icon" width="110">
 </p>
 
 <p align="center">

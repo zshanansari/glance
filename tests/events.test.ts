@@ -725,14 +725,14 @@ describe("the menu bar title", () => {
     expect(trayTitle(null, null, start, plain)).toBe("");
   });
 
-  it("follows a date with a middle dot", () => {
+  it("puts a bullet before the countdown after a date", () => {
     expect(trayTitle("Mon 9", call, start - 2 * 3_600_000 - 21 * 60_000, plain)).toBe(
-      "Mon 9 \u00b7 in 2h 21m",
+      "Mon 9 \u2022 in 2h 21m",
     );
   });
 
-  it("needs no dot beside the glyph alone", () => {
-    expect(trayTitle(null, call, start - 25 * 60_000, plain)).toBe("in 25m");
+  it("keeps the bullet beside the glyph alone", () => {
+    expect(trayTitle(null, call, start - 25 * 60_000, plain)).toBe("\u2022 in 25m");
   });
 
   it("adds the time and name when Settings asks, and drops the time once it starts", () => {
@@ -741,10 +741,10 @@ describe("the menu bar title", () => {
       new Date(start),
     );
     expect(trayTitle(null, call, start - 25 * 60_000, both, "en-US")).toBe(
-      `in 25m ${time}  Design sync`,
+      `\u2022 in 25m ${time}  Design sync`,
     );
     expect(trayTitle("Mon 9", call, start + 15 * 60_000, both, "en-US")).toBe(
-      "Mon 9 \u00b7 15m left Design sync",
+      "Mon 9 \u2022 15m left Design sync",
     );
   });
 

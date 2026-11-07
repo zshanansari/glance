@@ -438,7 +438,7 @@ export function trayEventText(
 
 /**
  * The menu bar item's title: the date (unless the cutout glyph carries it),
- * then "· in 25m" for the event being counted down, then its time and name
+ * then "• in 25m" for the event being counted down, then its time and name
  * when Settings asks for them. Empty for a glyph-only item.
  */
 export function trayTitle(
@@ -452,9 +452,9 @@ export function trayTitle(
   const countdown = event && now < event.endAt ? eventStatus(event, now).label : null;
   if (!countdown || !event) return date;
   const eventText = trayEventText(event, now, options, locale);
-  // A middle dot separates it from a date, as macOS separates items in a
-  // line of status text; beside the glyph alone it needs none.
-  const tail = [date ? `\u00b7 ${countdown}` : countdown, eventText].filter(Boolean).join(" ");
+  // The bullet always leads the countdown, with or without a date before it,
+  // so "• in 25m" reads as Glance's own mark beside the glyph.
+  const tail = [`\u2022 ${countdown}`, eventText].filter(Boolean).join(" ");
   return date ? `${date} ${tail}` : tail;
 }
 
