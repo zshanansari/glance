@@ -79,17 +79,23 @@ chord for joining the next meeting.
 
 <p align="center">
   <img src="docs/screenshots/search.png" alt="Searching for “Deepavali”: the matching event listed under Today, with new event, search and settings in the footer" width="272">
+  <br>
+  <sub>⌘F searches by title and place, upcoming first.</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/countdown.png" alt="The menu bar item counting down to the next meeting: “• in 6m” after the calendar icon" width="110">
+  <br>
+  <sub>The menu bar item counting down to the next meeting.</sub>
 </p>
 
+<!-- Reminder card, once captured as docs/screenshots/reminder.png:
 <p align="center">
-  <img src="docs/screenshots/events.png" alt="Settings → Events: which events the countdown counts, the meeting reminder with in-person meetings, and quick add’s calendar and meeting link" width="420">
-  &nbsp;
-  <img src="docs/screenshots/about.png" alt="Settings → About: the app icon, name and version, Check for Updates with when it last checked, and links" width="420">
+  <img src="docs/screenshots/reminder.png" alt="The reminder card under the menu bar item a minute before a call: the meeting's name and time, with Join, Snooze and Skip" width="320">
+  <br>
+  <sub>A minute before a call, the card offers Join without taking focus.</sub>
 </p>
+-->
 
 ## Install
 
@@ -125,6 +131,12 @@ the reminder card and Settings are all closed, so a relaunch never cuts off
 an event you are typing. Switched off, Glance still checks and puts a dot on
 its menu bar icon when a release is ready, with **Update and Restart** in the
 menu bar item's menu. Checking by hand always asks before it installs.
+
+<p align="center">
+  <img src="docs/screenshots/about.png" alt="Settings → About: the app icon, name and version, Check for Updates with when it last checked, and links" width="420">
+  <br>
+  <sub>Settings → About: the version, Check for Updates, and what’s new in a waiting release.</sub>
+</p>
 
 ### Uninstall
 
@@ -219,6 +231,12 @@ adds a card ten minutes before a meeting with a place and no link. Under
 *Quick add*, *Add events to* is the *Default calendar* or one of yours, and
 *Your meeting link* is the Zoom, Meet or Teams room that “on zoom” or “on
 meet” attaches.
+
+<p align="center">
+  <img src="docs/screenshots/events.png" alt="Settings → Events: which events the countdown counts, the meeting reminder with in-person meetings, and quick add’s calendar and meeting link" width="420">
+  <br>
+  <sub>Settings → Events: the countdown, the meeting reminder, and quick add.</sub>
+</p>
 
 **About.** The version, **Check for Updates** with when Glance last checked,
 *What’s new* for a waiting release, and links to the release notes, the
