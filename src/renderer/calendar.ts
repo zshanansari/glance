@@ -1212,17 +1212,18 @@ function startCalendar(api: DesktopApi): void {
       openQuickAddPanel();
       return;
     }
+    // ⌘N and ⌘F work from either field, so one panel swaps for the other.
+    if ((event.key === "f" || event.key === "F") && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      openSearchPanel();
+      return;
+    }
     if (event.target === quickAddInput) {
       if (event.key === "Enter") {
         event.preventDefault();
         void submitQuickAdd();
       }
       if (!(event.key === "," && (event.metaKey || event.ctrlKey))) return;
-    }
-    if ((event.key === "f" || event.key === "F") && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      openSearchPanel();
-      return;
     }
     // Typing in the field is typing, not the month's keys. Down moves to the
     // first result, Return opens it.

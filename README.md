@@ -6,7 +6,7 @@ nothing leaves this Mac.
 Apple Silicon Macs on macOS 13 or newer. Intel Macs can build it from source.
 
 <p align="center">
-  <img src="docs/screenshots/menubar.png" alt="The month calendar open under its menu bar icon, with the selected day's events" width="300">
+  <img src="docs/screenshots/menubar.png" alt="The month calendar open under its menu bar icon, adding “Lunch with Sam tomorrow 1pm at Blue Tokai” with a preview of the day, time and place" width="272">
   &nbsp;&nbsp;
   <img src="docs/screenshots/settings.png" alt="Settings → Appearance, laid out like System Settings: four menu bar styles, each named, and the theme" width="560">
 </p>
@@ -67,6 +67,10 @@ joining the next meeting. macOS may ask for Accessibility the first time a
 system-wide shortcut fires.
 
 ## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/search.png" alt="Searching for “Deepavali”: the matching event listed under Today, with new event, search and settings in the footer" width="272">
+</p>
 
 <p align="center">
   <img src="docs/screenshots/countdown.png" alt="The menu bar item counting down to the next meeting: “• in 6m” after the calendar icon" width="110">

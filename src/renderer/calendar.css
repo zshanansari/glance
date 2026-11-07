@@ -676,6 +676,12 @@ button:focus {
   outline: none;
 }
 
+/* A placeholder reads as a hint, as AppKit's do, not as typed text. */
+.search-input::placeholder {
+  color: var(--tertiary);
+  opacity: 1;
+}
+
 .search-input:focus {
   box-shadow: 0 0 0 2px var(--accent);
 }
