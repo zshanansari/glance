@@ -33,7 +33,7 @@ pub fn is_liquid_glass() -> bool {
 /// length AppKit takes over it.
 pub const FADE: std::time::Duration = std::time::Duration::from_millis(160);
 
-fn window_object(window: &tauri::WebviewWindow) -> Option<&AnyObject> {
+pub(crate) fn window_object(window: &tauri::WebviewWindow) -> Option<&AnyObject> {
     let pointer = window.ns_window().ok()?;
     if pointer.is_null() {
         return None;
@@ -62,9 +62,10 @@ pub fn fade_out(window: &tauri::WebviewWindow) {
     }
 }
 
-/// Puts the popover on screen already key, in one step, the way a status
-/// menu appears: no fade in, and no first frame drawn in the inactive look
-/// that `show` then `set_focus` produced before the window became key.
+/// Brings a window of the app proper, Settings, to the front and activates
+/// Glance for it, in one step: no first frame drawn in the inactive look that
+/// `show` then `set_focus` produced before the window became key. The month
+/// popover must not activate anything; `popover::present` shows that one.
 pub fn present(window: &tauri::WebviewWindow) {
     let Some(ns_window) = window_object(window) else {
         let _ = window.show();
