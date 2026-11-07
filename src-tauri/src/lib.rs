@@ -192,7 +192,6 @@ fn set_tray_label(
     style: String,
     image: Option<Vec<u8>>,
     description: Option<String>,
-    secondary_from: Option<usize>,
 ) {
     let _ = app.clone().run_on_main_thread(move || {
         let Some(tray) = app.tray_by_id(TRAY_ID) else {
@@ -202,7 +201,6 @@ fn set_tray_label(
         // Always write an explicit value so event status text clears reliably.
         let text = tray_title_text(title.as_deref());
         let _ = tray.set_title(Some(text.as_str()));
-        set_title_secondary_from(secondary_from);
         let bytes: Option<&[u8]> = match style.as_str() {
             "none" => None,
             "framed" => image

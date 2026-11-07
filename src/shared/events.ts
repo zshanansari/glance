@@ -440,9 +440,6 @@ export function trayEventText(
  * The menu bar item's title: the date (unless the cutout glyph carries it),
  * then "· in 25m" for the event being counted down, then its time and name
  * when Settings asks for them. Empty for a glyph-only item.
- *
- * `secondaryFrom` is where the countdown begins, in UTF-16 units, so the
- * host can set it smaller and softer than the date; null with no countdown.
  */
 export function trayTitle(
   dateText: string | null,
@@ -450,16 +447,15 @@ export function trayTitle(
   now: number,
   options: { showTitle: boolean; showTime: boolean },
   locale?: string,
-): { text: string; secondaryFrom: number | null } {
+): string {
   const date = dateText ?? "";
   const countdown = event && now < event.endAt ? eventStatus(event, now).label : null;
-  if (!countdown || !event) return { text: date, secondaryFrom: null };
+  if (!countdown || !event) return date;
   const eventText = trayEventText(event, now, options, locale);
   // A middle dot separates it from a date, as macOS separates items in a
   // line of status text; beside the glyph alone it needs none.
   const tail = [date ? `\u00b7 ${countdown}` : countdown, eventText].filter(Boolean).join(" ");
-  const lead = date ? `${date} ` : "";
-  return { text: `${lead}${tail}`, secondaryFrom: lead.length };
+  return date ? `${date} ${tail}` : tail;
 }
 
 export function eventTimeRange(

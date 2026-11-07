@@ -499,7 +499,7 @@ function startCalendar(api: DesktopApi): void {
     // stays as it reads when the popover is closed. The cutout style draws
     // its date into the glyph instead of the title.
     const counting = upcomingEvent && now.getTime() < upcomingEvent.endAt ? upcomingEvent : null;
-    const { text: title, secondaryFrom } = trayTitle(
+    const title = trayTitle(
       label.style === "framed" ? null : label.text,
       counting,
       now.getTime(),
@@ -510,7 +510,7 @@ function startCalendar(api: DesktopApi): void {
     );
     const trayStyle = label.style;
     const description = trayDescription(now.getTime(), counting);
-    const signature = `${trayLabelKey(label)}|${title}|${secondaryFrom}|${description}`;
+    const signature = `${trayLabelKey(label)}|${title}|${description}`;
     if (signature === lastTrayLabel) return;
     lastTrayLabel = signature;
     // The cutout style draws its date into the glyph instead of the title.
@@ -521,7 +521,6 @@ function startCalendar(api: DesktopApi): void {
       trayStyle,
       framed === null ? null : framedGlyphPng(framed),
       description,
-      secondaryFrom,
     );
   };
 

@@ -510,26 +510,11 @@ const GLYPH_HEIGHT: f64 = 15.0;
 #[cfg(target_os = "macos")]
 const BADGE_HEIGHT: f64 = 18.0;
 
-/// Where the countdown begins in the title, in UTF-16 units, as the month
-/// view reported it with the title. Kept so a repaint for the update dot
-/// styles the same title the same way.
-static TITLE_SECONDARY_FROM: std::sync::Mutex<Option<usize>> = std::sync::Mutex::new(None);
-
-pub(crate) fn set_title_secondary_from(from: Option<usize>) {
-    if let Ok(mut stored) = TITLE_SECONDARY_FROM.lock() {
-        *stored = from;
-    }
-}
-
-/// The countdown is set smaller than the date, at the size macOS gives the
-/// battery percentage, so it reads as detail rather than a second clock.
+/// The title's size: what macOS gives the battery percentage, a step under
+/// the clock, so the item reads as a status beside the clock rather than a
+/// second one.
 #[cfg(target_os = "macos")]
-const SECONDARY_SIZE_DROP: f64 = 2.0;
-
-/// And a little softer: the label color at this opacity, which still adapts
-/// to a light or dark menu bar and to the pressed highlight.
-#[cfg(target_os = "macos")]
-const SECONDARY_ALPHA: f64 = 0.75;
+const TITLE_SIZE_DROP: f64 = 2.0;
 
 /// How far the title is raised so its baseline meets the clock's and the
 /// other status items': a plain title sits half a point low beside a glyph.
@@ -537,20 +522,16 @@ const SECONDARY_ALPHA: f64 = 0.75;
 const TITLE_BASELINE_RAISE: f64 = 0.5;
 
 /// Sizes the glyph like the system's own items and sets the title in the
-/// menu bar's own font, as the clock draws it: the menu bar size, regular
-/// weight, and digits of one width, so a countdown does not shift sideways
-/// as it ticks.
+/// system font at the battery percentage's size, regular weight, with digits
+/// of one width so a countdown does not shift sideways as it ticks.
 #[cfg(target_os = "macos")]
 pub(crate) fn fit_status_item_to_menu_bar(tray: &tauri::tray::TrayIcon) {
     use objc2::runtime::AnyObject;
     use objc2::AnyThread;
     use objc2_app_kit::{
-        NSBaselineOffsetAttributeName, NSColor, NSFont, NSFontAttributeName, NSFontWeightRegular,
-        NSForegroundColorAttributeName,
+        NSBaselineOffsetAttributeName, NSFont, NSFontAttributeName, NSFontWeightRegular,
     };
-    use objc2_foundation::{
-        MainThreadMarker, NSDictionary, NSMutableAttributedString, NSNumber, NSRange, NSSize,
-    };
+    use objc2_foundation::{MainThreadMarker, NSAttributedString, NSDictionary, NSNumber, NSSize};
 
     let _ = tray.with_inner_tray_icon(|inner| {
         let Some(item) = inner.ns_status_item() else {
@@ -580,7 +561,7 @@ pub(crate) fn fit_status_item_to_menu_bar(tray: &tauri::tray::TrayIcon) {
         if title.length() == 0 {
             return;
         }
-        let size = NSFont::menuBarFontOfSize(0.0).pointSize();
+        let size = NSFont::menuBarFontOfSize(0.0).pointSize() - TITLE_SIZE_DROP;
         let font =
             unsafe { NSFont::monospacedDigitSystemFontOfSize_weight(size, NSFontWeightRegular) };
         let raise = NSNumber::new_f64(TITLE_BASELINE_RAISE);
@@ -593,34 +574,12 @@ pub(crate) fn fit_status_item_to_menu_bar(tray: &tauri::tray::TrayIcon) {
             )
         };
         let styled = unsafe {
-            NSMutableAttributedString::initWithString_attributes(
-                NSMutableAttributedString::alloc(),
+            NSAttributedString::initWithString_attributes(
+                NSAttributedString::alloc(),
                 &title,
                 Some(&primary),
             )
         };
-        let length = title.length();
-        let from = TITLE_SECONDARY_FROM.lock().ok().and_then(|stored| *stored);
-        if let Some(from) = from.filter(|from| *from < length) {
-            let small = unsafe {
-                NSFont::monospacedDigitSystemFontOfSize_weight(
-                    size - SECONDARY_SIZE_DROP,
-                    NSFontWeightRegular,
-                )
-            };
-            let soft = NSColor::labelColor().colorWithAlphaComponent(SECONDARY_ALPHA);
-            let small_object: &AnyObject = &small;
-            let soft_object: &AnyObject = &soft;
-            let secondary = unsafe {
-                NSDictionary::from_slices(
-                    &[NSFontAttributeName, NSForegroundColorAttributeName],
-                    &[small_object, soft_object],
-                )
-            };
-            unsafe {
-                styled.addAttributes_range(&secondary, NSRange::new(from, length - from));
-            }
-        }
         button.setAttributedTitle(&styled);
     });
 }

@@ -721,22 +721,18 @@ describe("the menu bar title", () => {
   const plain = { showTitle: false, showTime: false };
 
   it("is just the date with nothing to count down", () => {
-    expect(trayTitle("Mon 9", null, start, plain)).toEqual({ text: "Mon 9", secondaryFrom: null });
-    expect(trayTitle(null, null, start, plain)).toEqual({ text: "", secondaryFrom: null });
+    expect(trayTitle("Mon 9", null, start, plain)).toBe("Mon 9");
+    expect(trayTitle(null, null, start, plain)).toBe("");
   });
 
-  it("follows a date with a middle dot and marks where the countdown starts", () => {
-    expect(trayTitle("Mon 9", call, start - 2 * 3_600_000 - 21 * 60_000, plain)).toEqual({
-      text: "Mon 9 \u00b7 in 2h 21m",
-      secondaryFrom: 6,
-    });
+  it("follows a date with a middle dot", () => {
+    expect(trayTitle("Mon 9", call, start - 2 * 3_600_000 - 21 * 60_000, plain)).toBe(
+      "Mon 9 \u00b7 in 2h 21m",
+    );
   });
 
   it("needs no dot beside the glyph alone", () => {
-    expect(trayTitle(null, call, start - 25 * 60_000, plain)).toEqual({
-      text: "in 25m",
-      secondaryFrom: 0,
-    });
+    expect(trayTitle(null, call, start - 25 * 60_000, plain)).toBe("in 25m");
   });
 
   it("adds the time and name when Settings asks, and drops the time once it starts", () => {
@@ -744,18 +740,15 @@ describe("the menu bar title", () => {
     const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
       new Date(start),
     );
-    expect(trayTitle(null, call, start - 25 * 60_000, both, "en-US").text).toBe(
+    expect(trayTitle(null, call, start - 25 * 60_000, both, "en-US")).toBe(
       `in 25m ${time}  Design sync`,
     );
-    expect(trayTitle("Mon 9", call, start + 15 * 60_000, both, "en-US").text).toBe(
+    expect(trayTitle("Mon 9", call, start + 15 * 60_000, both, "en-US")).toBe(
       "Mon 9 \u00b7 15m left Design sync",
     );
   });
 
   it("drops the countdown once the event is over", () => {
-    expect(trayTitle("Mon 9", call, start + 31 * 60_000, plain)).toEqual({
-      text: "Mon 9",
-      secondaryFrom: null,
-    });
+    expect(trayTitle("Mon 9", call, start + 31 * 60_000, plain)).toBe("Mon 9");
   });
 });
