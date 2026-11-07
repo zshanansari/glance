@@ -81,9 +81,16 @@ export function startReminder(
     void api.hideReminder();
   };
 
-  // Escape puts the card away without dismissing the meeting.
+  // Escape puts the card away; Return joins, as the card's main action,
+  // unless a button has focus and Return is already pressing it.
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && showing) hide();
+    const onButton = document.activeElement instanceof HTMLButtonElement;
+    if (event.key === "Enter" && !onButton && showing?.joinUrl) {
+      event.preventDefault();
+      const url = showing.joinUrl;
+      api.joinMeeting(url).then(hide, () => undefined);
+    }
   });
 
   const row = (event: UpcomingEvent): HTMLElement => {

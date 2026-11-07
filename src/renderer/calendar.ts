@@ -15,6 +15,8 @@ import {
   eventsOnDay,
   coveringRanges,
   dayCountdownEvents,
+  nextAfterToday,
+  nextEventWhen,
   eventOverlaps,
   pastToFold,
   trayDescription,
@@ -29,6 +31,8 @@ import {
   type UpcomingEvent,
 } from "../shared/events";
 import { sfSymbol } from "./icons";
+import { meetingBrand } from "../shared/meetings";
+import { meetingIcon } from "./brand-icons";
 import { framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
 import { bandBox } from "./column-bands";
@@ -334,9 +338,12 @@ function startCalendar(api: DesktopApi): void {
       join.type = "button";
       join.className = "day-event-join";
       join.dataset.focusKey = `join:${occurrence}`;
-      join.setAttribute("aria-label", `Join ${event.title}`);
-      join.title = "Join meeting";
-      join.textContent = "Join";
+      // Join is the service's own icon, so the row says which call it opens:
+      // Meet, Zoom, Teams. Its name is in the tooltip and for VoiceOver.
+      const { brand, label } = meetingBrand(url);
+      join.append(meetingIcon(brand, 16));
+      join.title = label;
+      join.setAttribute("aria-label", `${label}: ${event.title}`);
       join.addEventListener("click", () => {
         api.joinMeeting(url).then(
           () => api.hideCalendar(),
@@ -380,9 +387,14 @@ function startCalendar(api: DesktopApi): void {
       isToday ? dayCountdownEvents(listed, now, upcomingEvent, dismissedEvents) : [],
     );
     const folded = isToday && !pastOpen ? pastToFold(listed, now) : [];
+    const upNext =
+      isToday && !listed.some((event) => !event.allDay && event.endAt > now)
+        ? nextAfterToday(calendarEvents, now)
+        : null;
     const key = JSON.stringify([
       focusIso,
       eventError,
+      upNext && [upNext.id, upNext.startAt, upNext.title],
       failure,
       folded.length,
       upcomingEvent && [upcomingEvent.id, upcomingEvent.endAt],
@@ -402,7 +414,7 @@ function startCalendar(api: DesktopApi): void {
     dayEventsKey = key;
     keepingFocus(
       dayEventsList,
-      () => paintDayEventRows(selectedDate, listed, counting, new Set(folded), now),
+      () => paintDayEventRows(selectedDate, listed, counting, new Set(folded), now, upNext),
       (lost) => {
         if (lost.startsWith("dismiss:")) return `open:${lost.slice("dismiss:".length)}`;
         // Opening the fold hands focus to the first meeting it showed.
@@ -419,6 +431,7 @@ function startCalendar(api: DesktopApi): void {
     next: Set<UpcomingEvent>,
     folded: Set<UpcomingEvent>,
     now: number,
+    upNext: UpcomingEvent | null,
   ): void => {
     dayEventsTitle.textContent = new Intl.DateTimeFormat(undefined, {
       weekday: "long",
@@ -450,7 +463,7 @@ function startCalendar(api: DesktopApi): void {
       const empty = document.createElement("p");
       empty.className = "day-events-empty";
       empty.textContent = "No Events";
-      dayEventsList.replaceChildren(empty);
+      dayEventsList.replaceChildren(empty, ...(upNext ? [upNextRow(upNext, now)] : []));
     } else {
       // On today, the meeting that is on or comes next says how soon, and so
       // does every other one at that same moment.
@@ -458,8 +471,39 @@ function startCalendar(api: DesktopApi): void {
         .filter((event) => !folded.has(event))
         .map((event) => dayEventRow(event, now, next.has(event)));
       if (folded.size) rows.unshift(foldRow(folded.size));
+      // A day with nothing left on it says what comes after it.
+      if (upNext) rows.push(upNextRow(upNext, now));
       dayEventsList.replaceChildren(...rows);
     }
+  };
+
+  /** "Next: Tomorrow, 11:45 AM · Stand-up": opens that day when clicked. */
+  const upNextRow = (event: UpcomingEvent, now: number): HTMLElement => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "day-events-next";
+    row.dataset.focusKey = "up-next";
+    const when = document.createElement("span");
+    when.className = "day-events-next-when";
+    when.textContent = `Next: ${nextEventWhen(event, now)}`;
+    const title = document.createElement("span");
+    title.className = "day-events-next-title";
+    title.textContent = event.title;
+    row.append(when, title);
+    row.title = `Show ${event.title}`;
+    row.addEventListener("click", () => {
+      const day = new Date(event.startAt);
+      focusIso = toIso(day);
+      pinnedOutsideIso = null;
+      if (day.getMonth() !== viewMonth || day.getFullYear() !== viewYear) {
+        viewYear = day.getFullYear();
+        viewMonth = day.getMonth();
+      }
+      render({ focusGrid: true });
+      paintDayEvents();
+      void refreshUpcoming();
+    });
+    return row;
   };
 
   /** "2 earlier": today's finished meetings, folded until asked for. */
@@ -507,6 +551,8 @@ function startCalendar(api: DesktopApi): void {
         showTitle: settings.showEventTitleInMenuBar,
         showTime: settings.showEventTimeInMenuBar,
       },
+      undefined,
+      label.style === "filled" || label.style === "calendar",
     );
     const trayStyle = label.style;
     const description = trayDescription(now.getTime(), counting);

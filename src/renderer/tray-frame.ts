@@ -11,16 +11,15 @@ const BOX = 36;
 /** Clear pixels around the badge. */
 const MARGIN = 1;
 const RADIUS = 8.3;
-// Width uses a slightly smaller face so the badge does not grow with the cutout.
-const FONT = '700 21px -apple-system, "SF Pro Text", system-ui, sans-serif';
 const TEXT_FONT = '700 24px -apple-system, "SF Pro Text", system-ui, sans-serif';
-/** Space between the text and the badge edge. */
-const PAD_X = 9;
+/** Space between the text and the badge edge, each side: 5pt at 2x. */
+const PAD_X = 10;
 
 function context(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("The 2D canvas context is unavailable.");
-  ctx.font = FONT;
+  // Measured in the face the text is cut in, so the padding is what it says.
+  ctx.font = TEXT_FONT;
   return ctx;
 }
 
@@ -71,8 +70,7 @@ export function framedGlyphPng(text: string): number[] {
   return Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-/** The cutout glyph as a mask, with its width over height, for a preview. */
-export function framedGlyph(text: string): { mask: string; aspect: number } {
-  const canvas = draw(text);
-  return { mask: `url("${canvas.toDataURL("image/png")}")`, aspect: canvas.width / canvas.height };
+/** The same glyph as a CSS mask, for the Appearance preview. */
+export function framedGlyphMask(text: string): string {
+  return `url("${draw(text).toDataURL("image/png")}")`;
 }

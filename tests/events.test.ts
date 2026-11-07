@@ -27,6 +27,8 @@ import {
   dayCountdownEvents,
   leadEvent,
   pastToFold,
+  nextAfterToday,
+  nextEventWhen,
   spokenStatus,
   trayDescription,
 } from "../src/shared/events";
@@ -379,8 +381,8 @@ describe("menu bar preview text", () => {
   it("shortens a title that would eat the menu bar", () => {
     const long = { ...standup, title: "Quarterly planning and roadmap review" };
     const text = trayEventText(long, before, { showTitle: true, showTime: false });
-    expect(text).toBe("Quarterly planning and…");
-    expect(text?.length).toBeLessThanOrEqual(24);
+    expect(text).toBe("Quarterly planning and road…");
+    expect(text?.length).toBeLessThanOrEqual(28);
   });
 });
 
@@ -750,5 +752,66 @@ describe("the menu bar title", () => {
 
   it("drops the countdown once the event is over", () => {
     expect(trayTitle("Mon 9", call, start + 31 * 60_000, plain)).toBe("Mon 9");
+  });
+});
+
+describe("long countdowns", () => {
+  const start = new Date(2026, 10, 9, 11, 45).getTime();
+  const call = { ...event, startAt: start, endAt: start + 15 * 60_000 };
+
+  it("counts days and hours past a day", () => {
+    expect(eventStatus(call, start - (2 * 24 + 5) * 3_600_000 - 20 * 60_000).label).toBe("in 2d 5h");
+    expect(eventStatus(call, start - 2 * 24 * 3_600_000).label).toBe("in 2d");
+  });
+
+  it("keeps hours and minutes under a day", () => {
+    expect(eventStatus(call, start - 23 * 3_600_000 - 59 * 60_000).label).toBe("in 23h 59m");
+  });
+});
+
+describe("the bullet after the glyph", () => {
+  const start = new Date(2026, 10, 9, 15, 0).getTime();
+  const call = { startAt: start, endAt: start + 30 * 60_000, allDay: false, title: "Design sync" };
+  const plain = { showTitle: false, showTime: false };
+
+  it("separates the glyph from a date, and the date from the countdown", () => {
+    expect(trayTitle("Mon Nov", call, start - 25 * 60_000, plain, undefined, true)).toBe(
+      "\u2022 Mon Nov \u2022 in 25m",
+    );
+    expect(trayTitle("Mon Nov", null, start, plain, undefined, true)).toBe("\u2022 Mon Nov");
+  });
+
+  it("leads with the date when there is no glyph before it", () => {
+    expect(trayTitle("Mon 9 Nov", call, start - 25 * 60_000, plain, undefined, false)).toBe(
+      "Mon 9 Nov \u2022 in 25m",
+    );
+  });
+});
+
+describe("what comes after an empty day", () => {
+  const now = new Date(2026, 10, 7, 18, 0).getTime();
+  const at = (day: number, hour: number, minute = 0) => new Date(2026, 10, day, hour, minute).getTime();
+  const later = (id: string, startAt: number, extra = {}) => ({
+    ...event,
+    id,
+    title: id,
+    startAt,
+    endAt: startAt + 15 * 60_000,
+    ...extra,
+  });
+
+  it("finds the first timed meeting after today, skipping declined ones", () => {
+    const events = [
+      later("tonight", at(7, 21)),
+      later("holiday", at(9, 0), { allDay: true, endAt: at(10, 0) }),
+      later("skipped", at(9, 9), { response: "declined" }),
+      later("standup", at(9, 11, 45)),
+    ];
+    expect(nextAfterToday(events, now)?.id).toBe("standup");
+  });
+
+  it("says tomorrow, or the weekday further out", () => {
+    expect(nextEventWhen({ startAt: at(8, 11, 45) }, now, "en-US")).toMatch(/^Tomorrow, 11:45/);
+    expect(nextEventWhen({ startAt: at(9, 11, 45) }, now, "en-US")).toMatch(/^Mon, 11:45/);
   });
 });

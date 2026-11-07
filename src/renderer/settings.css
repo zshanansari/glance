@@ -583,18 +583,14 @@ select {
 }
 
 /* Menu bar style picker: a segmented row of the four looks. */
-/* The menu bar styles: four previews of the menu bar as each style would
-   draw it, named underneath. The card's padding matches its rows, so the
-   previews line up with the labels and dividers below. */
+/* The card's rows start 12pt in, so the tiles do too, and the line under
+   them is inset like the lines between the rows. */
 .icon-styles {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px 12px 10px;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
 }
 
-/* The first row under the previews takes the same inset divider as the
-   rows between themselves. */
 .icon-styles + .row {
   margin: 0 12px;
   padding-right: 0;
@@ -603,83 +599,58 @@ select {
 }
 
 .icon-styles button {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
+  display: inline-grid;
+  flex: 1;
+  grid-template-rows: 18px auto;
+  gap: 4px;
+  place-items: center;
   min-width: 0;
-  padding: 0;
+  padding: 7px 4px 6px;
   border: 0;
-  background: transparent;
-  color: var(--label);
-}
-
-/* A strip of menu bar: the glyph and date at the size the menu bar draws
-   them. */
-.mb-preview {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  width: 100%;
-  height: 30px;
-  padding: 0 8px;
   border-radius: 8px;
+  background: transparent;
+}
+
+:where(:root:not([data-pointer-away])) .icon-styles button:hover {
   background: var(--control-fill);
-  box-shadow: inset 0 0 0 0.5px var(--separator);
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: box-shadow 120ms ease;
 }
 
-:where(:root:not([data-pointer-away])) .icon-styles button:hover .mb-preview {
-  background: var(--control-fill-hover);
-}
-
-/* Chosen: an accent ring around the preview, as System Settings marks a
-   chosen appearance, and the name in full strength. */
-.icon-styles button[aria-checked="true"] .mb-preview {
-  box-shadow: 0 0 0 2px var(--accent);
-}
-
-.icon-styles button:focus-visible {
-  outline: none;
-}
-
-.icon-styles button:focus-visible .mb-preview {
-  box-shadow:
-    0 0 0 2px var(--accent),
-    0 0 0 5px color-mix(in srgb, var(--accent) 35%, transparent);
+.icon-styles button[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .mb-name {
   overflow: hidden;
   max-width: 100%;
   color: var(--secondary);
-  font-size: 11px;
-  line-height: 13px;
+  font-size: 10px;
+  line-height: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .icon-styles button[aria-checked="true"] .mb-name {
-  color: var(--label);
-  font-weight: 600;
+  color: inherit;
 }
 
 .mb-icon {
-  flex: none;
-  width: calc(16px * var(--glyph-aspect, 1));
-  height: 16px;
+  display: block;
+  width: 18px;
+  height: 18px;
   background-color: currentColor;
   -webkit-mask: var(--tray-glyph) center / contain no-repeat;
   mask: var(--tray-glyph) center / contain no-repeat;
 }
 
-.mb-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.mb-icon.none {
+  display: inline-grid;
+  place-items: center;
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* Weekday picker for the highlighted columns. */

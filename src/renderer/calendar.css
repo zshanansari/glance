@@ -510,16 +510,42 @@ button:focus {
   white-space: nowrap;
 }
 
+/* Join: the meeting service's icon, no button around it until hovered. */
 .day-event-join {
+  display: inline-grid;
   flex: 0 0 auto;
-  height: 20px;
-  margin-right: 9px;
-  padding: 0 9px;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 11px;
-  font-weight: 500;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  margin-right: 8px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+}
+
+/* A 14pt square, with the logo fitted inside at its own proportions: a
+   wide mark is letterboxed, never squeezed. */
+.day-event-join img {
+  display: block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.day-event-join .sf-symbol {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+:root:not([data-pointer-away]) .day-event-join:hover {
+  background: var(--quaternary);
+}
+
+:root[data-keyboard] .day-event-join:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
 }
 
 /* Lets go of the meeting the menu bar counts down to: a quiet glyph beside
@@ -577,10 +603,47 @@ button:focus {
   box-shadow: 0 0 0 1px var(--on-accent);
 }
 
+/* On the highlighted row the icon sits on a light tile, so its colors still
+   read against the accent. */
 :root:not([data-pointer-away]) .day-event:hover .day-event-join,
 :root[data-keyboard] .day-event:has(.day-event-open:focus) .day-event-join {
   background: var(--on-accent);
   color: var(--accent);
+}
+
+/* "Next: Tomorrow, 11:45 AM", under a day with nothing left on it. */
+.day-events-next {
+  display: grid;
+  width: calc(100% - 10px);
+  margin: 2px 5px 0;
+  padding: 3px 9px 4px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.day-events-next-when {
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.day-events-next-title {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root:not([data-pointer-away]) .day-events-next:hover,
+:root[data-keyboard] .day-events-next:focus {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:root:not([data-pointer-away]) .day-events-next:hover .day-events-next-when,
+:root[data-keyboard] .day-events-next:focus .day-events-next-when {
+  color: var(--on-accent);
 }
 
 .day-events-empty {

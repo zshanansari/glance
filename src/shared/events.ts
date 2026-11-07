@@ -319,12 +319,22 @@ function roundedMinutes(milliseconds: number): number {
 /** An event that just started reads "now" rather than counting itself down. */
 const NOW_WINDOW_MS = 10 * 60_000;
 
+/**
+ * A countdown as short as it can be and still be right: "25m" under an hour,
+ * "2h 21m" under a day, then days and hours ("2d 5h"), which only change
+ * once an hour when a meeting is that far off.
+ */
 function relativeTime(milliseconds: number): string {
   const minutes = roundedMinutes(milliseconds);
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+  if (hours < 24) {
+    const remainder = minutes % 60;
+    return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  return rest ? `${days}d ${rest}h` : `${days}d`;
 }
 
 export function eventStatus(
@@ -394,8 +404,11 @@ export function trayDescription(
   return `${date}. ${event.title.trim() || "Untitled event"} ${spokenStatus(event, now)}`;
 }
 
-/** Longest event name the menu bar item carries before it is cut short. */
-export const TRAY_TITLE_LIMIT = 24;
+/**
+ * Longest event name the menu bar item carries before it is cut short. At
+ * the battery-size title, 28 characters take the room 24 used to.
+ */
+export const TRAY_TITLE_LIMIT = 28;
 
 export function trayEventTitle(title: string, limit = TRAY_TITLE_LIMIT): string {
   const trimmed = title.trim();
@@ -437,6 +450,39 @@ export function trayEventText(
 }
 
 /**
+ * The first timed event after today, for a day list with nothing left on
+ * it. Declined invitations are skipped, as the countdown skips them.
+ */
+export function nextAfterToday(
+  events: readonly UpcomingEvent[],
+  now: number,
+): UpcomingEvent | null {
+  const tomorrow = endOfDay(now, 1);
+  return (
+    events
+      .filter((event) => !event.allDay && event.response !== "declined" && event.startAt >= tomorrow)
+      .sort(compareEvents)[0] ?? null
+  );
+}
+
+/**
+ * When that next event is, for the line under an empty day: "Tomorrow,
+ * 11:45 AM", or the weekday and time ("Mon, 11:45 AM") further out.
+ */
+export function nextEventWhen(
+  event: Pick<UpcomingEvent, "startAt">,
+  now: number,
+  locale?: string,
+): string {
+  const start = new Date(event.startAt);
+  const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(start);
+  const day = start.getTime() < endOfDay(now, 2)
+    ? "Tomorrow"
+    : new Intl.DateTimeFormat(locale, { weekday: "short" }).format(start);
+  return `${day}, ${time}`;
+}
+
+/**
  * The menu bar item's title: the date (unless the cutout glyph carries it),
  * then "• in 25m" for the event being counted down, then its time and name
  * when Settings asks for them. Empty for a glyph-only item.
@@ -447,8 +493,11 @@ export function trayTitle(
   now: number,
   options: { showTitle: boolean; showTime: boolean },
   locale?: string,
+  afterGlyph = false,
 ): string {
-  const date = dateText ?? "";
+  // Beside a glyph, a date gets the same bullet the countdown does, so the
+  // glyph, the date and the countdown read as three separate parts.
+  const date = dateText ? (afterGlyph ? `\u2022 ${dateText}` : dateText) : "";
   const countdown = event && now < event.endAt ? eventStatus(event, now).label : null;
   if (!countdown || !event) return date;
   const eventText = trayEventText(event, now, options, locale);
