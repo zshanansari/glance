@@ -77,7 +77,7 @@ system-wide shortcut fires.
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/events.png" alt="Settings → Events: the menu bar countdown, which events it counts, and the meeting reminder" width="420">
+  <img src="docs/screenshots/events.png" alt="Settings → Events: which events the countdown counts, the meeting reminder with in-person meetings, and quick add’s calendar and meeting link" width="420">
   &nbsp;
   <img src="docs/screenshots/about.png" alt="Settings → About: the app icon, name and version, Check for Updates with when it last checked, and links" width="420">
 </p>
