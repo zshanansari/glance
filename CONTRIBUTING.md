@@ -16,8 +16,11 @@ For security issues, use [private reporting](SECURITY.md).
 
 ## What is in scope
 
-Glance is a month view in the menu bar. It can optionally read local macOS
-Calendar events through EventKit for upcoming meeting awareness. It does not
-sync accounts or send calendar data off the Mac.
+Glance is a month view in the menu bar that reads Calendar and Reminders on
+this Mac through EventKit: the day's events, a countdown to the next one, a
+reminder card before a call, search, and quick add for new events in plain
+words. It does not sync accounts or send calendar data off the Mac; the only
+connections it makes are the update check and the Google Calendar handoff the
+user chooses. Changes that keep to that, and to the plain macOS look, fit.
 
 For anything large, open an issue before writing it.
