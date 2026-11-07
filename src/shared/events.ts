@@ -1,4 +1,5 @@
 import { ICON_LEAD_ALWAYS, ICON_LEAD_AT_START, type AppSettings } from "./settings";
+import { dateFormat } from "./region";
 
 /** How the user answered the invitation; "confirmed" means no invitation. */
 export type EventResponse =
@@ -394,7 +395,7 @@ export function trayDescription(
   event: Pick<UpcomingEvent, "startAt" | "endAt" | "title"> | null,
   locale?: string,
 ): string {
-  const date = new Intl.DateTimeFormat(locale, {
+  const date = dateFormat(locale, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -426,7 +427,7 @@ export function trayEventTime(
   // left, so the time would only repeat it.
   if (now >= event.startAt) return "";
   if (event.allDay) return "All day";
-  return new Intl.DateTimeFormat(locale, {
+  return dateFormat(locale, {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(event.startAt));
@@ -447,6 +448,38 @@ export function trayEventText(
   if (options.showTitle) parts.push(trayEventTitle(event.title));
   const text = parts.filter((part) => part.length > 0).join("  ");
   return text.length ? text : null;
+}
+
+/** Most rows the coming days add under today, so the popover stays short. */
+export const COMING_ROWS = 8;
+
+/**
+ * The days after today and their events, for the list under today's: up to
+ * `days` days, skipping empty ones, and no more than COMING_ROWS events in
+ * all. All-day items lead each day, as they do in the day list.
+ */
+export function comingDayGroups(
+  events: readonly UpcomingEvent[],
+  now: number,
+  days: number,
+): { day: Date; events: UpcomingEvent[] }[] {
+  const groups: { day: Date; events: UpcomingEvent[] }[] = [];
+  let rows = 0;
+  const today = new Date(now);
+  for (let offset = 1; offset <= days && rows < COMING_ROWS; offset += 1) {
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+    const onDay = eventsOnDay([...events], day).slice(0, COMING_ROWS - rows);
+    if (!onDay.length) continue;
+    groups.push({ day, events: onDay });
+    rows += onDay.length;
+  }
+  return groups;
+}
+
+/** "Tomorrow", or the weekday and date further out: "Mon 9 Nov". */
+export function comingDayTitle(day: Date, now: number, locale?: string): string {
+  if (day.getTime() < endOfDay(now, 2)) return "Tomorrow";
+  return dateFormat(locale, { weekday: "short", day: "numeric", month: "short" }).format(day);
 }
 
 /**
@@ -475,10 +508,10 @@ export function nextEventWhen(
   locale?: string,
 ): string {
   const start = new Date(event.startAt);
-  const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(start);
+  const time = dateFormat(locale, { hour: "numeric", minute: "2-digit" }).format(start);
   const day = start.getTime() < endOfDay(now, 2)
     ? "Tomorrow"
-    : new Intl.DateTimeFormat(locale, { weekday: "short" }).format(start);
+    : dateFormat(locale, { weekday: "short" }).format(start);
   return `${day}, ${time}`;
 }
 
@@ -512,7 +545,7 @@ export function eventTimeRange(
   locale?: string,
 ): string {
   if (event.allDay) return "All day";
-  const format = new Intl.DateTimeFormat(locale, {
+  const format = dateFormat(locale, {
     hour: "numeric",
     minute: "2-digit",
   });
@@ -527,6 +560,11 @@ export function eventTimeRange(
  * slack keeps a tick that runs a little late from missing it.
  */
 export const REMINDER_LEAD_MS = 61_000;
+/**
+ * How far ahead the card comes for a meeting in a room: time to get there.
+ * The same slack as above.
+ */
+export const IN_PERSON_LEAD_MS = 10 * MINUTE_MS + 1_000;
 /** How long the card stays once the meeting has started, if left alone. */
 export const REMINDER_LINGER_MS = 5 * MINUTE_MS;
 
@@ -553,27 +591,40 @@ function preferAnswered(
 }
 
 /**
+ * A meeting with a place and no join link: somewhere to go, not a call. A
+ * location that is itself a web address is not a place.
+ */
+export function isInPerson(event: Pick<UpcomingEvent, "joinUrl" | "location">): boolean {
+  const place = event.location?.trim() ?? "";
+  return !event.joinUrl && place !== "" && !/^[a-z][a-z0-9+.-]*:\/\//i.test(place);
+}
+
+/**
  * The meeting to remind about now: timed, with a join link, not declined or
  * dismissed, and starting within the lead. One that started a few minutes
  * ago still qualifies when it was never offered, as when the month was open
  * at its minute. A meeting about to start comes before one already running;
  * otherwise the earliest start wins, and an answered meeting beats an
- * unanswered invitation at the same time.
+ * unanswered invitation at the same time. With `inPerson`, a meeting in a
+ * room counts too, from ten minutes out.
  */
 export function reminderEvent(
   events: readonly UpcomingEvent[],
   now: number,
   dismissed: readonly DismissedOccurrence[] = [],
   offered: (event: UpcomingEvent) => boolean = () => false,
+  inPerson = false,
 ): UpcomingEvent | null {
   let best: UpcomingEvent | null = null;
   const candidates: UpcomingEvent[] = [];
   const rank = (event: UpcomingEvent): number => (event.startAt > now ? 0 : 1);
   for (const event of events) {
-    if (event.allDay || !event.joinUrl || event.response === "declined") continue;
+    const room = inPerson && isInPerson(event);
+    if (event.allDay || (!event.joinUrl && !room) || event.response === "declined") continue;
     if (occurrenceIsDismissed(event, dismissed, now) || offered(event)) continue;
     const until = event.startAt - now;
-    if (until > REMINDER_LEAD_MS || !reminderStillDue(event, now)) continue;
+    const lead = room ? IN_PERSON_LEAD_MS : REMINDER_LEAD_MS;
+    if (until > lead || !reminderStillDue(event, now)) continue;
     candidates.push(event);
     if (
       !best ||
@@ -625,4 +676,72 @@ export const CALENDAR_ACCESS_MISSING = "Calendar access is not enabled";
  */
 export function needsCalendarAccess(error: string): boolean {
   return error === CALENDAR_ACCESS_MISSING;
+}
+
+/** How far back and ahead search looks, in days from today. */
+export const SEARCH_DAYS_BACK = 30;
+export const SEARCH_DAYS_AHEAD = 90;
+/** The most results search lists. */
+export const SEARCH_LIMIT = 20;
+
+/** Lower case, accents dropped: "Café" finds "cafe". */
+function folded(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/**
+ * Events whose title or location holds every word of the query, the ones
+ * nearest now kept up to the limit, grouped by day: today and later first,
+ * in calendar order, then earlier days, most recent first.
+ */
+export function searchEvents(
+  events: readonly UpcomingEvent[],
+  query: string,
+  now: number,
+  limit = SEARCH_LIMIT,
+): { day: Date; events: UpcomingEvent[] }[] {
+  const words = folded(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const seen = new Set<string>();
+  const found = events.filter((event) => {
+    const key = `${event.id}@${event.startAt}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const text = folded(`${event.title} ${event.location ?? ""}`);
+    return words.every((word) => text.includes(word));
+  });
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const nearest = found
+    .sort((a, b) => Math.abs(a.startAt - now) - Math.abs(b.startAt - now))
+    .slice(0, limit);
+  const upcoming = nearest.filter((event) => event.endAt > today.getTime()).sort(compareEvents);
+  const earlier = nearest
+    .filter((event) => event.endAt <= today.getTime())
+    .sort((a, b) => b.startAt - a.startAt || compareEvents(a, b));
+  const groups: { day: Date; events: UpcomingEvent[] }[] = [];
+  for (const event of [...upcoming, ...earlier]) {
+    const start = new Date(event.startAt);
+    const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const last = groups[groups.length - 1];
+    if (last && last.day.getTime() === day.getTime()) last.events.push(event);
+    else groups.push({ day, events: [event] });
+  }
+  return groups;
+}
+
+/** "Today", "Tomorrow", "Yesterday", or the date, with the year when it differs. */
+export function searchDayTitle(day: Date, now: number, locale?: string): string {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const offset = Math.round((day.getTime() - today.getTime()) / 86_400_000);
+  if (offset === 0) return "Today";
+  if (offset === 1) return "Tomorrow";
+  if (offset === -1) return "Yesterday";
+  return dateFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(day.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+  }).format(day);
 }

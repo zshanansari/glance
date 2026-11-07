@@ -10,6 +10,7 @@
     "core:event:allow-unlisten",
     "core:window:allow-start-dragging",
     "allow-get-settings",
+    "allow-system-region",
     "allow-update-settings",
     "allow-suspend-shortcuts",
     "allow-beep",

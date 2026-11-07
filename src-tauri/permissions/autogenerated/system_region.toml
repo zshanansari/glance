@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-system-region"
+description = "Enables the system_region command without any pre-configured scope."
+commands.allow = ["system_region"]
+
+[[permission]]
+identifier = "deny-system-region"
+description = "Denies the system_region command without any pre-configured scope."
+commands.deny = ["system_region"]

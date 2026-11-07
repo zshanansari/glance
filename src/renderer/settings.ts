@@ -19,6 +19,8 @@ import {
   type UpcomingIconLeadMinutes,
   type Weekday,
   type WeekStartsOn,
+  type WeekNumbering,
+  type ComingDays,
   type DayHighlight,
   ICON_LEAD_ALWAYS,
 } from "../shared/settings";
@@ -41,6 +43,8 @@ const TAB_ICONS: Record<string, { symbol: SymbolName; color: string }> = {
 import { bindCalendarAccess } from "./calendar-access";
 import { chordFromKeyboard, chordLabel, chordProblem } from "../shared/shortcuts";
 import { rovingTarget } from "../shared/roving";
+import { setRegion } from "../shared/region";
+import { knownTimeZones } from "../shared/zones";
 import { updateStatusLine, type UpdateStatus } from "../shared/updates";
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -154,6 +158,29 @@ function startSettings(api: DesktopApi): void {
   const showMonth = requireElement<HTMLInputElement>("show-month");
   const weekStart = requireElement<HTMLSelectElement>("week-start");
   const weekNumbers = requireElement<HTMLInputElement>("week-numbers");
+  const weekNumbering = requireElement<HTMLSelectElement>("week-numbering");
+  const comingDays = requireElement<HTMLSelectElement>("coming-days");
+  const secondTimeZone = requireElement<HTMLSelectElement>("second-time-zone");
+  const secondTimeZoneInMenuBar = requireElement<HTMLInputElement>("second-time-zone-in-menu-bar");
+  // Every zone the Mac knows, by region and city: "America / New York".
+  secondTimeZone.append(
+    ...knownTimeZones().map((zone) => {
+      const option = document.createElement("option");
+      option.value = zone;
+      option.textContent = zone.replace(/_/g, " ").replace(/\//g, " / ");
+      return option;
+    }),
+  );
+  /** The menu bar switch means nothing without a zone. */
+  const paintSecondZone = (zone: string): void => {
+    secondTimeZoneInMenuBar.disabled = !zone;
+    secondTimeZoneInMenuBar.closest(".row")?.classList.toggle("is-off", !zone);
+  };
+  /** Counting only matters while week numbers are shown. */
+  const paintWeekNumbering = (shown: boolean): void => {
+    weekNumbering.disabled = !shown;
+    weekNumbering.closest(".row")?.classList.toggle("is-off", !shown);
+  };
   const highlightDays = requireElement<HTMLDivElement>("highlight-days");
   const login = requireElement<HTMLInputElement>("login");
   const beep = requireElement<HTMLInputElement>("beep");
@@ -162,6 +189,12 @@ function startSettings(api: DesktopApi): void {
   const upcomingHorizon = requireElement<HTMLSelectElement>("upcoming-horizon");
   const upcomingIconLead = requireElement<HTMLSelectElement>("upcoming-icon-lead");
   const remindBeforeMeetings = requireElement<HTMLInputElement>("remind-before-meetings");
+  const remindInPerson = requireElement<HTMLInputElement>("remind-in-person");
+  /** In-person reminders ride on the reminder being on. */
+  const paintInPerson = (on: boolean): void => {
+    remindInPerson.disabled = !on;
+    remindInPerson.closest(".row")?.classList.toggle("is-off", !on);
+  };
   const includeWithoutParticipants = requireElement<HTMLInputElement>(
     "include-without-participants",
   );
@@ -548,6 +581,12 @@ function startSettings(api: DesktopApi): void {
     showMonth.checked = settings.showMonth;
     weekStart.value = String(settings.weekStartsOn);
     weekNumbers.checked = settings.showWeekNumbers;
+    weekNumbering.value = settings.weekNumbering;
+    comingDays.value = String(settings.comingDays);
+    secondTimeZone.value = settings.secondTimeZone;
+    secondTimeZoneInMenuBar.checked = settings.secondTimeZoneInMenuBar;
+    paintSecondZone(settings.secondTimeZone);
+    paintWeekNumbering(settings.showWeekNumbers);
     buildHighlightDays(settings.weekStartsOn);
     paintHighlights(settings.highlightWeekdays);
     login.checked = settings.launchAtLogin;
@@ -557,6 +596,8 @@ function startSettings(api: DesktopApi): void {
     upcomingHorizon.value = String(settings.upcomingHorizonDays);
     upcomingIconLead.value = String(settings.upcomingIconLeadMinutes);
     remindBeforeMeetings.checked = settings.remindBeforeMeetings;
+    remindInPerson.checked = settings.remindInPerson;
+    paintInPerson(settings.remindBeforeMeetings);
     includeWithoutParticipants.checked = settings.includeEventsWithoutParticipants;
     includeWithoutLocation.checked = settings.includeEventsWithoutLocation;
     showEventTitle.checked = settings.showEventTitleInMenuBar;
@@ -578,6 +619,10 @@ function startSettings(api: DesktopApi): void {
     showMonth: showMonth.checked,
     weekStartsOn: Number(weekStart.value) as WeekStartsOn,
     showWeekNumbers: weekNumbers.checked,
+    weekNumbering: weekNumbering.value as WeekNumbering,
+    comingDays: Number(comingDays.value) as ComingDays,
+    secondTimeZone: secondTimeZone.value,
+    secondTimeZoneInMenuBar: secondTimeZoneInMenuBar.checked,
     highlightWeekdays: selectedWeekdays(),
     launchAtLogin: login.checked,
     beepOnTheHour: beep.checked,
@@ -586,6 +631,7 @@ function startSettings(api: DesktopApi): void {
     upcomingHorizonDays: Number(upcomingHorizon.value) as UpcomingHorizonDays,
     upcomingIconLeadMinutes: Number(upcomingIconLead.value) as UpcomingIconLeadMinutes,
     remindBeforeMeetings: remindBeforeMeetings.checked,
+    remindInPerson: remindInPerson.checked,
     includeEventsWithoutParticipants: includeWithoutParticipants.checked,
     includeEventsWithoutLocation: includeWithoutLocation.checked,
     showEventTitleInMenuBar: showEventTitle.checked,
@@ -628,6 +674,9 @@ function startSettings(api: DesktopApi): void {
 
   form.addEventListener("change", () => {
     const patch = patchFromForm();
+    paintWeekNumbering(patch.showWeekNumbers ?? false);
+    paintSecondZone(patch.secondTimeZone ?? "");
+    paintInPerson(patch.remindBeforeMeetings ?? false);
     applyTheme(patch.theme ?? "system");
     paintHighlightName();
     paintUpcomingOptions(
@@ -892,11 +941,15 @@ function startSettings(api: DesktopApi): void {
     });
   });
 
-  void api.getSettings().then((settings) => {
-    paint(settings);
-    void refreshCalendarAccess();
-    if (!settings.onboarded) showWelcome(settings);
-  });
+  void api
+    .getSystemRegion()
+    .then(setRegion, () => setRegion(null))
+    .then(() => api.getSettings())
+    .then((settings) => {
+      paint(settings);
+      void refreshCalendarAccess();
+      if (!settings.onboarded) showWelcome(settings);
+    });
   void api.getAppVersion().then((value) => {
     version.textContent = `v${value}`;
     const sidebarVersion = document.getElementById("sidebar-version");

@@ -1,4 +1,5 @@
 import type { UpdateStatus } from "../shared/updates";
+import type { SystemRegion } from "../shared/region";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AppSettings, CalendarInfo } from "../shared/settings";
@@ -27,12 +28,14 @@ export type DesktopApi = {
   requestRemindersAccess: () => Promise<boolean>;
   getRemindersAccess: () => Promise<boolean>;
   joinMeeting: (url: string) => Promise<void>;
+  openInMaps: (place: string) => Promise<void>;
   openEvent: (id: string) => Promise<void>;
   checkForUpdates: () => Promise<UpdateOffer>;
   installUpdate: () => Promise<void>;
   /** The version a background check found and nobody has installed yet. */
   getUpdateAvailable: () => Promise<string | null>;
   getUpdateStatus: () => Promise<UpdateStatus>;
+  getSystemRegion: () => Promise<SystemRegion>;
   onUpdateStatus: (listener: (status: UpdateStatus) => void) => () => void;
   onUpdateAvailable: (listener: (version: string | null) => void) => () => void;
   /** An install started from the menu bar failed; carries the reason. */
@@ -98,11 +101,13 @@ export const api: DesktopApi = {
   requestRemindersAccess: () => invoke<boolean>("request_reminders_access"),
   getRemindersAccess: () => invoke<boolean>("get_reminders_access"),
   joinMeeting: (url) => invoke<void>("join_meeting", { url }),
+  openInMaps: (place) => invoke<void>("open_in_maps", { place }),
   openEvent: (id) => invoke<void>("open_event", { id }),
   checkForUpdates: () => invoke<UpdateOffer>("check_for_updates"),
   installUpdate: () => invoke<void>("install_update"),
   getUpdateAvailable: () => invoke<string | null>("update_available"),
   getUpdateStatus: () => invoke<UpdateStatus>("update_status"),
+  getSystemRegion: () => invoke<SystemRegion>("system_region"),
   onUpdateStatus: (listener) => subscribe<UpdateStatus>("update-status", listener),
   onUpdateAvailable: (listener) => subscribe<string | null>("update-available", listener),
   onUpdateFailed: (listener) => subscribe<string>("update-failed", listener),

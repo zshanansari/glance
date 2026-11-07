@@ -611,6 +611,16 @@ button:focus {
   color: var(--accent);
 }
 
+/* A coming day's heading under today's list, as the section's own. */
+.day-events-coming {
+  margin: 8px 0 0;
+  padding: 2px 14px 3px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
 /* "Next: Tomorrow, 11:45 AM", under a day with nothing left on it. */
 .day-events-next {
   display: grid;
@@ -644,6 +654,39 @@ button:focus {
 :root:not([data-pointer-away]) .day-events-next:hover .day-events-next-when,
 :root[data-keyboard] .day-events-next:focus .day-events-next-when {
   color: var(--on-accent);
+}
+
+/* Search: a field over the day list, results grouped by day. */
+.search {
+  padding: 2px 0 4px;
+}
+
+.search-input {
+  display: block;
+  width: calc(100% - 20px);
+  height: 24px;
+  margin: 0 10px 4px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--quaternary);
+  color: var(--label);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.search-input:focus {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.search-input::-webkit-search-decoration {
+  display: none;
+}
+
+.search-results {
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .day-events-empty {

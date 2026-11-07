@@ -15,7 +15,10 @@ export type SymbolName =
   | "mappin.and.ellipse"
   | "eye.slash"
   | "video.fill"
-  | "arrow.up.right";
+  | "arrow.up.right"
+  | "clock"
+  | "magnifyingglass"
+  | "map";
 
 /** Without a size, the stylesheet sizes the glyph. */
 export function sfSymbol(name: SymbolName, size?: number): HTMLElement {

@@ -9,6 +9,7 @@ import {
   selectionFollowsToday,
   toIso,
 } from "../shared/calendar";
+import { dateFormat, setRegion } from "../shared/region";
 import { menuBarLabel, highlightedColumnRuns, trayLabelKey, type AppSettings } from "../shared/settings";
 import {
   endOfToday,
@@ -16,6 +17,13 @@ import {
   coveringRanges,
   dayCountdownEvents,
   nextAfterToday,
+  searchEvents,
+  isInPerson,
+  searchDayTitle,
+  SEARCH_DAYS_AHEAD,
+  SEARCH_DAYS_BACK,
+  comingDayGroups,
+  comingDayTitle,
   nextEventWhen,
   eventOverlaps,
   pastToFold,
@@ -32,6 +40,7 @@ import {
 } from "../shared/events";
 import { sfSymbol } from "./icons";
 import { meetingBrand } from "../shared/meetings";
+import { isTimeZone, zoneCity, zoneShort, zoneTime } from "../shared/zones";
 import { meetingIcon } from "./brand-icons";
 import { framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
@@ -131,6 +140,11 @@ function startCalendar(api: DesktopApi): void {
   const dayEventsCount = requireElement<HTMLElement>("day-events-count");
   const dayEventsList = requireElement<HTMLElement>("day-events-list");
   const openSettings = requireElement<HTMLButtonElement>("open-settings");
+  const openSearch = requireElement<HTMLButtonElement>("open-search");
+  const search = requireElement<HTMLElement>("search");
+  const searchInput = requireElement<HTMLInputElement>("search-input");
+  const searchResults = requireElement<HTMLElement>("search-results");
+  openSearch.append(sfSymbol("magnifyingglass", 12));
   prev.append(sfSymbol("chevron.left", 12));
   next.append(sfSymbol("chevron.right", 12));
 
@@ -160,6 +174,9 @@ function startCalendar(api: DesktopApi): void {
   // Today's finished meetings fold into one line until it is opened; the
   // fold closes again with the popover.
   let pastOpen = false;
+  // Search reads its window once when it opens, then filters as you type.
+  let searchPool: UpcomingEvent[] | null = null;
+  let searchRequest = 0;
   // A failed open or join says so in the heading for a few seconds.
   let failure: string | null = null;
   let failureTimer = 0;
@@ -308,6 +325,11 @@ function startCalendar(api: DesktopApi): void {
     const time = document.createElement("span");
     time.className = "day-event-time";
     time.textContent = eventTimeRange(event);
+    // The start in the second zone too: "4:00 – 4:30 PM · 6:30 AM New York".
+    const zone = settings?.secondTimeZone ?? "";
+    if (zone && !event.allDay && isTimeZone(zone)) {
+      time.append(` \u00b7 ${zoneTime(event.startAt, zone)} ${zoneCity(zone)}`);
+    }
     if (isNext) {
       const when = document.createElement("span");
       when.className = "day-event-when";
@@ -378,7 +400,7 @@ function startCalendar(api: DesktopApi): void {
   };
 
   const paintDayEvents = (): void => {
-    dayEvents.hidden = false;
+    dayEvents.hidden = !search.hidden;
     const selectedDate = fromIso(focusIso);
     const now = Date.now();
     const listed = eventsOnDay(calendarEvents, selectedDate);
@@ -387,14 +409,21 @@ function startCalendar(api: DesktopApi): void {
       isToday ? dayCountdownEvents(listed, now, upcomingEvent, dismissedEvents) : [],
     );
     const folded = isToday && !pastOpen ? pastToFold(listed, now) : [];
+    const comingDays = settings?.comingDays ?? 0;
+    const coming = isToday && comingDays ? comingDayGroups(calendarEvents, now, comingDays) : [];
+    // With the coming days listed, the single "Next:" line would repeat them.
     const upNext =
-      isToday && !listed.some((event) => !event.allDay && event.endAt > now)
+      isToday && !comingDays && !listed.some((event) => !event.allDay && event.endAt > now)
         ? nextAfterToday(calendarEvents, now)
         : null;
     const key = JSON.stringify([
       focusIso,
       eventError,
       upNext && [upNext.id, upNext.startAt, upNext.title],
+      coming.map((group) => [
+        group.day.getTime(),
+        group.events.map((event) => [event.id, event.startAt, event.endAt, event.title, event.joinUrl]),
+      ]),
       failure,
       folded.length,
       upcomingEvent && [upcomingEvent.id, upcomingEvent.endAt],
@@ -414,7 +443,7 @@ function startCalendar(api: DesktopApi): void {
     dayEventsKey = key;
     keepingFocus(
       dayEventsList,
-      () => paintDayEventRows(selectedDate, listed, counting, new Set(folded), now, upNext),
+      () => paintDayEventRows(selectedDate, listed, counting, new Set(folded), now, upNext, coming),
       (lost) => {
         if (lost.startsWith("dismiss:")) return `open:${lost.slice("dismiss:".length)}`;
         // Opening the fold hands focus to the first meeting it showed.
@@ -432,8 +461,9 @@ function startCalendar(api: DesktopApi): void {
     folded: Set<UpcomingEvent>,
     now: number,
     upNext: UpcomingEvent | null,
+    coming: { day: Date; events: UpcomingEvent[] }[],
   ): void => {
-    dayEventsTitle.textContent = new Intl.DateTimeFormat(undefined, {
+    dayEventsTitle.textContent = dateFormat(undefined, {
       weekday: "long",
       month: "long",
       day: "numeric",
@@ -463,7 +493,11 @@ function startCalendar(api: DesktopApi): void {
       const empty = document.createElement("p");
       empty.className = "day-events-empty";
       empty.textContent = "No Events";
-      dayEventsList.replaceChildren(empty, ...(upNext ? [upNextRow(upNext, now)] : []));
+      dayEventsList.replaceChildren(
+        empty,
+        ...(upNext ? [upNextRow(upNext, now)] : []),
+        ...comingRows(coming, now),
+      );
     } else {
       // On today, the meeting that is on or comes next says how soon, and so
       // does every other one at that same moment.
@@ -473,9 +507,22 @@ function startCalendar(api: DesktopApi): void {
       if (folded.size) rows.unshift(foldRow(folded.size));
       // A day with nothing left on it says what comes after it.
       if (upNext) rows.push(upNextRow(upNext, now));
+      rows.push(...comingRows(coming, now));
       dayEventsList.replaceChildren(...rows);
     }
   };
+
+  /** The coming days under today: a small heading per day, then its rows. */
+  const comingRows = (
+    coming: { day: Date; events: UpcomingEvent[] }[],
+    now: number,
+  ): HTMLElement[] =>
+    coming.flatMap((group) => {
+      const title = document.createElement("p");
+      title.className = "day-events-coming";
+      title.textContent = comingDayTitle(group.day, now);
+      return [title, ...group.events.map((event) => dayEventRow(event, now, false))];
+    });
 
   /** "Next: Tomorrow, 11:45 AM · Stand-up": opens that day when clicked. */
   const upNextRow = (event: UpcomingEvent, now: number): HTMLElement => {
@@ -491,19 +538,129 @@ function startCalendar(api: DesktopApi): void {
     title.textContent = event.title;
     row.append(when, title);
     row.title = `Show ${event.title}`;
+    row.addEventListener("click", () => showDay(new Date(event.startAt)));
+    return row;
+  };
+
+  /** Selects a day, turning the month to it when it lies in another. */
+  const showDay = (day: Date): void => {
+    focusIso = toIso(day);
+    pinnedOutsideIso = null;
+    if (day.getMonth() !== viewMonth || day.getFullYear() !== viewYear) {
+      slide = Math.sign(
+        day.getFullYear() * 12 + day.getMonth() - (viewYear * 12 + viewMonth),
+      );
+      viewYear = day.getFullYear();
+      viewMonth = day.getMonth();
+    }
+    render({ focusGrid: true });
+    paintDayEvents();
+    void refreshUpcoming();
+  };
+
+  const searchMessage = (text: string): HTMLElement => {
+    const message = document.createElement("p");
+    message.className = "day-events-empty";
+    message.textContent = text;
+    return message;
+  };
+
+  /** One result: its time and title; a click closes search on its day. */
+  const searchRow = (event: UpcomingEvent): HTMLElement => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "day-events-next";
+    const when = document.createElement("span");
+    when.className = "day-events-next-when";
+    const time = event.allDay
+      ? "All day"
+      : dateFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(event.startAt));
+    // A call's "location" is often just the service's name; only a place shows.
+    when.textContent = isInPerson(event) ? `${time} · ${event.location!.trim()}` : time;
+    const title = document.createElement("span");
+    title.className = "day-events-next-title";
+    title.textContent = event.title;
+    row.append(when, title);
+    row.title = `Show ${event.title}`;
     row.addEventListener("click", () => {
-      const day = new Date(event.startAt);
-      focusIso = toIso(day);
-      pinnedOutsideIso = null;
-      if (day.getMonth() !== viewMonth || day.getFullYear() !== viewYear) {
-        viewYear = day.getFullYear();
-        viewMonth = day.getMonth();
-      }
-      render({ focusGrid: true });
-      paintDayEvents();
-      void refreshUpcoming();
+      closeSearch(false);
+      showDay(new Date(event.startAt));
     });
     return row;
+  };
+
+  const paintSearch = (): void => {
+    const query = searchInput.value.trim();
+    if (!searchPool) {
+      searchResults.replaceChildren(searchMessage("Searching…"));
+    } else if (!query) {
+      searchResults.replaceChildren();
+    } else {
+      const now = Date.now();
+      const groups = searchEvents(searchPool, query, now);
+      searchResults.replaceChildren(
+        ...(groups.length
+          ? groups.flatMap((group) => {
+              const title = document.createElement("p");
+              title.className = "day-events-coming";
+              title.textContent = searchDayTitle(group.day, now);
+              return [title, ...group.events.map(searchRow)];
+            })
+          : [searchMessage("No Matching Events")]),
+      );
+    }
+    syncHeight();
+  };
+
+  const searchIsOpen = (): boolean => !search.hidden;
+
+  const openSearchPanel = (): void => {
+    if (searchIsOpen()) {
+      searchInput.focus();
+      searchInput.select();
+      return;
+    }
+    search.hidden = false;
+    dayEvents.hidden = true;
+    openSearch.setAttribute("aria-expanded", "true");
+    searchInput.value = "";
+    searchPool = null;
+    paintSearch();
+    searchInput.focus();
+    const request = ++searchRequest;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(start.getDate() - SEARCH_DAYS_BACK);
+    const end = new Date(today);
+    end.setDate(end.getDate() + SEARCH_DAYS_AHEAD + 1);
+    api.getCalendarEvents(start.getTime(), end.getTime()).then(
+      (events) => {
+        if (request !== searchRequest || !searchIsOpen()) return;
+        searchPool = events;
+        paintSearch();
+      },
+      () => {
+        if (request !== searchRequest || !searchIsOpen()) return;
+        searchPool = [];
+        searchResults.replaceChildren(searchMessage("Couldn’t Load Events"));
+        syncHeight();
+      },
+    );
+  };
+
+  /** Back to the day list; the search button takes focus when asked. */
+  const closeSearch = (refocus: boolean): void => {
+    if (!searchIsOpen()) return;
+    searchRequest++;
+    search.hidden = true;
+    dayEvents.hidden = false;
+    openSearch.setAttribute("aria-expanded", "false");
+    searchPool = null;
+    searchResults.replaceChildren();
+    paintDayEvents();
+    syncHeight();
+    if (refocus) openSearch.focus();
   };
 
   /** "2 earlier": today's finished meetings, folded until asked for. */
@@ -554,15 +711,22 @@ function startCalendar(api: DesktopApi): void {
       undefined,
       label.style === "filled" || label.style === "calendar",
     );
+    // The second zone's time follows, when Settings puts it in the menu bar.
+    const zone = settings.secondTimeZone;
+    const zonePiece =
+      settings.secondTimeZoneInMenuBar && zone && isTimeZone(zone)
+        ? `\u2022 ${zoneShort(zone)} ${zoneTime(now.getTime(), zone)}`
+        : "";
+    const fullTitle = [title, zonePiece].filter(Boolean).join(" ");
     const trayStyle = label.style;
     const description = trayDescription(now.getTime(), counting);
-    const signature = `${trayLabelKey(label)}|${title}|${description}`;
+    const signature = `${trayLabelKey(label)}|${fullTitle}|${description}`;
     if (signature === lastTrayLabel) return;
     lastTrayLabel = signature;
     // The cutout style draws its date into the glyph instead of the title.
     const framed = label.style === "framed" ? label.text : null;
     void api.setTrayLabel(
-      title || null,
+      fullTitle || null,
       label.day,
       trayStyle,
       framed === null ? null : framedGlyphPng(framed),
@@ -577,7 +741,7 @@ function startCalendar(api: DesktopApi): void {
     // As Calendar titles a month: the name in full, the year lighter.
     const monthName = document.createElement("span");
     monthName.className = "month-name";
-    monthName.textContent = new Intl.DateTimeFormat(undefined, { month: "long" }).format(
+    monthName.textContent = dateFormat(undefined, { month: "long" }).format(
       new Date(viewYear, viewMonth, 1),
     );
     const year = document.createElement("span");
@@ -631,7 +795,7 @@ function startCalendar(api: DesktopApi): void {
         const number = document.createElement("th");
         number.scope = "row";
         number.className = "weeknum";
-        number.textContent = String(rowWeekNumber(week) ?? "");
+        number.textContent = String(rowWeekNumber(week, settings.weekNumbering) ?? "");
         row.append(number);
       }
       for (const day of week) {
@@ -675,6 +839,8 @@ function startCalendar(api: DesktopApi): void {
         button.addEventListener("click", () => {
           focusIso = day.iso;
           pinnedOutsideIso = day.inMonth ? null : day.iso;
+          // Picking a day means its list, so search makes way for it.
+          closeSearch(false);
           render({ focusGrid: true });
           paintDayEvents();
         });
@@ -785,12 +951,19 @@ function startCalendar(api: DesktopApi): void {
   openSettings.addEventListener("click", () => {
     void api.openSettings();
   });
+  openSearch.addEventListener("click", () => {
+    if (searchIsOpen()) closeSearch(true);
+    else openSearchPanel();
+  });
+  searchInput.addEventListener("input", () => paintSearch());
 
   // Focus rings follow the keyboard: on after a key, off after the mouse.
   document.addEventListener("mousedown", () => {
     delete document.documentElement.dataset.keyboard;
   });
   api.onCalendarHidden(() => {
+    // Search closes with the popover; a reopen shows the day.
+    closeSearch(false);
     // The fold closes with the popover; a reopen shows today's meetings tidy.
     if (pastOpen) {
       pastOpen = false;
@@ -806,10 +979,42 @@ function startCalendar(api: DesktopApi): void {
     if (!event.metaKey && event.key !== "Escape") {
       document.documentElement.dataset.keyboard = "";
     }
+    // Escape leaves search first, and the popover only after.
     if (event.key === "Escape") {
       event.preventDefault();
-      void api.hideCalendar();
+      if (searchIsOpen()) closeSearch(true);
+      else void api.hideCalendar();
       return;
+    }
+    if ((event.key === "f" || event.key === "F") && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      openSearchPanel();
+      return;
+    }
+    // Typing in the field is typing, not the month's keys. Down moves to the
+    // first result, Return opens it.
+    if (event.target === searchInput) {
+      const first = searchResults.querySelector<HTMLButtonElement>("button");
+      if (event.key === "ArrowDown" && first) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.key === "Enter" && first) {
+        event.preventDefault();
+        first.click();
+      }
+      if (!(event.key === "," && (event.metaKey || event.ctrlKey))) return;
+    }
+    // In the results, Up and Down walk the list instead of the month.
+    if (event.target instanceof HTMLElement && searchResults.contains(event.target)) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const rows = Array.from(searchResults.querySelectorAll<HTMLButtonElement>("button"));
+        const at = rows.indexOf(event.target as HTMLButtonElement);
+        const to = at + (event.key === "ArrowDown" ? 1 : -1);
+        (to < 0 ? searchInput : rows[Math.min(to, rows.length - 1)])?.focus();
+        return;
+      }
+      if (event.key !== "," && event.key !== "Tab") return;
     }
     if (event.key === "," && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
@@ -879,9 +1084,15 @@ function startCalendar(api: DesktopApi): void {
     void refreshUpcoming();
   };
 
-  void api.getSettings().then((next) => {
-    applySettings(next);
-  });
+  // Dates and times follow the Mac's Language & Region, read before the
+  // first paint so the month never draws in the wrong format first.
+  void api
+    .getSystemRegion()
+    .then(setRegion, () => setRegion(null))
+    .then(() => api.getSettings())
+    .then((next) => {
+      applySettings(next);
+    });
   void markPopoverMaterial(() => api.getPopoverMaterial());
   api.onSettingsChanged(applySettings);
   // A new day carries the selection with it when it was on the old today,

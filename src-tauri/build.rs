@@ -20,6 +20,7 @@ const COMMANDS: &[&str] = &[
     "check_for_updates",
     "update_available",
     "update_status",
+    "system_region",
     "install_update",
     "open_repository",
     "open_link",
@@ -32,6 +33,7 @@ const COMMANDS: &[&str] = &[
     "request_reminders_access",
     "get_reminders_access",
     "join_meeting",
+    "open_in_maps",
     "open_event",
 ];
 

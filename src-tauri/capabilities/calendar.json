@@ -9,6 +9,7 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-get-settings",
+    "allow-system-region",
     "allow-get-calendar-events",
     "allow-get-dismissed-events",
     "allow-dismiss-upcoming-event",

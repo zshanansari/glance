@@ -9,6 +9,7 @@
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-get-settings",
+    "allow-system-region",
     "allow-get-calendar-events",
     "allow-get-dismissed-events",
     "allow-dismiss-upcoming-event",
@@ -17,6 +18,7 @@
     "allow-hide-reminder",
     "allow-set-reminder-height",
     "allow-open-event",
-    "allow-join-meeting"
+    "allow-join-meeting",
+    "allow-open-in-maps"
   ]
 }

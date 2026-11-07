@@ -37,6 +37,15 @@ pub struct AppSettings {
     pub show_month: bool,
     pub week_starts_on: u8,
     pub show_week_numbers: bool,
+    /// How week numbers count: "iso" (ISO 8601) or "us" (the week holding
+    /// 1 January is week 1, weeks starting on Sunday).
+    pub week_numbering: String,
+    /// Days after today whose events follow today's list; 0 shows none.
+    pub coming_days: u8,
+    /// A second time zone, as an IANA name; empty for none.
+    pub second_time_zone: String,
+    /// Whether that zone's time shows in the menu bar too.
+    pub second_time_zone_in_menu_bar: bool,
     pub highlight_weekdays: Vec<u8>,
     /// Read only so files from before icon styles can be migrated.
     #[serde(default, skip_serializing)]
@@ -57,6 +66,8 @@ pub struct AppSettings {
     pub show_event_time_in_menu_bar: bool,
     /// A card with Join under the menu bar a minute before a meeting starts.
     pub remind_before_meetings: bool,
+    /// The card also comes ten minutes before a meeting with a place and no link.
+    pub remind_in_person: bool,
     pub toggle_calendar_shortcut: String,
     pub join_meeting_shortcut: String,
     pub hidden_calendar_ids: Vec<String>,
@@ -78,6 +89,10 @@ impl Default for AppSettings {
             show_month: false,
             week_starts_on: 0,
             show_week_numbers: false,
+            week_numbering: "iso".into(),
+            coming_days: 3,
+            second_time_zone: String::new(),
+            second_time_zone_in_menu_bar: false,
             highlight_weekdays: vec![0, 6],
             menu_bar_format: String::new(),
             launch_at_login: false,
@@ -91,6 +106,7 @@ impl Default for AppSettings {
             show_event_title_in_menu_bar: false,
             show_event_time_in_menu_bar: false,
             remind_before_meetings: true,
+            remind_in_person: false,
             toggle_calendar_shortcut: "Control+Command+K".into(),
             join_meeting_shortcut: String::new(),
             hidden_calendar_ids: Vec::new(),
@@ -126,6 +142,23 @@ impl AppSettings {
         }
         if self.week_starts_on > 6 {
             self.week_starts_on = base.week_starts_on;
+        }
+        // A zone name is letters, digits and / _ + - only; anything else is
+        // not a zone, and is dropped rather than shown.
+        self.second_time_zone = self.second_time_zone.trim().to_string();
+        if self.second_time_zone.len() > 64
+            || !self
+                .second_time_zone
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "/_+-".contains(c))
+        {
+            self.second_time_zone = String::new();
+        }
+        if !matches!(self.coming_days, 0 | 1 | 2 | 3 | 5 | 7) {
+            self.coming_days = base.coming_days;
+        }
+        if !matches!(self.week_numbering.as_str(), "iso" | "us") {
+            self.week_numbering = base.week_numbering.clone();
         }
         if !matches!(self.theme.as_str(), "system" | "light" | "dark") {
             self.theme = base.theme.clone();
@@ -193,6 +226,8 @@ impl AppSettings {
 pub struct SettingsStore {
     path: PathBuf,
     current: AppSettings,
+    /// Whether there was no settings file to read: a first launch.
+    fresh: bool,
 }
 
 /// Reads settings one field at a time, so a field of the wrong type (a
@@ -297,6 +332,7 @@ fn usable_shortcut(chord: &str, fallback: &str) -> String {
 impl SettingsStore {
     pub fn load(dir: PathBuf) -> Self {
         let path = dir.join("settings.json");
+        let fresh = !path.exists();
         let current = fs::read_to_string(&path)
             .ok()
             .and_then(|raw| {
@@ -321,7 +357,24 @@ impl SettingsStore {
                 Some(parsed.normalize(&AppSettings::default()))
             })
             .unwrap_or_default();
-        Self { path, current }
+        Self {
+            path,
+            current,
+            fresh,
+        }
+    }
+
+    /// On a first launch, starts the week on the day the Mac does and
+    /// numbers weeks as its region does. An existing file keeps its choices.
+    pub fn adopt_region_if_new(&mut self, first_weekday: u8, us_weeks: bool) {
+        if !self.fresh {
+            return;
+        }
+        let mut next = self.current.clone();
+        next.week_starts_on = first_weekday;
+        next.week_numbering = if us_weeks { "us" } else { "iso" }.into();
+        self.update(next);
+        self.fresh = false;
     }
 
     pub fn value(&self) -> AppSettings {

@@ -5,6 +5,8 @@
  * the meeting.
  */
 import {
+  IN_PERSON_LEAD_MS,
+  isInPerson,
   REMINDER_LEAD_MS,
   REMINDER_LINGER_MS,
   reminderEvent,
@@ -12,6 +14,7 @@ import {
   reminderStillDue,
   type UpcomingEvent,
 } from "../shared/events";
+import { dateFormat, setRegion } from "../shared/region";
 import { installTauriBridge, type DesktopApi } from "./host";
 import { sfSymbol } from "./icons";
 import { meetingBrand } from "../shared/meetings";
@@ -25,7 +28,9 @@ function applyTheme(theme: AppSettings["theme"]): void {
   else document.documentElement.setAttribute("data-theme", theme);
 }
 
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+/** Built when used, so it follows the region the window read at start. */
+const timeFormat = (): Intl.DateTimeFormat =>
+  dateFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
 /**
  * "Starts in 1 minute" before the start, "Happening now" once it is under
@@ -45,9 +50,57 @@ export function reminderStep(
   showing: Pick<UpcomingEvent, "startAt" | "endAt"> | null,
   enabled: boolean,
   now: number,
+  shownAt?: number,
 ): "hide" | "refresh" | "look" | "idle" {
-  if (showing) return enabled && reminderStillDue(showing, now) ? "refresh" : "hide";
+  if (showing) {
+    // A card that came back from a snooze after the start stays its full
+    // few minutes from when it came back, not from the start.
+    const due =
+      shownAt !== undefined && shownAt > showing.startAt
+        ? now < Math.min(shownAt + REMINDER_LINGER_MS, showing.endAt)
+        : reminderStillDue(showing, now);
+    return enabled && due ? "refresh" : "hide";
+  }
   return enabled ? "look" : "idle";
+}
+
+/** How long "Remind me later" puts the card away. */
+export const SNOOZE_MS = 5 * 60_000;
+
+export type Snooze = { event: UpcomingEvent; until: number };
+
+/**
+ * The snoozed meeting due back now, if any, and the snoozes still to keep:
+ * one whose meeting has ended is dropped.
+ */
+export function takeDueSnooze(
+  snoozes: readonly Snooze[],
+  now: number,
+): { due: Snooze | null; keep: Snooze[] } {
+  const live = snoozes.filter((snooze) => snooze.event.endAt > now);
+  const due = live.find((snooze) => snooze.until <= now) ?? null;
+  return { due, keep: due ? live.filter((snooze) => snooze !== due) : live };
+}
+
+const SNOOZE_STORE = "glance.snoozed";
+
+/** Snoozes survive a restart in the card's own storage. */
+function loadSnoozes(): Snooze[] {
+  try {
+    const raw = localStorage.getItem(SNOOZE_STORE);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as Snooze[]).slice(0, 20) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSnoozes(snoozes: readonly Snooze[]): void {
+  try {
+    localStorage.setItem(SNOOZE_STORE, JSON.stringify(snoozes));
+  } catch {
+    // Storage is a convenience: without it a snooze lasts until a restart.
+  }
 }
 
 function occurrenceKey(event: Pick<UpcomingEvent, "id" | "startAt">): string {
@@ -60,7 +113,10 @@ export function startReminder(
   announcer: HTMLElement | null = null,
 ): void {
   let enabled = false;
+  let inPerson = false;
   let showing: UpcomingEvent | null = null;
+  let shownAt = 0;
+  let snoozes = loadSnoozes();
   // Each occurrence is offered once: a dismissed or ignored card stays gone.
   const offered = new Set<string>();
   let checking = 0;
@@ -111,7 +167,7 @@ export function startReminder(
     title.className = "title";
     const when = document.createElement("span");
     when.className = "time";
-    when.textContent = timeFormat.format(new Date(event.startAt));
+    when.textContent = timeFormat().format(new Date(event.startAt));
     title.append(when, ` ${event.title}`);
     element.title = `${when.textContent} · ${event.title}`;
     element.setAttribute("aria-label", `Open ${event.title} in Calendar`);
@@ -159,8 +215,30 @@ export function startReminder(
         });
       });
       nodes.push(join);
+    } else if (isInPerson(event) && event.location) {
+      // Somewhere to go: the place, and a way to find it.
+      const place = event.location.trim();
+      const maps = action(sfSymbol("map", 14), place, () => {
+        api.openInMaps(place).then(hide, () => {
+          const text = maps.querySelector(".label");
+          if (text) text.textContent = "Couldn’t open Maps";
+          if (announcer) announcer.textContent = "Couldn’t open Maps";
+        });
+      });
+      maps.title = `Open ${place} in Maps`;
+      maps.setAttribute("aria-label", `Open ${place} in Maps`);
+      nodes.push(maps);
     }
     nodes.push(
+      // Puts the card away and brings it back in five minutes, Join and all.
+      action(sfSymbol("clock", 14), "Remind me in 5 minutes", () => {
+        snoozes = [
+          ...snoozes.filter((snooze) => occurrenceKey(snooze.event) !== occurrenceKey(event)),
+          { event, until: Date.now() + SNOOZE_MS },
+        ];
+        saveSnoozes(snoozes);
+        hide();
+      }),
       // Skipping stops the countdown too; Escape only puts the card away.
       action(sfSymbol("eye.slash", 14), "Skip this meeting", () => {
         void api.dismissUpcomingEvent(event.id, event.endAt);
@@ -175,19 +253,38 @@ export function startReminder(
   const check = async (): Promise<void> => {
     const run = ++checking;
     const now = Date.now();
-    const step = reminderStep(showing, enabled, now);
+    const step = reminderStep(showing, enabled, now, shownAt);
     if (step === "hide") hide();
     if (showing && step === "refresh") refreshHeading(showing, now);
     if (step !== "look") return;
     try {
       const [events, dismissed] = await Promise.all([
-        api.getCalendarEvents(now - REMINDER_LINGER_MS, now + REMINDER_LEAD_MS),
+        api.getCalendarEvents(
+          now - REMINDER_LINGER_MS,
+          now + (inPerson ? IN_PERSON_LEAD_MS : REMINDER_LEAD_MS),
+        ),
         api.getDismissedEvents().catch(() => []),
       ]);
       if (run !== checking || showing) return;
-      const event = reminderEvent(events, now, dismissed, (candidate) =>
-        offered.has(occurrenceKey(candidate)),
-      );
+      // A snoozed meeting coming back takes precedence over a new one.
+      // Ended meetings drop out now; the due one stays until its card has
+      // actually appeared, since the host holds cards back while the month
+      // is open.
+      const { due, keep } = takeDueSnooze(snoozes, now);
+      const pruned = due ? [...keep, due] : keep;
+      if (pruned.length !== snoozes.length) {
+        snoozes = pruned;
+        saveSnoozes(snoozes);
+      }
+      const event =
+        due?.event ??
+        reminderEvent(
+          events,
+          now,
+          dismissed,
+          (candidate) => offered.has(occurrenceKey(candidate)),
+          inPerson,
+        );
       if (!event) return;
       paint(event, now);
       // The host holds it back while the month is open, which lists the
@@ -196,6 +293,11 @@ export function startReminder(
       if (await api.showReminder()) {
         offered.add(occurrenceKey(event));
         showing = event;
+        shownAt = now;
+        if (due) {
+          snoozes = snoozes.filter((snooze) => snooze !== due);
+          saveSnoozes(snoozes);
+        }
         // Said once, when the card arrives, not again on every minute.
         if (announcer) announcer.textContent = `${reminderHeading(event, now)}: ${event.title}`;
       }
@@ -211,13 +313,19 @@ export function startReminder(
   });
 
   void markPopoverMaterial(() => api.getPopoverMaterial());
-  void api.getSettings().then((settings) => {
-    enabled = settings.remindBeforeMeetings;
-    applyTheme(settings.theme);
-    void check();
-  });
+  void api
+    .getSystemRegion()
+    .then(setRegion, () => setRegion(null))
+    .then(() => api.getSettings())
+    .then((settings) => {
+      enabled = settings.remindBeforeMeetings;
+      inPerson = settings.remindInPerson;
+      applyTheme(settings.theme);
+      void check();
+    });
   api.onSettingsChanged((settings) => {
     enabled = settings.remindBeforeMeetings;
+    inPerson = settings.remindInPerson;
     applyTheme(settings.theme);
     void check();
   });

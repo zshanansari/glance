@@ -8,6 +8,7 @@ mod clock;
 mod events;
 mod glass;
 mod placement;
+mod region;
 mod settings;
 mod shortcuts;
 mod tray;
@@ -535,6 +536,12 @@ fn join_meeting(url: String) -> Result<(), String> {
     events::open_meeting(&url)
 }
 
+/// Shows a meeting's place in Maps.
+#[tauri::command]
+fn open_in_maps(place: String) -> Result<(), String> {
+    events::open_https(&events::maps_url(&place)?)
+}
+
 #[tauri::command]
 fn open_event(id: String) -> Result<(), String> {
     events::open_event(&id)
@@ -564,6 +571,13 @@ async fn check_for_updates(app: AppHandle) -> Result<UpdateOffer, String> {
             .unwrap_or_default(),
         notes: found.and_then(|update| update.body).unwrap_or_default(),
     })
+}
+
+/// The Mac's locale, clock and first weekday, for formatting dates and times
+/// as Language & Region sets them.
+#[tauri::command]
+fn system_region() -> region::SystemRegion {
+    region::current()
 }
 
 /// What the last check said, for a Settings window that opened after it.
@@ -647,7 +661,12 @@ pub fn run() {
             std::fs::create_dir_all(&user_data).ok();
             let dismissed_path = user_data.join("dismissed.json");
             let dismissed = events::load_dismissed(&dismissed_path, unix_now_ms());
-            let store = SettingsStore::load(user_data);
+            let mut store = SettingsStore::load(user_data);
+            let system = region::current();
+            store.adopt_region_if_new(
+                system.first_weekday,
+                region::numbers_weeks_like_the_us(system.region.as_deref()),
+            );
             let initial = store.value();
             app.manage(AppState {
                 settings: Mutex::new(store),
@@ -711,6 +730,7 @@ pub fn run() {
             get_dismissed_events,
             suspend_shortcuts,
             update_status,
+            system_region,
             dismiss_upcoming_event,
             list_calendars,
             request_calendar_access,
@@ -718,6 +738,7 @@ pub fn run() {
             request_reminders_access,
             get_reminders_access,
             join_meeting,
+            open_in_maps,
             open_event,
         ])
         .run(tauri::generate_context!())

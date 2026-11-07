@@ -18,6 +18,9 @@
         <header class="header">
           <h1 id="month-label"></h1>
           <div class="nav">
+            <button type="button" class="icon-button" id="open-search" title="Search events (⌘F)" aria-controls="search" aria-expanded="false">
+              <span class="visually-hidden">Search events</span>
+            </button>
             <button type="button" class="today-button" id="today-month" title="Go to today">Today</button>
             <button type="button" class="icon-button" id="prev-month" title="Previous month">
               <span class="visually-hidden">Previous month</span>
@@ -32,6 +35,20 @@
         <div id="grid"></div>
 
         <hr class="separator" />
+
+        <section class="search" id="search" aria-label="Search events" hidden>
+          <input
+            type="search"
+            id="search-input"
+            class="search-input"
+            placeholder="Search events"
+            aria-label="Search events"
+            aria-controls="search-results"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="search-results" id="search-results" aria-live="polite"></div>
+        </section>
 
         <section class="day-events" id="day-events" aria-labelledby="day-events-title">
           <div class="day-events-heading">

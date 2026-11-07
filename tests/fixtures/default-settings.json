@@ -4,6 +4,10 @@
   "showMonth": false,
   "weekStartsOn": 0,
   "showWeekNumbers": false,
+  "weekNumbering": "iso",
+  "comingDays": 3,
+  "secondTimeZone": "",
+  "secondTimeZoneInMenuBar": false,
   "highlightWeekdays": [
     0,
     6
@@ -18,6 +22,7 @@
   "showEventTitleInMenuBar": false,
   "showEventTimeInMenuBar": false,
   "remindBeforeMeetings": true,
+  "remindInPerson": false,
   "toggleCalendarShortcut": "Control+Command+K",
   "joinMeetingShortcut": "",
   "hiddenCalendarIds": [],

@@ -1284,6 +1284,18 @@ pub fn open_meeting(url: &str) -> Result<(), String> {
     open_https(url)
 }
 
+/// Apple Maps searching for a meeting's place. The host is fixed and the
+/// place goes in as a query value, so the text cannot point anywhere else.
+pub fn maps_url(place: &str) -> Result<String, String> {
+    let place = place.trim();
+    if place.is_empty() || place.chars().count() > 500 {
+        return Err("Not a place".into());
+    }
+    url::Url::parse_with_params("https://maps.apple.com/", &[("q", place)])
+        .map(|url| url.to_string())
+        .map_err(|error| error.to_string())
+}
+
 /// Opens a fixed https address the host itself chose, such as the repository.
 pub fn open_https(url: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -1606,6 +1618,18 @@ mod tests {
         ] {
             assert!(!is_meeting_url(bad), "{bad} should not be joinable");
         }
+    }
+
+    #[test]
+    fn maps_url_keeps_the_place_inside_the_query() {
+        assert_eq!(
+            super::maps_url("Room 4, 1 Infinite Loop").unwrap(),
+            "https://maps.apple.com/?q=Room+4%2C+1+Infinite+Loop"
+        );
+        assert!(super::maps_url("x&y=https://evil.example")
+            .unwrap()
+            .starts_with("https://maps.apple.com/?q=x%26y%3D"));
+        assert!(super::maps_url("  ").is_err());
     }
 
     #[test]

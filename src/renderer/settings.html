@@ -281,9 +281,33 @@
               <div class="row">
                 <div class="copy">
                   <label for="week-numbers">Week numbers</label>
-                  <p>ISO week numbers along the left edge of the month.</p>
+                  <p>Along the left edge of the month.</p>
                 </div>
                 <input id="week-numbers" name="showWeekNumbers" type="checkbox" switch />
+              </div>
+              <div class="row" id="week-numbering-row">
+                <div class="copy">
+                  <label for="week-numbering">Count weeks</label>
+                  <p>ISO starts week 1 with the first Thursday; US with 1 January.</p>
+                </div>
+                <select id="week-numbering" name="weekNumbering">
+                  <option value="iso">ISO 8601</option>
+                  <option value="us">US</option>
+                </select>
+              </div>
+              <div class="row">
+                <div class="copy">
+                  <label for="coming-days">Coming days</label>
+                  <p>Meetings on the next few days, under today&rsquo;s.</p>
+                </div>
+                <select id="coming-days" name="comingDays">
+                  <option value="0">Off</option>
+                  <option value="1">1 day</option>
+                  <option value="2">2 days</option>
+                  <option value="3">3 days</option>
+                  <option value="5">5 days</option>
+                  <option value="7">1 week</option>
+                </select>
               </div>
               <div class="row">
                 <div class="copy">
@@ -311,6 +335,29 @@
                   role="group"
                   aria-labelledby="highlight-label"
                 ></div>
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            <h2 id="zone-heading">Second time zone</h2>
+            <div class="card">
+              <div class="row">
+                <div class="copy">
+                  <label for="second-time-zone">Time zone</label>
+                  <p>Each meeting&rsquo;s start there too, beside its time.</p>
+                </div>
+                <select id="second-time-zone" name="secondTimeZone">
+                  <option value="">Off</option>
+                </select>
+              </div>
+              <div class="row">
+                <label for="second-time-zone-in-menu-bar">Show in the menu bar</label>
+                <input
+                  id="second-time-zone-in-menu-bar"
+                  name="secondTimeZoneInMenuBar"
+                  type="checkbox"
+                  switch
+                />
               </div>
             </div>
           </div>
@@ -459,6 +506,13 @@
                   type="checkbox"
                   switch
                 />
+              </div>
+              <div class="row">
+                <div class="copy">
+                  <label for="remind-in-person">In-person meetings too</label>
+                  <p>Ten minutes ahead for a meeting with a place and no call link, with Open in Maps.</p>
+                </div>
+                <input id="remind-in-person" name="remindInPerson" type="checkbox" switch />
               </div>
             </div>
           </div>

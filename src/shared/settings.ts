@@ -1,6 +1,11 @@
+import { dateFormat } from "./region";
+
 export type WeekStartsOn = Weekday;
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type Theme = "system" | "light" | "dark";
+export type WeekNumbering = "iso" | "us";
+export const COMING_DAYS = [0, 1, 2, 3, 5, 7] as const;
+export type ComingDays = (typeof COMING_DAYS)[number];
 export type MenuBarIconStyle = "filled" | "framed" | "calendar" | "none";
 /** Look-ahead lengths, counted in whole local days through midnight. */
 export const UPCOMING_HORIZON_DAYS = [1, 2, 3, 4, 5, 6, 7, 14, 30] as const;
@@ -38,6 +43,14 @@ export type AppSettings = {
   showMonth: boolean;
   weekStartsOn: WeekStartsOn;
   showWeekNumbers: boolean;
+  /** "iso" (ISO 8601) or "us" (week 1 holds 1 January, weeks from Sunday). */
+  weekNumbering: WeekNumbering;
+  /** Days after today whose events follow today's list; 0 shows none. */
+  comingDays: ComingDays;
+  /** A second time zone (IANA name), or "" for none. */
+  secondTimeZone: string;
+  /** Whether that zone's time shows in the menu bar too. */
+  secondTimeZoneInMenuBar: boolean;
   highlightWeekdays: Weekday[];
   launchAtLogin: boolean;
   beepOnTheHour: boolean;
@@ -59,6 +72,8 @@ export type AppSettings = {
   showEventTimeInMenuBar: boolean;
   /** A card with Join under the menu bar a minute before a meeting starts. */
   remindBeforeMeetings: boolean;
+  /** The card also comes ten minutes before a meeting with a place and no link. */
+  remindInPerson: boolean;
   /** System-wide chord that toggles the month popover. Empty is unset. */
   toggleCalendarShortcut: string;
   /** System-wide chord that joins the meeting under way or next today. Empty is unset. */
@@ -155,6 +170,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showMonth: false,
   weekStartsOn: 0,
   showWeekNumbers: false,
+  weekNumbering: "iso",
+  comingDays: 3,
+  secondTimeZone: "",
+  secondTimeZoneInMenuBar: false,
   highlightWeekdays: [...DEFAULT_HIGHLIGHT_WEEKDAYS],
   launchAtLogin: false,
   beepOnTheHour: false,
@@ -166,6 +185,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showEventTitleInMenuBar: false,
   showEventTimeInMenuBar: false,
   remindBeforeMeetings: true,
+  remindInPerson: false,
   toggleCalendarShortcut: "Control+Command+K",
   joinMeetingShortcut: "",
   hiddenCalendarIds: [],
@@ -177,7 +197,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export function weekdayLetter(id: Weekday, locale?: string): string {
   // 5 January 2020 is a Sunday, so adding `id` lands on that weekday.
-  return new Intl.DateTimeFormat(locale, { weekday: "narrow" }).format(
+  return dateFormat(locale, { weekday: "narrow" }).format(
     new Date(2020, 0, 5 + id, 12),
   );
 }
@@ -252,7 +272,7 @@ export type MenuBarLabel = {
 };
 
 function formatPart(part: MenuBarPart, date: Date, locale?: string): string {
-  return new Intl.DateTimeFormat(locale, PART_OPTIONS[part]).format(date);
+  return dateFormat(locale, PART_OPTIONS[part]).format(date);
 }
 
 /**

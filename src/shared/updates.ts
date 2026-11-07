@@ -1,3 +1,4 @@
+import { dateFormat } from "./region";
 /** What the last update check said (`updates.rs`). */
 export type UpdateStatus = {
   checkedAt: number | null;
@@ -20,7 +21,7 @@ export function updateFailureReason(error: string): string {
 
 /** "today at 2:51 AM", "yesterday at 9:05 PM", or "4 Nov at 10:00 AM". */
 export function checkedWhen(checkedAt: number, now: number, locale?: string): string {
-  const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(
+  const time = dateFormat(locale, { hour: "numeric", minute: "2-digit" }).format(
     new Date(checkedAt),
   );
   const startOf = (value: number) => {
@@ -31,7 +32,7 @@ export function checkedWhen(checkedAt: number, now: number, locale?: string): st
   const days = Math.round((startOf(now) - startOf(checkedAt)) / 86_400_000);
   if (days === 0) return `today at ${time}`;
   if (days === 1) return `yesterday at ${time}`;
-  const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(
+  const date = dateFormat(locale, { day: "numeric", month: "short" }).format(
     new Date(checkedAt),
   );
   return `${date} at ${time}`;

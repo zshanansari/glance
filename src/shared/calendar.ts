@@ -1,4 +1,5 @@
 import type { WeekStartsOn } from "./settings";
+import { dateFormat } from "./region";
 
 export type CalendarDay = {
   iso: string;
@@ -80,7 +81,7 @@ export function weekdayIndex(date: Date, weekStartsOn: WeekStartsOn): number {
 
 /** "November 2026", in full, for the grid's caption and VoiceOver. */
 export function monthTitle(year: number, month: number, locale?: string): string {
-  return new Intl.DateTimeFormat(locale, {
+  return dateFormat(locale, {
     month: "long",
     year: "numeric",
   }).format(atNoon(year, month, 1));
@@ -90,9 +91,9 @@ export function weekdayLabels(
   weekStartsOn: WeekStartsOn,
   locale?: string,
 ): { short: string; long: string; narrow: string }[] {
-  const short = new Intl.DateTimeFormat(locale, { weekday: "short" });
-  const long = new Intl.DateTimeFormat(locale, { weekday: "long" });
-  const narrow = new Intl.DateTimeFormat(locale, { weekday: "narrow" });
+  const short = dateFormat(locale, { weekday: "short" });
+  const long = dateFormat(locale, { weekday: "long" });
+  const narrow = dateFormat(locale, { weekday: "narrow" });
   // 5 Jan 2020 is a Sunday, so offsets land on a known weekday.
   return Array.from({ length: WEEKDAY_COUNT }, (_, index) => {
     const date = atNoon(2020, 0, 5 + weekStartsOn + index);
@@ -109,9 +110,38 @@ export function weekdayLabels(
  * first column is a Sunday or Saturday when the week starts there, and that
  * day still belongs to the ISO week before.
  */
-export function rowWeekNumber(row: readonly CalendarDay[]): number | null {
+export function rowWeekNumber(
+  row: readonly CalendarDay[],
+  numbering: "iso" | "us" = "iso",
+): number | null {
+  if (numbering === "us") return rowUsWeekNumber(row);
   const monday = row.find((day) => new Date(day.year, day.month, day.day).getDay() === 1);
   return (monday ?? row[0])?.weekNumber ?? null;
+}
+
+/**
+ * The US week number of a date: week 1 holds 1 January, and each week
+ * starts on Sunday, so the year's first week may be short.
+ */
+export function usWeekNumber(date: Date): number {
+  const january = new Date(date.getFullYear(), 0, 1);
+  const day = Math.round(
+    (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() - january.getTime()) /
+      86_400_000,
+  );
+  return Math.floor((day + january.getDay()) / 7) + 1;
+}
+
+/**
+ * The US week a row belongs to. A row holding 1 January is week 1 of the new
+ * year; any other row takes the week of its Sunday, which is how a US
+ * calendar counts even when the month starts its weeks on another day.
+ */
+export function rowUsWeekNumber(row: readonly CalendarDay[]): number | null {
+  if (row.some((day) => day.month === 0 && day.day === 1)) return 1;
+  const sunday = row.find((day) => new Date(day.year, day.month, day.day).getDay() === 0);
+  const pick = sunday ?? row[0];
+  return pick ? usWeekNumber(new Date(pick.year, pick.month, pick.day)) : null;
 }
 
 export function buildMonth(
@@ -154,7 +184,7 @@ export function buildMonth(
 }
 
 export function dayName(date: Date, locale?: string): string {
-  return new Intl.DateTimeFormat(locale, {
+  return dateFormat(locale, {
     weekday: "long",
     month: "long",
     day: "numeric",
