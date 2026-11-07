@@ -495,6 +495,88 @@ pub(crate) fn paint_tray_glyph(tray: &tauri::tray::TrayIcon, base: Option<&[u8]>
     }
     #[cfg(target_os = "macos")]
     align_status_item_content(tray);
+    #[cfg(target_os = "macos")]
+    fit_status_item_to_menu_bar(tray);
+}
+
+/// The glyph's height in the menu bar. The PNGs are drawn at 18pt with
+/// their ink filling most of it, which stood taller than the system's own
+/// items; at 15pt the ink matches Control Centre and Spotlight.
+#[cfg(target_os = "macos")]
+const GLYPH_HEIGHT: f64 = 15.0;
+
+/// The cutout badge carries the date as text inside it, so it keeps the
+/// height that lets that text read at the size of the title beside it.
+#[cfg(target_os = "macos")]
+const BADGE_HEIGHT: f64 = 18.0;
+
+/// How far the title is raised so its baseline meets the clock's and the
+/// other status items': a plain title sits half a point low beside a glyph.
+#[cfg(target_os = "macos")]
+const TITLE_BASELINE_RAISE: f64 = 0.5;
+
+/// Sizes the glyph like the system's own items and sets the title in the
+/// menu bar's own font, as the clock draws it: the menu bar size, regular
+/// weight, and digits of one width, so a countdown does not shift sideways
+/// as it ticks.
+#[cfg(target_os = "macos")]
+pub(crate) fn fit_status_item_to_menu_bar(tray: &tauri::tray::TrayIcon) {
+    use objc2::runtime::AnyObject;
+    use objc2::AnyThread;
+    use objc2_app_kit::{
+        NSBaselineOffsetAttributeName, NSFont, NSFontAttributeName, NSFontWeightRegular,
+    };
+    use objc2_foundation::{MainThreadMarker, NSAttributedString, NSDictionary, NSNumber, NSSize};
+
+    let _ = tray.with_inner_tray_icon(|inner| {
+        let Some(item) = inner.ns_status_item() else {
+            return;
+        };
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
+        let Some(button) = item.button(mtm) else {
+            return;
+        };
+        if let Some(image) = button.image() {
+            let current = image.size();
+            // Square glyphs are icons; a wide one is the cutout badge.
+            let height = if current.width > current.height * 1.25 {
+                BADGE_HEIGHT
+            } else {
+                GLYPH_HEIGHT
+            };
+            if current.height > 0.0 && (current.height - height).abs() > 0.01 {
+                let width = current.width * height / current.height;
+                image.setSize(NSSize::new(width, height));
+                button.setImage(Some(&image));
+            }
+        }
+        let title = button.title();
+        if title.length() == 0 {
+            return;
+        }
+        let size = NSFont::menuBarFontOfSize(0.0).pointSize();
+        let font =
+            unsafe { NSFont::monospacedDigitSystemFontOfSize_weight(size, NSFontWeightRegular) };
+        let raise = NSNumber::new_f64(TITLE_BASELINE_RAISE);
+        let font_object: &AnyObject = &font;
+        let raise_object: &AnyObject = &raise;
+        let attributes = unsafe {
+            NSDictionary::from_slices(
+                &[NSFontAttributeName, NSBaselineOffsetAttributeName],
+                &[font_object, raise_object],
+            )
+        };
+        let styled = unsafe {
+            NSAttributedString::initWithString_attributes(
+                NSAttributedString::alloc(),
+                &title,
+                Some(&attributes),
+            )
+        };
+        button.setAttributedTitle(&styled);
+    });
 }
 
 /// Follows a check's verdict into the menu bar: the dot on the glyph, and the

@@ -719,27 +719,29 @@ describe("the menu bar title", () => {
   const start = new Date(2026, 10, 9, 15, 0).getTime();
   const call = { startAt: start, endAt: start + 30 * 60_000, allDay: false, title: "Design sync" };
   const plain = { showTitle: false, showTime: false };
-  const hair = "\u200a";
 
   it("is just the date with nothing to count down", () => {
     expect(trayTitle("Mon 9", null, start, plain)).toBe("Mon 9");
     expect(trayTitle(null, null, start, plain)).toBe("");
   });
 
-  it("adds the countdown after a bullet, with hair spaces in the units", () => {
+  it("adds the countdown after a middle dot, written as the clock writes it", () => {
     expect(trayTitle("Mon 9", call, start - 2 * 3_600_000 - 21 * 60_000, plain)).toBe(
-      `Mon 9 \u2022 in 2${hair}h 21${hair}m`,
+      "Mon 9 \u00b7 in 2h 21m",
     );
-    expect(trayTitle(null, call, start - 25 * 60_000, plain)).toBe(`\u2022 in 25${hair}m`);
+    expect(trayTitle(null, call, start - 25 * 60_000, plain)).toBe("\u00b7 in 25m");
   });
 
   it("adds the time and name when Settings asks, and drops the time once it starts", () => {
     const both = { showTitle: true, showTime: true };
+    const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
+      new Date(start),
+    );
     expect(trayTitle(null, call, start - 25 * 60_000, both, "en-US")).toBe(
-      `\u2022 in 25${hair}m 3:00 PM  Design sync`,
+      `\u00b7 in 25m ${time}  Design sync`,
     );
     expect(trayTitle(null, call, start + 15 * 60_000, both, "en-US")).toBe(
-      `\u2022 15${hair}m left Design sync`,
+      "\u00b7 15m left Design sync",
     );
   });
 
