@@ -84,18 +84,16 @@ chord for joining the next meeting.
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/countdown.png" alt="The menu bar item counting down to the next meeting: “• in 6m” after the calendar icon" width="110">
+  <img src="docs/screenshots/countdown.png" alt="The menu bar item counting down to the next meeting: “• in 6m” after the calendar icon" width="96">
   <br>
   <sub>The menu bar item counting down to the next meeting.</sub>
 </p>
 
-<!-- Reminder card, once captured as docs/screenshots/reminder.png:
 <p align="center">
-  <img src="docs/screenshots/reminder.png" alt="The reminder card under the menu bar item a minute before a call: the meeting's name and time, with Join, Snooze and Skip" width="320">
+  <img src="docs/screenshots/reminder.png" alt="The reminder card a minute before a call: “Starts in 1 minute”, the meeting’s time and name, Join Zoom meeting, Remind me in 5 minutes, and Skip this meeting" width="326">
   <br>
   <sub>A minute before a call, the card offers Join without taking focus.</sub>
 </p>
--->
 
 ## Install
 
