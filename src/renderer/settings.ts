@@ -46,17 +46,7 @@ import { rovingTarget } from "../shared/roving";
 import { setRegion } from "../shared/region";
 import { knownTimeZones } from "../shared/zones";
 import { updateStatusLine, type UpdateStatus } from "../shared/updates";
-
-function requireElement<T extends HTMLElement>(id: string): T {
-  const node = document.getElementById(id);
-  if (!node) throw new Error(`Missing #${id}`);
-  return node as T;
-}
-
-function applyTheme(theme: Theme): void {
-  if (theme === "system") document.documentElement.removeAttribute("data-theme");
-  else document.documentElement.setAttribute("data-theme", theme);
-}
+import { applyTheme, requireElement } from "./dom";
 
 function fillSelect(
   select: HTMLSelectElement,

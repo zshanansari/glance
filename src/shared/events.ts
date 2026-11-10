@@ -262,6 +262,14 @@ export type DismissedOccurrence = {
   endAt: number;
 };
 
+/**
+ * One occurrence of an event: a repeating meeting shares its id across
+ * days, so the start tells this one apart.
+ */
+export function occurrenceKey(event: Pick<UpcomingEvent, "id" | "startAt">): string {
+  return `${event.id}@${event.startAt}`;
+}
+
 export function occurrenceIsDismissed(
   event: Pick<UpcomingEvent, "id" | "endAt">,
   dismissed: readonly DismissedOccurrence[],
@@ -714,7 +722,7 @@ export function searchEvents(
   if (!words.length) return [];
   const seen = new Set<string>();
   const found = events.filter((event) => {
-    const key = `${event.id}@${event.startAt}`;
+    const key = occurrenceKey(event);
     if (seen.has(key)) return false;
     seen.add(key);
     const text = folded(`${event.title} ${event.location ?? ""}`);

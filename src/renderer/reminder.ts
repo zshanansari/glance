@@ -8,6 +8,7 @@ import {
   IN_PERSON_LEAD_MS,
   isInPerson,
   occurrenceIsDismissed,
+  occurrenceKey,
   REMINDER_LEAD_MS,
   REMINDER_LINGER_MS,
   reminderEvent,
@@ -21,13 +22,7 @@ import { sfSymbol } from "./icons";
 import { meetingBrand } from "../shared/meetings";
 import { meetingIcon } from "./brand-icons";
 import { markPopoverMaterial, popoverHeight } from "./popover-size";
-import type { AppSettings } from "../shared/settings";
-
-/** Follows Settings' Theme, as the month does, instead of only the system. */
-function applyTheme(theme: AppSettings["theme"]): void {
-  if (theme === "system") document.documentElement.removeAttribute("data-theme");
-  else document.documentElement.setAttribute("data-theme", theme);
-}
+import { applyTheme } from "./dom";
 
 /** Built when used, so it follows the region the window read at start. */
 const timeFormat = (): Intl.DateTimeFormat =>
@@ -126,10 +121,6 @@ function saveSnoozes(snoozes: readonly Snooze[]): void {
   } catch {
     // Storage is a convenience: without it a snooze lasts until a restart.
   }
-}
-
-function occurrenceKey(event: Pick<UpcomingEvent, "id" | "startAt">): string {
-  return `${event.id}@${event.startAt}`;
 }
 
 export function startReminder(

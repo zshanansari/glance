@@ -417,6 +417,15 @@ pub(crate) fn tray_title_text(title: Option<&str>) -> String {
 /// and a reminder card on screen has to follow it. The item's frame is only
 /// current once AppKit has laid the new title out, a moment after it is set.
 pub(crate) fn follow_status_item(app: &AppHandle) {
+    // The menu bar is repainted every minute, and the card is almost never
+    // up; only then is there anything to follow, so only then a thread.
+    let card_open = app
+        .get_webview_window(REMINDER_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+    if !card_open {
+        return;
+    }
     let handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(120));

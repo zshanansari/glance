@@ -36,6 +36,7 @@ import {
   eventTimeRange,
   trayIconEvent,
   upcomingFetchEnd,
+  occurrenceKey,
   type UpcomingEvent,
 } from "../shared/events";
 import { sfSymbol } from "./icons";
@@ -53,17 +54,7 @@ import { framedGlyphPng } from "./tray-frame";
 import { boxHeight, markPopoverMaterial } from "./popover-size";
 import { bandBox } from "./column-bands";
 import { installTauriBridge, type DesktopApi } from "./host";
-
-function requireElement<T extends HTMLElement>(id: string): T {
-  const node = document.getElementById(id);
-  if (!node) throw new Error(`Missing #${id}`);
-  return node as T;
-}
-
-function applyTheme(theme: AppSettings["theme"]): void {
-  if (theme === "system") document.documentElement.removeAttribute("data-theme");
-  else document.documentElement.setAttribute("data-theme", theme);
-}
+import { applyTheme, requireElement } from "./dom";
 
 function announce(message: string): void {
   requireElement("live").textContent = message;
@@ -266,7 +257,7 @@ function startCalendar(api: DesktopApi): void {
       ]);
       const seen = new Set<string>();
       const all = batches.flat().filter((event) => {
-        const key = `${event.id}@${event.startAt}`;
+        const key = occurrenceKey(event);
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -356,7 +347,7 @@ function startCalendar(api: DesktopApi): void {
     open.className = "day-event-open";
     // A long name is cut short in the row; the tooltip carries it whole.
     open.title = event.title;
-    const occurrence = `${event.id}@${event.startAt}`;
+    const occurrence = occurrenceKey(event);
     open.dataset.focusKey = `open:${occurrence}`;
     const dot = document.createElement("span");
     dot.className = "day-event-dot";
