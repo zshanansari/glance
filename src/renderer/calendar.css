@@ -611,6 +611,58 @@ button:focus {
   color: var(--accent);
 }
 
+/* A reminder is ticked off from a circle where an event's dot sits, as in
+   Reminders. The circle takes the list's color; the title lines up with an
+   event's: 5px margin, a 16px circle and 4px of padding make the 25px an
+   event's 9px padding, 8px dot and 8px gap do. */
+.day-event.is-reminder .day-event-open {
+  grid-template-areas:
+    "title"
+    "time";
+  grid-template-columns: minmax(0, 1fr);
+  padding-left: 4px;
+}
+
+.day-event-check {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 5px;
+  border-radius: 50%;
+}
+
+.day-event-check::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--event-color, var(--secondary));
+  border-radius: 50%;
+}
+
+/* Filled while pointed at, as the click target, and once ticked off while
+   the list catches up. */
+:root:not([data-pointer-away]) .day-event-check:hover::before,
+.day-event-check.is-done::before {
+  background: var(--event-color, var(--accent));
+}
+
+/* On the highlighted row the circle is drawn in the row's own white. */
+:root:not([data-pointer-away]) .day-event:hover .day-event-check::before,
+:root[data-keyboard] .day-event:has(.day-event-open:focus) .day-event-check::before {
+  border-color: var(--on-accent);
+}
+
+:root:not([data-pointer-away]) .day-event:hover .day-event-check:hover::before {
+  background: var(--on-accent);
+}
+
+:root[data-keyboard] .day-event-check:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* A coming day's heading under today's list, as the section's own. */
 .day-events-coming {
   margin: 8px 0 0;

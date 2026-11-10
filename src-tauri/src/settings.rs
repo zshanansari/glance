@@ -82,6 +82,10 @@ pub struct AppSettings {
     pub remind_in_person: bool,
     pub toggle_calendar_shortcut: String,
     pub join_meeting_shortcut: String,
+    /// System-wide chord that opens the calendar straight into quick add.
+    /// Empty until recorded, so an update never starts taking a chord from
+    /// another app.
+    pub quick_add_shortcut: String,
     pub hidden_calendar_ids: Vec<String>,
     pub auto_update: bool,
     pub theme: String,
@@ -123,6 +127,7 @@ impl Default for AppSettings {
             remind_in_person: false,
             toggle_calendar_shortcut: "Control+Command+K".into(),
             join_meeting_shortcut: String::new(),
+            quick_add_shortcut: String::new(),
             hidden_calendar_ids: Vec::new(),
             auto_update: true,
             theme: "system".into(),
@@ -224,6 +229,16 @@ impl AppSettings {
                 == canonical_chord(&self.toggle_calendar_shortcut)
         {
             self.join_meeting_shortcut = String::new();
+        }
+        self.quick_add_shortcut =
+            usable_shortcut(&self.quick_add_shortcut, &base.quick_add_shortcut);
+        if !self.quick_add_shortcut.is_empty() {
+            let quick = canonical_chord(&self.quick_add_shortcut);
+            if quick == canonical_chord(&self.toggle_calendar_shortcut)
+                || quick == canonical_chord(&self.join_meeting_shortcut)
+            {
+                self.quick_add_shortcut = String::new();
+            }
         }
         let mut days: Vec<u8> = self
             .highlight_weekdays
@@ -635,6 +650,28 @@ mod tests {
         assert!(!settings.show_event_time_in_menu_bar);
         assert_eq!(settings.toggle_calendar_shortcut, "Control+Command+K");
         assert!(settings.join_meeting_shortcut.is_empty());
+    }
+
+    #[test]
+    fn quick_add_starts_unset_and_never_shares_a_chord() {
+        let base = AppSettings::default();
+        assert!(base.quick_add_shortcut.is_empty());
+        let mut input = base.clone();
+        input.quick_add_shortcut = "Control+Command+KeyN".into();
+        assert_eq!(
+            input.clone().normalize(&base).quick_add_shortcut,
+            "Control+Command+KeyN"
+        );
+        // The calendar's chord, spelled another way, stays the calendar's.
+        input.quick_add_shortcut = "Command+Control+K".into();
+        assert!(input.clone().normalize(&base).quick_add_shortcut.is_empty());
+        input.join_meeting_shortcut = "Control+Alt+KeyJ".into();
+        input.quick_add_shortcut = "Control+Alt+J".into();
+        let settings = input.clone().normalize(&base);
+        assert_eq!(settings.join_meeting_shortcut, "Control+Alt+KeyJ");
+        assert!(settings.quick_add_shortcut.is_empty());
+        input.quick_add_shortcut = "Command+KeyQ".into();
+        assert!(input.clone().normalize(&base).quick_add_shortcut.is_empty());
     }
 
     #[test]

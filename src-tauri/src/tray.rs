@@ -44,6 +44,61 @@ pub(crate) const TRAY_ICON: &[u8] = include_bytes!("../../icons/tray-icon.png");
 
 pub(crate) const UPDATE_MENU_ID: &str = "install-update";
 
+/// "Join Design review", at the top of the right-click menu while a meeting
+/// with a link is on or next today.
+pub(crate) const JOIN_MENU_ID: &str = "join-meeting";
+
+/// Longest meeting name the Join item shows before cutting it short.
+const JOIN_MENU_MAX_CHARS: usize = 48;
+
+/// The Join item and the separator under it, added to the right-click menu
+/// and taken off again, as the update item is.
+pub(crate) struct JoinMenu {
+    pub(crate) menu: Menu<tauri::Wry>,
+    pub(crate) item: MenuItem<tauri::Wry>,
+    pub(crate) separator: PredefinedMenuItem<tauri::Wry>,
+}
+
+/// The Join item's text for what the calendar sent: one line, no control
+/// characters, cut short with an ellipsis. None when there is nothing to show.
+pub(crate) fn join_menu_text(label: Option<&str>) -> Option<String> {
+    let line: String = label?
+        .chars()
+        .filter(|character| !character.is_control())
+        .collect();
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
+    }
+    let mut shown: String = line.chars().take(JOIN_MENU_MAX_CHARS).collect();
+    if line.chars().count() > JOIN_MENU_MAX_CHARS {
+        shown = format!("{}\u{2026}", shown.trim_end());
+    }
+    Some(format!("Join {shown}"))
+}
+
+/// Puts the Join item at the top of the right-click menu, renames it, or
+/// takes it off.
+pub(crate) fn show_join_menu(app: &AppHandle, label: Option<&str>) {
+    let Some(join) = app.try_state::<JoinMenu>() else {
+        return;
+    };
+    let shown = join.menu.get(JOIN_MENU_ID).is_some();
+    match join_menu_text(label) {
+        Some(text) => {
+            let _ = join.item.set_text(text);
+            if !shown {
+                let _ = join.menu.prepend_items(&[&join.item, &join.separator]);
+            }
+        }
+        None if shown => {
+            let _ = join.menu.remove(&join.item);
+            let _ = join.menu.remove(&join.separator);
+        }
+        None => {}
+    }
+}
+
 /// "Update to X and Restart", kept so it can be put at the top of the
 /// status item menu and taken off again. The menu is edited in place because
 /// the NSMenu a right click pops up is the one taken off the item at launch.
@@ -256,6 +311,8 @@ pub(crate) fn handle_menu_action(app: &AppHandle, id: &str) {
         }
         "quit" => app.exit(0),
         UPDATE_MENU_ID => install_update_from_menu(app),
+        // The calendar looks the meeting up itself, as it does for the chord.
+        JOIN_MENU_ID => join_upcoming_from_shortcut(app),
         _ => {}
     }
 }
@@ -288,6 +345,11 @@ pub(crate) fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>
 pub(crate) fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let icon = tauri::image::Image::from_bytes(TRAY_ICON)?;
     let menu = build_tray_menu(app)?;
+    app.manage(JoinMenu {
+        menu: menu.clone(),
+        item: MenuItem::with_id(app, JOIN_MENU_ID, "Join", true, None::<&str>)?,
+        separator: PredefinedMenuItem::separator(app)?,
+    });
     app.manage(UpdateMenu {
         menu: menu.clone(),
         item: MenuItem::with_id(

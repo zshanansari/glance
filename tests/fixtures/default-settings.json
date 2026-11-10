@@ -27,6 +27,7 @@
   "quickAddCalendarId": "",
   "toggleCalendarShortcut": "Control+Command+K",
   "joinMeetingShortcut": "",
+  "quickAddShortcut": "",
   "hiddenCalendarIds": [],
   "autoUpdate": true,
   "theme": "system",

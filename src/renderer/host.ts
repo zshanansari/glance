@@ -29,6 +29,10 @@ export type DesktopApi = {
   requestRemindersAccess: () => Promise<boolean>;
   getRemindersAccess: () => Promise<boolean>;
   joinMeeting: (url: string) => Promise<void>;
+  /** Names the meeting in the right-click menu's Join item; null takes it off. */
+  setJoinMenu: (label: string | null) => Promise<void>;
+  completeReminder: (id: string) => Promise<void>;
+  undoCompletedReminder: (id: string) => Promise<void>;
   openInMaps: (place: string) => Promise<void>;
   detectDates: (text: string) => Promise<DetectedDate[]>;
   createEvent: (event: {
@@ -75,7 +79,10 @@ export type DesktopApi = {
   onSettingsChanged: (listener: (settings: AppSettings) => void) => () => void;
   suspendShortcuts: (suspended: boolean) => Promise<void>;
   onShortcutFailed: (
-    listener: (failure: { setting: "toggleCalendarShortcut" | "joinMeetingShortcut"; chord: string }) => void,
+    listener: (failure: {
+      setting: "toggleCalendarShortcut" | "joinMeetingShortcut" | "quickAddShortcut";
+      chord: string;
+    }) => void,
   ) => () => void;
   onCalendarShown: (listener: () => void) => () => void;
   onCalendarHidden: (listener: () => void) => () => void;
@@ -83,6 +90,8 @@ export type DesktopApi = {
   onClockTick: (listener: () => void) => () => void;
   onEventDismissed: (listener: () => void) => () => void;
   onJoinUpcomingRequested: (listener: () => void) => () => void;
+  /** The quick-add chord was pressed; the host has shown the calendar. */
+  onQuickAddRequested: (listener: () => void) => () => void;
 };
 
 function subscribe<T>(event: string, handler: (payload: T) => void): () => void {
@@ -118,6 +127,9 @@ export const api: DesktopApi = {
   requestRemindersAccess: () => invoke<boolean>("request_reminders_access"),
   getRemindersAccess: () => invoke<boolean>("get_reminders_access"),
   joinMeeting: (url) => invoke<void>("join_meeting", { url }),
+  setJoinMenu: (label) => invoke<void>("set_join_menu", { label }),
+  completeReminder: (id) => invoke<void>("complete_reminder", { id }),
+  undoCompletedReminder: (id) => invoke<void>("undo_completed_reminder", { id }),
   openInMaps: (place) => invoke<void>("open_in_maps", { place }),
   detectDates: (text) => invoke<DetectedDate[]>("detect_dates", { text }),
   createEvent: (event) => invoke<string>("create_event", { event }),
@@ -158,6 +170,7 @@ export const api: DesktopApi = {
   onClockTick: (listener) => subscribe<void>("clock-tick", listener),
   onEventDismissed: (listener) => subscribe<void>("event-dismissed", listener),
   onJoinUpcomingRequested: (listener) => subscribe<void>("join-upcoming", listener),
+  onQuickAddRequested: (listener) => subscribe<void>("quick-add-requested", listener),
 };
 
 export function installTauriBridge(): DesktopApi {

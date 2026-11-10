@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-join-menu"
+description = "Enables the set_join_menu command without any pre-configured scope."
+commands.allow = ["set_join_menu"]
+
+[[permission]]
+identifier = "deny-set-join-menu"
+description = "Denies the set_join_menu command without any pre-configured scope."
+commands.deny = ["set_join_menu"]

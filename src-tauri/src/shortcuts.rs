@@ -8,12 +8,14 @@ use super::*;
 pub(crate) enum ShortcutAction {
     ToggleCalendar,
     JoinUpcoming,
+    QuickAdd,
 }
 
 #[derive(Default)]
 pub(crate) struct RegisteredShortcuts {
     pub(crate) toggle_calendar: Option<Shortcut>,
     pub(crate) join_meeting: Option<Shortcut>,
+    pub(crate) quick_add: Option<Shortcut>,
 }
 
 impl RegisteredShortcuts {
@@ -21,6 +23,7 @@ impl RegisteredShortcuts {
         match action {
             ShortcutAction::ToggleCalendar => &mut self.toggle_calendar,
             ShortcutAction::JoinUpcoming => &mut self.join_meeting,
+            ShortcutAction::QuickAdd => &mut self.quick_add,
         }
     }
 
@@ -30,6 +33,9 @@ impl RegisteredShortcuts {
         }
         if self.join_meeting.as_ref() == Some(shortcut) {
             return Some(ShortcutAction::JoinUpcoming);
+        }
+        if self.quick_add.as_ref() == Some(shortcut) {
+            return Some(ShortcutAction::QuickAdd);
         }
         None
     }
@@ -52,10 +58,31 @@ pub(crate) fn join_upcoming_from_shortcut(app: &AppHandle) {
     let _ = app.emit_to(CALENDAR_LABEL, "join-upcoming", ());
 }
 
+/// Opens the month, if it is not open already, straight into quick add.
+/// Unlike the calendar's own chord this never closes it: a second press
+/// while typing an event should not throw the event away.
+pub(crate) fn quick_add_from_shortcut(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        let open = handle
+            .get_webview_window(CALENDAR_LABEL)
+            .and_then(|window| window.is_visible().ok())
+            .unwrap_or(false);
+        if !open {
+            let Some(rect) = tray_anchor(&handle) else {
+                return;
+            };
+            show_calendar(&handle, rect);
+        }
+        let _ = handle.emit_to(CALENDAR_LABEL, "quick-add-requested", ());
+    });
+}
+
 pub(crate) fn run_shortcut(app: &AppHandle, action: ShortcutAction) {
     match action {
         ShortcutAction::ToggleCalendar => toggle_calendar_from_shortcut(app),
         ShortcutAction::JoinUpcoming => join_upcoming_from_shortcut(app),
+        ShortcutAction::QuickAdd => quick_add_from_shortcut(app),
     }
 }
 
@@ -148,10 +175,14 @@ pub(crate) fn set_shortcuts_suspended(app: &AppHandle, suspended: bool) {
             return;
         }
         let bound: Vec<Shortcut> = match state.shortcuts.lock() {
-            Ok(registered) => [registered.toggle_calendar, registered.join_meeting]
-                .into_iter()
-                .flatten()
-                .collect(),
+            Ok(registered) => [
+                registered.toggle_calendar,
+                registered.join_meeting,
+                registered.quick_add,
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
             Err(_) => return,
         };
         for shortcut in bound {
@@ -181,6 +212,7 @@ pub(crate) fn put_back_refused_shortcuts(
     previous: &AppSettings,
     (toggle, toggle_ok): (&str, bool),
     (join, join_ok): (&str, bool),
+    (quick, quick_ok): (&str, bool),
 ) -> (AppSettings, Vec<ShortcutFailure>) {
     let mut failures = Vec::new();
     if !toggle_ok && next.toggle_calendar_shortcut == toggle {
@@ -195,6 +227,13 @@ pub(crate) fn put_back_refused_shortcuts(
         failures.push(ShortcutFailure {
             setting: "joinMeetingShortcut",
             chord: join.to_string(),
+        });
+    }
+    if !quick_ok && next.quick_add_shortcut == quick {
+        next.quick_add_shortcut = previous.quick_add_shortcut.clone();
+        failures.push(ShortcutFailure {
+            setting: "quickAddShortcut",
+            chord: quick.to_string(),
         });
     }
     (next, failures)
@@ -214,6 +253,7 @@ pub(crate) fn apply_shortcuts(
     let handle = app.clone();
     let toggle = settings.toggle_calendar_shortcut.clone();
     let join = settings.join_meeting_shortcut.clone();
+    let quick = settings.quick_add_shortcut.clone();
     let previous = previous.cloned();
     std::thread::spawn(move || {
         let state = handle.state::<AppState>();
@@ -222,6 +262,7 @@ pub(crate) fn apply_shortcuts(
         };
         let toggle_ok = rebind_shortcut(&handle, ShortcutAction::ToggleCalendar, &toggle);
         let join_ok = rebind_shortcut(&handle, ShortcutAction::JoinUpcoming, &join);
+        let quick_ok = rebind_shortcut(&handle, ShortcutAction::QuickAdd, &quick);
         let Some(previous) = previous else {
             return;
         };
@@ -234,6 +275,7 @@ pub(crate) fn apply_shortcuts(
                 &previous,
                 (&toggle, toggle_ok),
                 (&join, join_ok),
+                (&quick, quick_ok),
             );
             if failures.is_empty() {
                 return;

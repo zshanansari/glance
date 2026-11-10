@@ -29,6 +29,7 @@ import {
   pastToFold,
   nextAfterToday,
   nextEventWhen,
+  joinMenuLabel,
   spokenStatus,
   trayDescription,
 } from "../src/shared/events";
@@ -818,6 +819,13 @@ describe("what comes after an empty day", () => {
       later("standup", at(9, 11, 45)),
     ];
     expect(nextAfterToday(events, now)?.id).toBe("standup");
+  });
+
+  it("names the meeting for the menu's Join item, with its start until it begins", () => {
+    const call = { title: "Design review", startAt: at(8, 15, 0) };
+    expect(joinMenuLabel(call, at(8, 14, 0), "en-US")).toMatch(/^Design review at 3:00/);
+    expect(joinMenuLabel(call, at(8, 15, 0), "en-US")).toBe("Design review");
+    expect(joinMenuLabel(call, at(8, 15, 20), "en-US")).toBe("Design review");
   });
 
   it("says tomorrow, the weekday within the week, or the date past it", () => {

@@ -241,6 +241,8 @@ function startSettings(api: DesktopApi): void {
   const joinMeetingShortcutClear = requireElement<HTMLButtonElement>(
     "join-meeting-shortcut-clear",
   );
+  const quickAddShortcut = requireElement<HTMLButtonElement>("quick-add-shortcut");
+  const quickAddShortcutClear = requireElement<HTMLButtonElement>("quick-add-shortcut-clear");
   const calendarAccessStatus = requireElement<HTMLParagraphElement>("calendar-access-status");
   const calendarAccess = requireElement<HTMLButtonElement>("calendar-access");
   const calendarAccessRow = requireElement<HTMLElement>("calendar-access-row");
@@ -526,6 +528,7 @@ function startSettings(api: DesktopApi): void {
     "toggle-calendar-shortcut-problem",
   );
   const joinMeetingShortcutProblem = requireElement<HTMLElement>("join-meeting-shortcut-problem");
+  const quickAddShortcutProblem = requireElement<HTMLElement>("quick-add-shortcut-problem");
 
   /** Says why a chord was refused under its field, or clears the note. */
   const showShortcutProblem = (problem: HTMLElement, text: string | null): void => {
@@ -537,8 +540,8 @@ function startSettings(api: DesktopApi): void {
     field: HTMLButtonElement,
     clear: HTMLButtonElement,
     problem: HTMLElement,
-    key: "toggleCalendarShortcut" | "joinMeetingShortcut",
-    other: () => { chord: string; name: string },
+    key: "toggleCalendarShortcut" | "joinMeetingShortcut" | "quickAddShortcut",
+    others: () => { chord: string; name: string }[],
   ): void => {
     // While a field records, Glance's own chords are set aside so their keys
     // reach it; otherwise ⌃⌘K would open the month rather than be recorded.
@@ -574,8 +577,13 @@ function startSettings(api: DesktopApi): void {
       }
       const chord = chordFromKeyboard(event);
       if (!chord) return;
-      const { chord: otherChord, name } = other();
-      const refused = chordProblem(chord, otherChord, name);
+      // Reserved first, then each of the other two chords.
+      const refused =
+        chordProblem(chord, "", "") ??
+        others()
+          .map(({ chord: otherChord, name }) => chordProblem(chord, otherChord, name))
+          .find((problem) => problem !== null) ??
+        null;
       showShortcutProblem(problem, refused);
       // A refused chord keeps the field listening for another.
       if (refused) return;
@@ -591,26 +599,48 @@ function startSettings(api: DesktopApi): void {
     });
   };
 
+  const showsCalendar = () => ({
+    chord: toggleCalendarShortcut.dataset.chord ?? "",
+    name: "shows the calendar",
+  });
+  const joinsMeeting = () => ({
+    chord: joinMeetingShortcut.dataset.chord ?? "",
+    name: "joins your meeting",
+  });
+  const addsEvent = () => ({
+    chord: quickAddShortcut.dataset.chord ?? "",
+    name: "adds a new event",
+  });
   bindShortcutField(
     toggleCalendarShortcut,
     toggleCalendarShortcutClear,
     toggleCalendarShortcutProblem,
     "toggleCalendarShortcut",
-    () => ({ chord: joinMeetingShortcut.dataset.chord ?? "", name: "joins your meeting" }),
+    () => [joinsMeeting(), addsEvent()],
   );
   bindShortcutField(
     joinMeetingShortcut,
     joinMeetingShortcutClear,
     joinMeetingShortcutProblem,
     "joinMeetingShortcut",
-    () => ({ chord: toggleCalendarShortcut.dataset.chord ?? "", name: "shows the calendar" }),
+    () => [showsCalendar(), addsEvent()],
+  );
+  bindShortcutField(
+    quickAddShortcut,
+    quickAddShortcutClear,
+    quickAddShortcutProblem,
+    "quickAddShortcut",
+    () => [showsCalendar(), joinsMeeting()],
   );
 
   // The host could not bind a chord (another app holds it, or macOS wants
   // Accessibility first) and has put the working one back.
   api.onShortcutFailed(({ setting, chord }) => {
-    const problem =
-      setting === "toggleCalendarShortcut" ? toggleCalendarShortcutProblem : joinMeetingShortcutProblem;
+    const problem = {
+      toggleCalendarShortcut: toggleCalendarShortcutProblem,
+      joinMeetingShortcut: joinMeetingShortcutProblem,
+      quickAddShortcut: quickAddShortcutProblem,
+    }[setting];
     showShortcutProblem(
       problem,
       `macOS would not let Glance use ${chordLabel(chord)}. Another app may hold it.`,
@@ -656,6 +686,7 @@ function startSettings(api: DesktopApi): void {
     paintUpcomingOptions(settings.showUpcomingEvent, settings.upcomingIconLeadMinutes);
     paintShortcut(toggleCalendarShortcut, settings.toggleCalendarShortcut);
     paintShortcut(joinMeetingShortcut, settings.joinMeetingShortcut);
+    paintShortcut(quickAddShortcut, settings.quickAddShortcut);
     hiddenCalendarIds = settings.hiddenCalendarIds;
     paintCalendarSelection(settings.hiddenCalendarIds);
     theme.value = settings.theme;

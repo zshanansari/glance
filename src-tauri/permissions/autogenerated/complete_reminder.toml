@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-complete-reminder"
+description = "Enables the complete_reminder command without any pre-configured scope."
+commands.allow = ["complete_reminder"]
+
+[[permission]]
+identifier = "deny-complete-reminder"
+description = "Denies the complete_reminder command without any pre-configured scope."
+commands.deny = ["complete_reminder"]

@@ -74,6 +74,9 @@ struct AppState {
     dismissed_events: Mutex<Vec<events::DismissedOccurrence>>,
     /// Events quick add made this run: only these can be undone.
     created_events: Mutex<Vec<String>>,
+    /// Reminders completed from the day list this run: only these can be
+    /// marked not done again.
+    completed_reminders: Mutex<Vec<String>>,
     /// Where dismissals are kept between runs.
     dismissed_path: PathBuf,
     /// The chords currently registered with the system, so a failed rebind
@@ -176,6 +179,7 @@ fn update_settings(
     }
     if saved.toggle_calendar_shortcut != previous.toggle_calendar_shortcut
         || saved.join_meeting_shortcut != previous.join_meeting_shortcut
+        || saved.quick_add_shortcut != previous.quick_add_shortcut
     {
         apply_shortcuts(&app, &saved, Some(&previous));
     }
@@ -569,6 +573,13 @@ async fn get_reminders_access(app: AppHandle) -> Result<bool, String> {
     on_main_async(app, events::has_reminders_access).await
 }
 
+/// What the right-click menu's Join item says: the meeting the calendar
+/// would join, or None to take the item off.
+#[tauri::command]
+fn set_join_menu(app: AppHandle, label: Option<String>) {
+    show_join_menu(&app, label.as_deref());
+}
+
 #[tauri::command]
 fn join_meeting(url: String) -> Result<(), String> {
     events::open_meeting(&url)
@@ -615,6 +626,39 @@ async fn undo_created_event(app: AppHandle, id: String) -> Result<(), String> {
         created.remove(at);
     }
     on_main_async(app, move || events::remove_event(&id)).await?
+}
+
+/// Ticks off a reminder from the day list, and remembers it for Undo.
+#[tauri::command]
+async fn complete_reminder(app: AppHandle, id: String) -> Result<(), String> {
+    let done = id.clone();
+    on_main_async(app.clone(), move || {
+        events::set_reminder_completed(&done, true)
+    })
+    .await??;
+    if let Ok(mut completed) = app.state::<AppState>().completed_reminders.lock() {
+        completed.push(id);
+        let extra = completed.len().saturating_sub(20);
+        completed.drain(..extra);
+    }
+    Ok(())
+}
+
+/// Undo for a ticked-off reminder: only one completed here this run.
+#[tauri::command]
+async fn undo_completed_reminder(app: AppHandle, id: String) -> Result<(), String> {
+    {
+        let state = app.state::<AppState>();
+        let mut completed = state
+            .completed_reminders
+            .lock()
+            .map_err(|error| error.to_string())?;
+        let Some(at) = completed.iter().position(|item| *item == id) else {
+            return Err("Only a reminder just completed can be undone".into());
+        };
+        completed.remove(at);
+    }
+    on_main_async(app, move || events::set_reminder_completed(&id, false)).await?
 }
 
 /// Hands a meeting with guests to Google Calendar's new-event page.
@@ -763,6 +807,7 @@ pub fn run() {
                 reminder_fade: AtomicU64::new(0),
                 dismissed_events: Mutex::new(dismissed),
                 created_events: Mutex::new(Vec::new()),
+                completed_reminders: Mutex::new(Vec::new()),
                 dismissed_path,
                 shortcuts: Mutex::new(RegisteredShortcuts::default()),
                 shortcut_rebind: Mutex::new(()),
@@ -826,6 +871,9 @@ pub fn run() {
             request_reminders_access,
             get_reminders_access,
             join_meeting,
+            set_join_menu,
+            complete_reminder,
+            undo_completed_reminder,
             open_in_maps,
             detect_dates,
             create_event,
@@ -953,6 +1001,7 @@ mod tests {
             &previous,
             ("Control+Alt+KeyK", false),
             ("Control+Alt+KeyJ", true),
+            ("", true),
         );
         assert_eq!(
             fixed.toggle_calendar_shortcut,
@@ -961,6 +1010,23 @@ mod tests {
         assert_eq!(fixed.join_meeting_shortcut, "Control+Alt+KeyJ");
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0].setting, "toggleCalendarShortcut");
+    }
+
+    #[test]
+    fn a_refused_quick_add_chord_goes_back_too() {
+        let previous = AppSettings::default();
+        let mut next = previous.clone();
+        next.quick_add_shortcut = "Control+Command+KeyN".into();
+        let (fixed, failures) = super::put_back_refused_shortcuts(
+            next,
+            &previous,
+            (&previous.toggle_calendar_shortcut, true),
+            ("", true),
+            ("Control+Command+KeyN", false),
+        );
+        assert!(fixed.quick_add_shortcut.is_empty());
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].setting, "quickAddShortcut");
     }
 
     #[test]
@@ -973,9 +1039,28 @@ mod tests {
             &previous,
             ("Control+Alt+KeyK", false),
             ("", true),
+            ("", true),
         );
         assert_eq!(fixed.toggle_calendar_shortcut, "Control+Alt+KeyL");
         assert!(failures.is_empty());
+    }
+
+    #[test]
+    fn the_join_item_names_the_meeting_on_one_short_line() {
+        assert_eq!(super::join_menu_text(None), None);
+        assert_eq!(super::join_menu_text(Some("  \n ")), None);
+        assert_eq!(
+            super::join_menu_text(Some("Design review at 3:00 PM")).as_deref(),
+            Some("Join Design review at 3:00 PM")
+        );
+        assert_eq!(
+            super::join_menu_text(Some("Line\nbreak")).as_deref(),
+            Some("Join Linebreak")
+        );
+        let long = "x".repeat(80);
+        let text = super::join_menu_text(Some(&long)).unwrap();
+        assert_eq!(text.chars().count(), "Join ".len() + 48 + 1);
+        assert!(text.ends_with('\u{2026}'));
     }
 
     #[test]

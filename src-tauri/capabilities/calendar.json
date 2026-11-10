@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "calendar",
-  "description": "The month popover: reads settings and events, draws the menu bar item, sizes itself, opens or joins an event, and stops counting down to one.",
+  "description": "The month popover: reads settings and events, draws the menu bar item, sizes itself, opens or joins an event, stops counting down to one, keeps the menu's Join item current, and ticks off reminders.",
   "windows": [
     "calendar"
   ],
@@ -18,6 +18,9 @@
     "allow-open-settings",
     "allow-beep",
     "allow-join-meeting",
+    "allow-set-join-menu",
+    "allow-complete-reminder",
+    "allow-undo-completed-reminder",
     "allow-detect-dates",
     "allow-create-event",
     "allow-undo-created-event",

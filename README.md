@@ -31,13 +31,15 @@ Apple Silicon Macs on macOS 13 or newer. Intel Macs can build it from source.
 
 - **This month, next to the clock.** Click the date for the month, with a dot
   under every day that has events. Pick a day to see its events, open one in
-  Calendar, or join a meeting from it. Today's finished meetings fold into an
-  “N earlier” line, and declined ones are struck through. Optionally, the list
-  runs on into the coming days.
+  Calendar, or join a meeting from it. Tick a reminder's circle to mark it
+  done in Reminders, with Undo right after. Today's finished meetings fold into
+  an “N earlier” line, and declined ones are struck through. Optionally, the
+  list runs on into the coming days.
 - **Add an event in your own words.** Press **⌘N** or the + in the footer and
   type “Lunch with Sam tomorrow 1pm at Blue Tokai”. Glance shows what it
   understood as you type, adds the event to the calendar you chose, and offers
-  Undo for 30 seconds. The phrases it reads are under [Quick add](#quick-add).
+  Undo for 30 seconds. Record a chord in Settings → General to start one from
+  any app. The phrases it reads are under [Quick add](#quick-add).
 - **Find any event.** **⌘F** or the search icon looks through your events by
   title and place, from a month back to three months ahead, upcoming first.
   Return opens the first result's day.
@@ -73,9 +75,10 @@ Apple Silicon Macs on macOS 13 or newer. Intel Macs can build it from source.
   Join only ever opens a link to a known meeting service.
 
 The popover's footer holds new event, search and settings; point at one to see
-its shortcut. Right-click the menu bar item for Settings and Quit. **⌃⌘K**
-shows or hides the calendar from any app, and Settings → General can record a
-chord for joining the next meeting.
+its shortcut. Right-click the menu bar item for Settings and Quit, and, while
+a meeting with a link is on or still to come today, **Join** it from the top of
+that menu. **⌃⌘K** shows or hides the calendar from any app, and Settings →
+General can record chords for joining the next meeting and for a new event.
 
 <p align="center">
   <img src="docs/screenshots/search.png" alt="Searching for “Deepavali”: the matching event listed under Today, with new event, search and settings in the footer" width="272">
@@ -150,8 +153,8 @@ Glance asks for at most three things, and works with none of them granted.
 | Permission | What it is for | If you say no |
 | --- | --- | --- |
 | **Calendar** | Reading your events for the month's dots, the day list, search, the countdown and the reminder card, and adding the events you quick add. macOS words the prompt as “Glance uses your calendars to show your next meeting in the menu bar.” | The month still opens and the day list offers **Allow Calendar Access…**. Allow it later there, in Settings → Calendar, or under System Settings → Privacy & Security → Calendars. |
-| **Reminders** | Showing scheduled reminders beside your events and in the countdown. Asked right after Calendar access is granted, and again from **Allow Access…** under Reminders in Settings → Calendar. | Only reminders are missing. Events are unaffected. |
-| **Accessibility** | Only the system-wide chords: show or hide the calendar, and join the upcoming meeting. macOS may ask the first time one fires. The popover's own keys and the click-outside-to-close need no grant. | The chord does nothing until Glance is allowed under System Settings → Privacy & Security → Accessibility. Everything else works. |
+| **Reminders** | Showing scheduled reminders beside your events and in the countdown, and marking one done when you tick it off. Asked right after Calendar access is granted, and again from **Allow Access…** under Reminders in Settings → Calendar. | Only reminders are missing. Events are unaffected. |
+| **Accessibility** | Only the system-wide chords: show or hide the calendar, join the upcoming meeting, and start a new event. macOS may ask the first time one fires. The popover's own keys and the click-outside-to-close need no grant. | The chord does nothing until Glance is allowed under System Settings → Privacy & Security → Accessibility. Everything else works. |
 
 Glance asks for nothing else: no Automation, no notifications, no files.
 
@@ -175,6 +178,7 @@ Google Calendar from quick add, and the links in Settings → About.
 | --- | --- | --- |
 | Anywhere | **⌃⌘K** | Shows or hides the calendar. Change or clear it in Settings → General. |
 | Anywhere | *your chord* | Joins the meeting under way, or your next one today. Record it in Settings → General; there is none until you do. |
+| Anywhere | *your chord* | Opens the calendar straight into quick add. Record it in Settings → General as *New event*; there is none until you do. |
 | Calendar | **⌘N** | New event. Return adds it; Escape closes the field. |
 | Calendar | **⌘F** | Search. ↓ moves to the results and ↑ ↓ walk them; Return opens the first result's day. |
 | Calendar | **⌘,** | Opens Settings. |
@@ -183,7 +187,7 @@ Google Calendar from quick add, and the links in Settings → About.
 | Calendar | **Home**, **End** | The first or last day of the month. |
 | Calendar | **T** | Back to today. |
 | Calendar | **Escape** | Closes quick add, then search, then the popover. |
-| Menu bar item | **⌘,** **⌘Q** | Settings… and Quit Glance, in the right-click menu. |
+| Menu bar item | **⌘,** **⌘Q** | Settings… and Quit Glance, in the right-click menu, with Join at the top while a meeting with a link is on or next today. |
 | Settings | **↑ ↓**, **Home**, **End** | Moves through the panes in the sidebar. ← and → work too. |
 | Settings | **← → ↑ ↓** | Chooses a menu bar style or a color in those pickers. |
 | Settings | **Escape** | Stops recording a chord without changing it. |
@@ -196,8 +200,9 @@ Google Calendar from quick add, and the links in Settings → About.
 *Hourly chime* sounds once an hour, softly, with a button to preview it.
 *Install updates automatically* installs a release when one is found; off, the
 menu bar icon shows a dot instead. Under *Shortcuts*, *Show or hide the
-calendar* holds ⌃⌘K and *Join upcoming meeting* is empty until you record a
-chord. Click a field, press the keys, and **Clear** removes it.
+calendar* holds ⌃⌘K, and *Join upcoming meeting* and *New event* are empty
+until you record a chord. Click a field, press the keys, and **Clear** removes
+it. No two of them can share a chord.
 
 **Appearance.** *Menu bar* picks one of four styles, *Calendar with date*,
 *Dotted calendar*, *Cutout date* and *Date only*, and *Show day of week* and

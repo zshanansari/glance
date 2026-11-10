@@ -42,3 +42,31 @@ it("opens About links through their own command, not the meeting one", async () 
   await expect(api.openUrl("https://github.com/zshanansari")).resolves.toBeUndefined();
   expect(invoke).toHaveBeenCalledWith("open_link", { url: "https://github.com/zshanansari" });
 });
+
+it("names the menu's Join item, or takes it off with null", async () => {
+  invoke.mockResolvedValue(undefined);
+  await api.setJoinMenu("Design review at 3:00 PM");
+  expect(invoke).toHaveBeenCalledWith("set_join_menu", { label: "Design review at 3:00 PM" });
+  await api.setJoinMenu(null);
+  expect(invoke).toHaveBeenCalledWith("set_join_menu", { label: null });
+});
+
+it("ticks a reminder off and back on by its id", async () => {
+  invoke.mockResolvedValue(undefined);
+  await api.completeReminder("reminder:ABC");
+  expect(invoke).toHaveBeenCalledWith("complete_reminder", { id: "reminder:ABC" });
+  await api.undoCompletedReminder("reminder:ABC");
+  expect(invoke).toHaveBeenCalledWith("undo_completed_reminder", { id: "reminder:ABC" });
+});
+
+it("lets the calendar window call the commands it was given", async () => {
+  // A command missing from the window's capability is refused at run time
+  // with nothing on screen, so the grant is checked here.
+  const { readFileSync } = await import("node:fs");
+  const capability = JSON.parse(readFileSync("src-tauri/capabilities/calendar.json", "utf8"));
+  const commands = readFileSync("src-tauri/build.rs", "utf8");
+  for (const command of ["set_join_menu", "complete_reminder", "undo_completed_reminder"]) {
+    expect(commands).toContain(`"${command}"`);
+    expect(capability.permissions).toContain(`allow-${command.replace(/_/g, "-")}`);
+  }
+});

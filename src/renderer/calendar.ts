@@ -32,6 +32,7 @@ import {
   type DismissedOccurrence,
   eventStatus,
   meetingToJoin,
+  joinMenuLabel,
   needsCalendarAccess,
   eventTimeRange,
   trayIconEvent,
@@ -181,6 +182,10 @@ function startCalendar(api: DesktopApi): void {
   // chevrons must not reuse that ring on a spillover cell like "today, 10".
   let pinnedOutsideIso: string | null = null;
   let lastTrayLabel = "";
+  /** What the right-click menu's Join item last said, so it is sent once. */
+  let lastJoinLabel: string | null = null;
+  /** Today's events, read whatever month is on show, for the Join item. */
+  let todayEvents: UpcomingEvent[] = [];
   let lastHour = new Date().getHours();
   let upcomingEvent: UpcomingEvent | null = null;
   let calendarEvents: UpcomingEvent[] = [];
@@ -204,8 +209,10 @@ function startCalendar(api: DesktopApi): void {
   let quickRequest = 0;
   let quickBusy = false;
   // The event quick add just made, offered for Undo for a few seconds.
-  let added: { id: string; day: string; title: string } | null = null;
-  let addedTimer = 0;
+  /** The last change Undo can take back: an event added, or a reminder ticked off. */
+  let undoable: { kind: "added" | "completed"; id: string; day: string; title: string } | null =
+    null;
+  let undoTimer = 0;
   /** How long "Added · Undo" stays beside the day an event went to. */
   const UNDO_MS = 30_000;
   // Search reads its window once when it opens, then filters as you type.
@@ -249,7 +256,15 @@ function startCalendar(api: DesktopApi): void {
         : null;
       // One read covers the month, the selected day and the countdown's
       // window whenever they overlap, as they do on the current month.
-      const reads = coveringRanges(upcoming ? [month, day, upcoming] : [month, day]);
+      // Today is read too, whatever month is on show, so the menu's Join
+      // item still knows today's meetings while another month is browsed.
+      const today = {
+        start: new Date(new Date(now).setHours(0, 0, 0, 0)).getTime(),
+        end: endOfToday(new Date(now)),
+      };
+      const reads = coveringRanges(
+        upcoming ? [month, day, today, upcoming] : [month, day, today],
+      );
       const [batches, dismissed] = await Promise.all([
         Promise.all(reads.map((range) => api.getCalendarEvents(range.start, range.end))),
         // The day list leaves dismissed meetings unmarked, countdown on or off.
@@ -277,6 +292,7 @@ function startCalendar(api: DesktopApi): void {
       if (request !== eventRequest) return;
       upcomingEvent = next;
       dismissedEvents = dismissed;
+      todayEvents = all.filter((event) => eventOverlaps(event, today));
       const fetched = all.filter(
         (event) => eventOverlaps(event, month) || eventOverlaps(event, day),
       );
@@ -303,6 +319,7 @@ function startCalendar(api: DesktopApi): void {
       if (request !== eventRequest) return;
       upcomingEvent = null;
       calendarEvents = [];
+      todayEvents = [];
       eventsKey = "";
       eventError = error instanceof Error ? error.message : String(error);
     }
@@ -380,7 +397,22 @@ function startCalendar(api: DesktopApi): void {
       said.textContent = `, ${event.response}`;
       title.append(said);
     }
-    open.append(dot, title, time);
+    // A reminder is ticked off where its dot would be, as in Reminders.
+    if (event.kind === "reminder") {
+      row.classList.add("is-reminder");
+      open.append(title, time);
+      const check = document.createElement("button");
+      check.type = "button";
+      check.className = "day-event-check";
+      check.dataset.focusKey = `check:${occurrence}`;
+      check.title = "Mark as completed";
+      check.setAttribute("aria-label", `Mark ${event.title} as completed`);
+      if (event.color) check.style.setProperty("--event-color", event.color);
+      check.addEventListener("click", () => void completeReminder(event, check));
+      row.append(check);
+    } else {
+      open.append(dot, title, time);
+    }
     open.addEventListener("click", () => {
       api.openEvent(event.id).then(
         () => api.hideCalendar(),
@@ -459,7 +491,7 @@ function startCalendar(api: DesktopApi): void {
         group.events.map((event) => [event.id, event.startAt, event.endAt, event.title, event.joinUrl]),
       ]),
       failure,
-      added && added.day === focusIso && added.id,
+      undoable && undoable.day === focusIso && [undoable.kind, undoable.id],
       folded.length,
       upcomingEvent && [upcomingEvent.id, upcomingEvent.endAt],
       listed.map((event) => [
@@ -481,6 +513,8 @@ function startCalendar(api: DesktopApi): void {
       () => paintDayEventRows(selectedDate, listed, counting, new Set(folded), now, upNext, coming),
       (lost) => {
         if (lost.startsWith("dismiss:")) return `open:${lost.slice("dismiss:".length)}`;
+        // A ticked-off reminder leaves the list; its Undo is where focus goes.
+        if (lost.startsWith("check:")) return "undo";
         // Opening the fold hands focus to the first meeting it showed.
         if (lost === "fold" && listed[0]) return `open:${listed[0].id}@${listed[0].startAt}`;
         return null;
@@ -512,15 +546,19 @@ function startCalendar(api: DesktopApi): void {
       (selectedEvents.length
         ? `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`
         : "");
-    if (!failure && added && added.day === toIso(selectedDate)) {
+    if (!failure && undoable && undoable.day === toIso(selectedDate)) {
+      const adding = undoable.kind === "added";
       const undo = document.createElement("button");
       undo.type = "button";
       undo.className = "day-events-undo";
       undo.textContent = "Undo";
       undo.dataset.focusKey = "undo";
-      undo.setAttribute("aria-label", `Undo adding ${added.title}`);
-      undo.addEventListener("click", () => void undoAdded());
-      dayEventsCount.replaceChildren("Added ·", undo);
+      undo.setAttribute(
+        "aria-label",
+        `Undo ${adding ? "adding" : "completing"} ${undoable.title}`,
+      );
+      undo.addEventListener("click", () => void undoLastChange());
+      dayEventsCount.replaceChildren(`${adding ? "Added" : "Completed"} ·`, undo);
     }
     if (eventError) {
       // Only a missing permission is fixed by asking for one; any other
@@ -813,12 +851,7 @@ function startCalendar(api: DesktopApi): void {
       });
       closeQuickAdd(false);
       const day = new Date(draft.startAt);
-      added = { id, day: toIso(day), title: draft.title };
-      window.clearTimeout(addedTimer);
-      addedTimer = window.setTimeout(() => {
-        added = null;
-        paintDayEvents();
-      }, UNDO_MS);
+      offerUndo({ kind: "added", id, day: toIso(day), title: draft.title });
       announce(`Added ${draft.title}, ${quickWhen(draft)}`);
       showDay(day);
     } catch (error) {
@@ -831,15 +864,53 @@ function startCalendar(api: DesktopApi): void {
     }
   };
 
-  /** Removes the event just added, while its Undo is still showing. */
-  const undoAdded = async (): Promise<void> => {
-    const last = added;
-    if (!last) return;
-    added = null;
-    window.clearTimeout(addedTimer);
+  /** Shows Undo beside the day for a while, for the change just made. */
+  const offerUndo = (change: NonNullable<typeof undoable>): void => {
+    undoable = change;
+    window.clearTimeout(undoTimer);
+    undoTimer = window.setTimeout(() => {
+      undoable = null;
+      paintDayEvents();
+    }, UNDO_MS);
+  };
+
+  /**
+   * Ticks a reminder off in Reminders. It leaves the list on the next read,
+   * since only reminders still to do are listed; Undo brings it back.
+   */
+  const completeReminder = async (
+    event: UpcomingEvent,
+    check: HTMLButtonElement,
+  ): Promise<void> => {
+    check.disabled = true;
+    check.classList.add("is-done");
     try {
-      await api.undoCreatedEvent(last.id);
-      announce(`Removed ${last.title}`);
+      await api.completeReminder(event.id);
+      offerUndo({ kind: "completed", id: event.id, day: focusIso, title: event.title });
+      announce(`Completed ${event.title}`);
+    } catch {
+      check.disabled = false;
+      check.classList.remove("is-done");
+      showFailure("Couldn’t complete this reminder");
+      return;
+    }
+    void refreshUpcoming();
+  };
+
+  /** Takes back the event just added or the reminder just ticked off. */
+  const undoLastChange = async (): Promise<void> => {
+    const last = undoable;
+    if (!last) return;
+    undoable = null;
+    window.clearTimeout(undoTimer);
+    try {
+      if (last.kind === "added") {
+        await api.undoCreatedEvent(last.id);
+        announce(`Removed ${last.title}`);
+      } else {
+        await api.undoCompletedReminder(last.id);
+        announce(`${last.title} is back on your list`);
+      }
     } catch {
       failure = "Couldn’t undo";
       window.clearTimeout(failureTimer);
@@ -924,6 +995,13 @@ function startCalendar(api: DesktopApi): void {
     const fullTitle = [title, zonePiece].filter(Boolean).join(" ");
     const trayStyle = label.style;
     const description = trayDescription(now.getTime(), counting);
+    // The right-click menu offers Join for the meeting the chord would join.
+    const joinable = meetingToJoin(todayEvents, now.getTime());
+    const joinLabel = joinable ? joinMenuLabel(joinable, now.getTime()) : null;
+    if (joinLabel !== lastJoinLabel) {
+      lastJoinLabel = joinLabel;
+      void api.setJoinMenu(joinLabel);
+    }
     const signature = `${trayLabelKey(label)}|${fullTitle}|${description}`;
     if (signature === lastTrayLabel) return;
     lastTrayLabel = signature;
@@ -1352,6 +1430,8 @@ function startCalendar(api: DesktopApi): void {
   // The global shortcut fires wherever focus is; the calendar window already
   // knows which event the menu bar item is previewing.
   api.onJoinUpcomingRequested(() => void joinUpcoming());
+  // The quick-add chord: the host has shown the month; open straight into it.
+  api.onQuickAddRequested(() => openQuickAddPanel());
   // Opening shows what was drawn while hidden; only a new day redraws it.
   // Nothing takes focus: the arrow keys work from the document, and a ring
   // around today on every open is not how a menu looks.

@@ -685,6 +685,23 @@ export function meetingToJoin(
   return preferAnswered(leadEvent(candidates, now), candidates);
 }
 
+/**
+ * What the right-click menu's Join item names: the meeting alone once it is
+ * under way, or with its start ("Design review at 3:00 PM") while it is
+ * still to come, so the item never reads as if the call were on now.
+ */
+export function joinMenuLabel(
+  event: Pick<UpcomingEvent, "title" | "startAt">,
+  now: number,
+  locale?: string,
+): string {
+  if (event.startAt <= now) return event.title;
+  const time = dateFormat(locale, { hour: "numeric", minute: "2-digit" }).format(
+    new Date(event.startAt),
+  );
+  return `${event.title} at ${time}`;
+}
+
 /** The host's words when Calendar access has not been granted (events.rs). */
 export const CALENDAR_ACCESS_MISSING = "Calendar access is not enabled";
 

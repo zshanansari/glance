@@ -1211,6 +1211,26 @@ mod macos {
         })
     }
 
+    /// Marks a reminder done, or not done again for Undo. `id` is the
+    /// reminder's own identifier, without Glance's prefix.
+    pub fn set_reminder_completed(id: &str, completed: bool) -> Result<(), String> {
+        require_main_thread();
+        autoreleasepool(|_| {
+            let store = event_store();
+            let item = unsafe { store.calendarItemWithIdentifier(&NSString::from_str(id)) }
+                .ok_or_else(|| "This reminder is no longer in Reminders".to_string())?;
+            let reminder = item
+                .downcast::<EKReminder>()
+                .map_err(|_| "This item is not a reminder".to_string())?;
+            unsafe {
+                reminder.setCompleted(completed);
+                store
+                    .saveReminder_commit_error(&reminder, true)
+                    .map_err(|error| ns_string(&error.localizedDescription()))
+            }
+        })
+    }
+
     /// Removes an event quick add just created, for Undo.
     pub fn remove_event(id: &str) -> Result<(), String> {
         require_main_thread();
@@ -1429,6 +1449,29 @@ pub fn remove_event(id: &str) -> Result<(), String> {
     }
 }
 
+/// The reminder's own identifier inside one of Glance's ids, which carry a
+/// prefix so a reminder and an event can never be taken for each other.
+pub(crate) fn reminder_identifier(id: &str) -> Option<&str> {
+    id.strip_prefix(REMINDER_ID_PREFIX)
+        .filter(|rest| !rest.is_empty() && rest.len() <= MAX_DISMISSED_ID_LEN)
+}
+
+/// Marks a reminder listed in the day list done, or not done again.
+pub fn set_reminder_completed(id: &str, completed: bool) -> Result<(), String> {
+    let Some(reminder) = reminder_identifier(id) else {
+        return Err("Only a reminder can be completed".into());
+    };
+    #[cfg(target_os = "macos")]
+    {
+        macos::set_reminder_completed(reminder, completed)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (reminder, completed);
+        Err("Completing reminders is only supported on macOS".into())
+    }
+}
+
 pub fn open_event(id: &str) -> Result<(), String> {
     if id.is_empty() {
         return Err("This event has no identifier to open".into());
@@ -1558,6 +1601,19 @@ mod tests {
         );
         assert!(event_show_url("A1B2:C3D4").starts_with("ical://ekevent/A1B2%3AC3D4?"));
         assert!(event_show_url("with space/slash").contains("with%20space%2Fslash"));
+    }
+
+    #[test]
+    fn only_a_prefixed_reminder_id_reaches_eventkit() {
+        use super::reminder_identifier;
+        assert_eq!(reminder_identifier("reminder:ABC-123"), Some("ABC-123"));
+        assert_eq!(reminder_identifier("ABC-123"), None);
+        assert_eq!(reminder_identifier("reminder:"), None);
+        assert_eq!(
+            reminder_identifier(&format!("reminder:{}", "x".repeat(600))),
+            None
+        );
+        assert!(super::set_reminder_completed("event-id", true).is_err());
     }
 
     #[test]

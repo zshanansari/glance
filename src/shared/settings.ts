@@ -82,6 +82,8 @@ export type AppSettings = {
   toggleCalendarShortcut: string;
   /** System-wide chord that joins the meeting under way or next today. Empty is unset. */
   joinMeetingShortcut: string;
+  /** System-wide chord that opens the calendar straight into quick add. Empty is unset. */
+  quickAddShortcut: string;
   /** EventKit identifiers the upcoming-event list should ignore. Empty shows every calendar. */
   hiddenCalendarIds: string[];
   autoUpdate: boolean;
@@ -196,6 +198,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quickAddCalendarId: "",
   toggleCalendarShortcut: "Control+Command+K",
   joinMeetingShortcut: "",
+  quickAddShortcut: "",
   hiddenCalendarIds: [],
   autoUpdate: true,
   theme: "system",
