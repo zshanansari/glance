@@ -749,7 +749,7 @@ function startCalendar(api: DesktopApi): void {
     if (message) {
       lines.push(quickLine(`quick-add-hint${message.failure ? " is-failure" : ""}`, message.text));
     } else if (!quickAddInput.value.trim()) {
-      lines.push(quickLine("quick-add-hint", "Type what and when; Return adds it."));
+      lines.push(quickLine("quick-add-hint", "Use “at” for a place. Return adds it."));
     } else if (!quickDraft) {
       lines.push(quickLine("quick-add-hint", "Add a day or time, like “tomorrow 3pm”."));
     } else {
