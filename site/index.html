@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Glance — a month calendar for the macOS menu bar</title>
+  <meta name="description" content="A month calendar in the macOS menu bar. Quick add in your own words, a countdown to your next meeting, and Join a minute before it starts. Free, open source, and nothing leaves your Mac.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#2a1220">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Glance — a month calendar for the macOS menu bar">
+  <meta property="og:description" content="Quick add in your own words, a countdown to your next meeting, and Join a minute before it starts. Free, open source, and nothing leaves your Mac.">
+  <meta property="og:url" content="https://zshanansari.github.io/glance/">
+  <meta property="og:image" content="https://zshanansari.github.io/glance/screenshots/menubar.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top"><img src="icon.png" alt="" width="28" height="28"> Glance</a>
+      <nav aria-label="Sections">
+        <a href="#features">Features</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/zshanansari/glance">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="hero-copy">
+          <img class="hero-icon" src="icon.png" alt="" width="88" height="88">
+          <h1>The month, right next to the clock.</h1>
+          <p class="lede">Glance is a month calendar for the macOS menu bar. No account, no main window, and nothing leaves your Mac.</p>
+          <div class="actions">
+            <a class="button primary" data-download href="https://github.com/zshanansari/glance/releases/latest">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span data-download-label>Download for Mac</span>
+            </a>
+            <a class="button secondary" href="https://github.com/zshanansari/glance">View the source</a>
+          </div>
+          <p class="meta">Free and open source · Apple Silicon · macOS 13 or later</p>
+        </div>
+        <figure class="hero-shot">
+          <img src="screenshots/menubar.png" width="272" height="417" alt="The month calendar open under its menu bar icon, adding “Lunch with Sam tomorrow 1pm at Blue Tokai” with a preview of the day, time and place">
+        </figure>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <div class="wrap">
+        <article class="row">
+          <div class="copy">
+            <p class="eyebrow">Quick add</p>
+            <h2>Add an event the way you’d say it.</h2>
+            <p>Press <kbd>⌘N</kbd> and type. Glance shows what it understood as you go, adds the event to the calendar you chose, and keeps Undo beside the day for 30 seconds. Record a shortcut in Settings to start one from any app.</p>
+          </div>
+          <ul class="phrases" aria-label="Examples of quick add">
+            <li><code>Lunch with Sam tomorrow 1pm</code><span>Tomorrow, 1:00 – 2:00 PM</span></li>
+            <li><code>Review 2 to 3:30pm</code><span>A range sets the end</span></li>
+            <li><code>Call Friday 4pm for 30m</code><span>Thirty minutes long</span></li>
+            <li><code>Coffee 10am at Blue Tokai</code><span>“at” sets the place</span></li>
+            <li><code>Sync Monday 11am on zoom</code><span>Attaches your meeting link</span></li>
+          </ul>
+        </article>
+
+        <article class="row flip">
+          <div class="copy">
+            <p class="eyebrow">Meeting reminder</p>
+            <h2>Never late to a call.</h2>
+            <p>A minute before a meeting with a link, a small card slides out under the menu bar item with a Join button. It never takes focus from what you’re typing. Snooze it, skip the meeting, or press Escape. In-person meetings can get a card ten minutes ahead, with the place one click from Maps.</p>
+          </div>
+          <figure class="shot">
+            <img src="screenshots/reminder.png" width="326" height="175" loading="lazy" alt="The reminder card a minute before a call: “Starts in 1 minute”, the meeting’s time and name, Join Zoom meeting, Remind me in 5 minutes, and Skip this meeting">
+          </figure>
+        </article>
+
+        <article class="row">
+          <div class="copy">
+            <p class="eyebrow">Countdown</p>
+            <h2>What’s next, at a glance.</h2>
+            <p>The menu bar item can count down to your next event or reminder. A meeting about to start takes over from a long block that’s still running. Right-click the item to Join the meeting that’s on, or the next one today.</p>
+          </div>
+          <figure class="shot menubar-strip">
+            <img src="screenshots/countdown.png" width="96" height="32" loading="lazy" alt="The menu bar item counting down to the next meeting: “• in 6m” after the calendar icon">
+          </figure>
+        </article>
+
+        <article class="row flip">
+          <div class="copy">
+            <p class="eyebrow">Search</p>
+            <h2>Find any event.</h2>
+            <p><kbd>⌘F</kbd> searches your events by title and place, from a month back to three months ahead, upcoming first. Return opens the day.</p>
+          </div>
+          <figure class="shot">
+            <img src="screenshots/search.png" width="272" height="426" loading="lazy" alt="Searching for “Deepavali”: the matching event listed under Today, with new event, search and settings in the footer">
+          </figure>
+        </article>
+
+        <article class="row wide">
+          <div class="copy">
+            <p class="eyebrow">Settings</p>
+            <h2>Feels like part of macOS.</h2>
+            <p>The popover opens and closes like a system menu, in the system font and colors, and follows light and dark. Settings is laid out like System Settings: four menu bar styles, your accent color for today, week numbers, and which calendars count.</p>
+          </div>
+          <figure class="shot">
+            <img src="screenshots/settings.png" width="892" height="752" loading="lazy" alt="Settings → Appearance, laid out like System Settings: four menu bar styles, each named, and the theme">
+          </figure>
+        </article>
+
+        <h2 class="grid-title">And the small things.</h2>
+        <ul class="grid">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.6 2.5L16 9.5"/></svg>
+            <h3>Tick off reminders</h3>
+            <p>Reminders sit beside your events. Tick one to mark it done in Reminders, with Undo right after.</p>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 3.9 5.7 3.9 9s-1.3 6.3-3.9 9c-2.6-2.7-3.9-5.7-3.9-9S9.4 5.7 12 3z"/></svg>
+            <h3>A second time zone</h3>
+            <p>Pick a city to see each event’s start there too, and its time in the menu bar if you like.</p>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <h3>Your calendars, your lists</h3>
+            <p>Choose which calendars and reminder lists Glance reads, and which events the countdown counts.</p>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM9 3v4M15 3v4M5 10h14"/></svg>
+            <h3>Your language and region</h3>
+            <p>Dates, the 12- or 24-hour clock and the first day of the week follow your Mac. Week numbers count the ISO or US way.</p>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg>
+            <h3>Keyboard and VoiceOver</h3>
+            <p>The month, search, quick add and Settings work from the keyboard, and VoiceOver reads your next meeting.</p>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg>
+            <h3>Updates itself</h3>
+            <p>New releases install quietly, and only once the calendar and Settings are closed, so nothing you’re typing is lost.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="privacy" class="privacy">
+      <div class="wrap">
+        <p class="eyebrow">Privacy</p>
+        <h2>Stays on this Mac.</h2>
+        <p class="section-lede">Glance reads Calendar and Reminders locally and uploads nothing. It asks for at most three permissions, and works with none of them.</p>
+        <ul class="permissions">
+          <li><h3>Calendar</h3><p>For the month’s dots, the day list, search, the countdown, and the events you add.</p></li>
+          <li><h3>Reminders</h3><p>For scheduled reminders beside your events, and ticking them off.</p></li>
+          <li><h3>Accessibility</h3><p>Only for the shortcuts that work from any app.</p></li>
+        </ul>
+        <p class="fine">The only connection Glance makes itself is the update check to GitHub. Everything else that reaches the network is a page you open: a meeting you join, a place in Maps, an event you hand to Google Calendar.</p>
+      </div>
+    </section>
+
+    <section id="install" class="install">
+      <div class="wrap">
+        <p class="eyebrow">Install</p>
+        <h2>Ready in a minute.</h2>
+        <ol class="steps">
+          <li><span>1</span><div><h3>Download</h3><p>Get the disk image from the <a data-download href="https://github.com/zshanansari/glance/releases/latest">latest release</a>.</p></div></li>
+          <li><span>2</span><div><h3>Drag to Applications</h3><p>Open the disk image and drag Glance into Applications.</p></div></li>
+          <li><span>3</span><div><h3>Open it once</h3><p>Glance isn’t notarized yet, so macOS stops the first launch. Open it, then choose <strong>Open Anyway</strong> in System Settings → Privacy &amp; Security. On macOS 14 and earlier, right-click Glance and choose <strong>Open</strong> instead.</p></div></li>
+        </ol>
+        <p class="fine">Needs an Apple Silicon Mac on macOS 13 or later. After the first launch, Glance opens normally and keeps itself up to date.</p>
+        <div class="actions center">
+          <a class="button primary" data-download href="https://github.com/zshanansari/glance/releases/latest">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span data-download-label>Download for Mac</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <p>Glance began as a fork of <a href="https://github.com/vipinsight/calendo">Calendo</a> by Vipin Yadav. The hourly chime is from <a href="https://github.com/sfsam/Itsycal">Itsycal</a> by Sanjay Madan. MIT licensed.</p>
+      <nav aria-label="Project links">
+        <a href="https://github.com/zshanansari/glance/releases">Release notes</a>
+        <a href="https://github.com/zshanansari/glance/issues">Report an issue</a>
+        <a href="https://github.com/zshanansari/glance">Source</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    // Point every Download link straight at the latest disk image, and name its
+    // version. Without the API (offline, rate limited) they keep linking to the
+    // latest release page, which works just as well.
+    fetch("https://api.github.com/repos/zshanansari/glance/releases/latest")
+      .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
+      .then((release) => {
+        const dmg = (release.assets || []).find((asset) => asset.name.endsWith(".dmg"));
+        if (!dmg) return;
+        for (const link of document.querySelectorAll("[data-download]")) link.href = dmg.browser_download_url;
+        const version = String(release.tag_name || "").replace(/^v/, "");
+        if (!version) return;
+        for (const label of document.querySelectorAll("[data-download-label]")) {
+          label.textContent = `Download Glance ${version}`;
+        }
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

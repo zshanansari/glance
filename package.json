@@ -17,7 +17,8 @@
     "test:ui": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "symbols": "swift scripts/generate-symbols.swift",
-    "dmg:unnotarized": "node scripts/release-dmg.mjs --unnotarized"
+    "dmg:unnotarized": "node scripts/release-dmg.mjs --unnotarized",
+    "site": "node scripts/build-site.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",

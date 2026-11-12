@@ -104,8 +104,10 @@ Download the disk image from
 [Releases](https://github.com/zshanansari/glance/releases/latest) and drag
 Glance to Applications.
 
-Releases are not notarized yet, so the first launch needs a right-click on
-Glance in Applications, then **Open**. After that it opens normally. On the
+Releases are not notarized yet, so macOS stops the first launch. Open Glance,
+then choose **Open Anyway** in System Settings → Privacy & Security; on macOS
+14 and earlier, right-click Glance in Applications and choose **Open**
+instead. After that it opens normally. On the
 first launch, Settings opens on a welcome page that asks for Calendar access,
 offers launch at login and the countdown, and shows the shortcut that opens
 the calendar from anywhere.
@@ -272,8 +274,10 @@ seconds.
 ## Troubleshooting
 
 **“Glance can’t be opened” on the first launch.** Releases are not notarized.
-Right-click Glance in Applications, choose **Open**, then **Open** again in the
-dialog. Later launches need nothing.
+Open System Settings → Privacy & Security, choose **Open Anyway** beside the
+message about Glance, then **Open** in the dialog. On macOS 14 and earlier,
+right-click Glance in Applications and choose **Open** instead. Later launches
+need nothing.
 
 **Calendar asks for access again after an update.** macOS ties the grant to
 the app's signature. Every release is signed with the same certificate, so
