@@ -19,7 +19,7 @@
   "bundle": {
     "active": true,
     "resources": [
-      "resources/beep.mp3"
+      "resources/chime.wav"
     ],
     "targets": [
       "app",

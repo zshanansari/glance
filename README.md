@@ -343,10 +343,8 @@ than in a public issue.
 ## Credits
 
 Glance began as a fork of [Calendo](https://github.com/vipinsight/calendo) by
-Vipin Yadav. The hourly chime, `beep.mp3`, is from
-[Itsycal](https://github.com/sfsam/Itsycal) by Sanjay Madan. The marks on join
-rows are the services' own logos, and the trademarks belong to Google, Zoom,
-Microsoft, Cisco and Apple.
+Vipin Yadav. The marks on join rows are the services' own logos, and the
+trademarks belong to Google, Zoom, Microsoft, Cisco and Apple.
 
 ## License
 

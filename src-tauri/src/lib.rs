@@ -252,7 +252,7 @@ fn beep(app: AppHandle) -> Result<(), String> {
     {
         let path = app
             .path()
-            .resolve("resources/beep.mp3", tauri::path::BaseDirectory::Resource)
+            .resolve("resources/chime.wav", tauri::path::BaseDirectory::Resource)
             .map_err(|error| error.to_string())?;
         beep::play_native(&path, beep::beep_playback_volume())?;
     }

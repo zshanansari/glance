@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "symbols": "swift scripts/generate-symbols.swift",
     "dmg:unnotarized": "node scripts/release-dmg.mjs --unnotarized",
-    "site": "node scripts/build-site.mjs"
+    "site": "node scripts/build-site.mjs",
+    "chime": "swift scripts/generate-chime.swift"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
