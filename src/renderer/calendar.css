@@ -472,6 +472,84 @@ button:focus {
   box-shadow: inset 0 0 0 1.5px var(--event-color, var(--accent));
 }
 
+/* Event details replace the rows so the menu bar popover stays compact. */
+.event-details {
+  display: grid;
+  gap: 8px;
+  padding: 4px 14px 10px;
+}
+
+.event-details-back {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.event-details-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.event-details-when {
+  margin: -4px 0 0;
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.event-details-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.event-details-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.event-details-row dt {
+  color: var(--secondary);
+}
+
+.event-details-row dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.event-details-action {
+  min-height: 25px;
+  padding: 0 9px;
+  border-radius: 6px;
+  background: var(--quaternary);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.event-details-action.is-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 /* "2 earlier": today's finished meetings, folded. */
 .day-events-fold {
   display: flex;

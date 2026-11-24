@@ -191,6 +191,7 @@ function startCalendar(api: DesktopApi): void {
   let calendarEvents: UpcomingEvent[] = [];
   let eventError: string | null = null;
   let eventRequest = 0;
+  let detailOccurrence: string | null = null;
   // Which way the month just moved, so the grid can slide in from that side.
   let slide = 0;
   // The day the grid was last drawn for, and what the events looked like, so
@@ -414,10 +415,16 @@ function startCalendar(api: DesktopApi): void {
       open.append(dot, title, time);
     }
     open.addEventListener("click", () => {
-      api.openEvent(event.id).then(
-        () => api.hideCalendar(),
-        () => showFailure("Couldn’t open this event in Calendar"),
-      );
+      if (event.kind === "event") {
+        detailOccurrence = occurrence;
+        paintDayEvents();
+        dayEventsList.querySelector<HTMLButtonElement>('[data-focus-key="event-details-back"]')?.focus();
+      } else {
+        api.openEvent(event.id).then(
+          () => api.hideCalendar(),
+          () => showFailure("Couldn’t open this event in Calendar"),
+        );
+      }
     });
     row.append(open);
     if (event.joinUrl && event.endAt > now) {
@@ -465,6 +472,113 @@ function startCalendar(api: DesktopApi): void {
     return row;
   };
 
+  const eventDetailsPanel = (event: UpcomingEvent): HTMLElement => {
+    const panel = document.createElement("div");
+    panel.className = "event-details";
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-labelledby", "event-details-title");
+    const occurrence = occurrenceKey(event);
+
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "event-details-back";
+    back.dataset.focusKey = "event-details-back";
+    back.append(sfSymbol("chevron.left", 10), document.createTextNode("Back to events"));
+    back.addEventListener("click", () => {
+      detailOccurrence = null;
+      paintDayEvents();
+      focusEventRow(occurrence);
+    });
+
+    const title = document.createElement("h3");
+    title.className = "event-details-title";
+    title.id = "event-details-title";
+    title.textContent = event.title;
+
+    const when = document.createElement("p");
+    when.className = "event-details-when";
+    const date = dateFormat(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(event.startAt));
+    when.textContent = `${date} · ${eventTimeRange(event)}`;
+
+    const details = document.createElement("dl");
+    details.className = "event-details-list";
+    const addDetail = (label: string, value: string): void => {
+      const row = document.createElement("div");
+      row.className = "event-details-row";
+      const name = document.createElement("dt");
+      name.textContent = label;
+      const text = document.createElement("dd");
+      text.textContent = value;
+      row.append(name, text);
+      details.append(row);
+    };
+    addDetail("Location", event.location?.trim() || "No location");
+    addDetail("Calendar", event.calendar || "Unknown calendar");
+    addDetail("Meeting link", event.joinUrl || "No meeting link");
+
+    const actions = document.createElement("div");
+    actions.className = "event-details-actions";
+    const meetingUrl = event.joinUrl;
+    if (meetingUrl && event.endAt > Date.now()) {
+      const join = document.createElement("button");
+      join.type = "button";
+      join.className = "event-details-action is-primary";
+      join.dataset.focusKey = "event-details-join";
+      join.textContent = "Join";
+      join.addEventListener("click", () => {
+        api.joinMeeting(meetingUrl).then(
+          () => api.hideCalendar(),
+          () => showFailure("Couldn’t open the meeting link"),
+        );
+      });
+      actions.append(join);
+    }
+    if (meetingUrl) {
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "event-details-action";
+      copy.dataset.focusKey = "event-details-copy";
+      copy.textContent = "Copy link";
+      copy.addEventListener("click", () => {
+        if (!navigator.clipboard?.writeText) {
+          showFailure("Couldn’t copy the meeting link");
+          return;
+        }
+        void navigator.clipboard.writeText(meetingUrl).then(
+          () => announce("Meeting link copied"),
+          () => showFailure("Couldn’t copy the meeting link"),
+        );
+      });
+      actions.append(copy);
+    }
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "event-details-action";
+    open.dataset.focusKey = "event-details-open";
+    open.textContent = "Open in Calendar";
+    open.addEventListener("click", () => {
+      api.openEvent(event.id).then(
+        () => api.hideCalendar(),
+        () => showFailure("Couldn’t open this event in Calendar"),
+      );
+    });
+    actions.append(open);
+    panel.append(back, title, when, details, actions);
+    return panel;
+  };
+
+  const focusEventRow = (occurrence: string): void => {
+    const target = Array.from(dayEventsList.querySelectorAll<HTMLButtonElement>("[data-focus-key]")).find(
+      (button) => button.dataset.focusKey === `open:${occurrence}`,
+    );
+    target?.focus();
+  };
+
   const paintDayEvents = (): void => {
     dayEvents.hidden = !search.hidden || !quickAdd.hidden;
     const selectedDate = fromIso(focusIso);
@@ -484,6 +598,7 @@ function startCalendar(api: DesktopApi): void {
         : null;
     const key = JSON.stringify([
       focusIso,
+      detailOccurrence,
       eventError,
       upNext && [upNext.id, upNext.startAt, upNext.title],
       coming.map((group) => [
@@ -499,6 +614,8 @@ function startCalendar(api: DesktopApi): void {
         event.startAt,
         event.endAt,
         event.title,
+        event.location,
+        event.calendar,
         event.joinUrl,
         event.color,
         event.response,
@@ -560,6 +677,14 @@ function startCalendar(api: DesktopApi): void {
       undo.addEventListener("click", () => void undoLastChange());
       dayEventsCount.replaceChildren(`${adding ? "Added" : "Completed"} ·`, undo);
     }
+    const detailEvent = detailOccurrence
+      ? calendarEvents.find((event) => occurrenceKey(event) === detailOccurrence)
+      : undefined;
+    if (detailEvent) {
+      dayEventsList.replaceChildren(eventDetailsPanel(detailEvent));
+      return;
+    }
+    if (detailOccurrence) detailOccurrence = null;
     if (eventError) {
       // Only a missing permission is fixed by asking for one; any other
       // failure is offered again instead of a prompt that would not help.
@@ -627,6 +752,7 @@ function startCalendar(api: DesktopApi): void {
 
   /** Selects a day, turning the month to it when it lies in another. */
   const showDay = (day: Date): void => {
+    detailOccurrence = null;
     focusIso = toIso(day);
     pinnedOutsideIso = null;
     if (day.getMonth() !== viewMonth || day.getFullYear() !== viewYear) {
@@ -1253,6 +1379,8 @@ function startCalendar(api: DesktopApi): void {
     // Search and quick add close with the popover; a reopen shows the day.
     closeSearch(false);
     closeQuickAdd(false);
+    detailOccurrence = null;
+    paintDayEvents();
     // The fold closes with the popover; a reopen shows today's meetings tidy.
     if (pastOpen) {
       pastOpen = false;
@@ -1273,6 +1401,12 @@ function startCalendar(api: DesktopApi): void {
       event.preventDefault();
       if (quickAddIsOpen()) closeQuickAdd(true);
       else if (searchIsOpen()) closeSearch(true);
+      else if (detailOccurrence) {
+        const occurrence = detailOccurrence;
+        detailOccurrence = null;
+        paintDayEvents();
+        focusEventRow(occurrence);
+      }
       else void api.hideCalendar();
       return;
     }
@@ -1318,6 +1452,17 @@ function startCalendar(api: DesktopApi): void {
         return;
       }
       if (event.key !== "," && event.key !== "Tab") return;
+    }
+    // Let Tab move through event details; don't treat their arrow keys or
+    // ordinary typing as commands for the month grid.
+    if (
+      detailOccurrence &&
+      event.target instanceof HTMLElement &&
+      dayEventsList.contains(event.target) &&
+      event.key !== "," &&
+      event.key !== "Tab"
+    ) {
+      return;
     }
     if (event.key === "," && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
