@@ -62,6 +62,34 @@ describe("parseQuickEvent", () => {
     });
   });
 
+  it("keeps meal names that macOS includes in the detected date", () => {
+    for (const meal of ["Lunch", "Dinner", "Breakfast"]) {
+      const event = parse(`${meal} tomorrow 3pm`, `${meal} tomorrow 3pm`, local(9, 15));
+      expect(event.title).toBe(meal);
+      expect(event.startAt).toBe(local(9, 15));
+    }
+
+    const teamLunch = parse("Team lunch tomorrow 3pm", "Team lunch tomorrow 3pm", local(9, 15));
+    expect(teamLunch.title).toBe("Team lunch");
+
+    const review = parse("Client review tomorrow 3pm", "Client review tomorrow 3pm", local(9, 15));
+    expect(review.title).toBe("Client review");
+  });
+
+  it("keeps meal-title recovery separate from duration and location parsing", () => {
+    const event = parse(
+      "Lunch tomorrow 3pm for 30m at Office",
+      "Lunch tomorrow 3pm",
+      local(9, 15),
+    );
+    expect(event).toMatchObject({
+      title: "Lunch",
+      startAt: local(9, 15),
+      endAt: local(9, 15, 30),
+      location: "Office",
+    });
+  });
+
   it("keeps a lowercase word after “at” in the title", () => {
     const event = parse("Look at designs tomorrow 10am", "tomorrow 10am", local(9, 10));
     expect(event.title).toBe("Look at designs");

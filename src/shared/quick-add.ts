@@ -41,6 +41,8 @@ const HAS_TIME =
   /\d\s*(?:am|pm|a\.m\.|p\.m\.)|\d:\d\d|\bnoon\b|\bmidnight\b|\btonight\b|\bmorning\b|\bafternoon\b|\bevening\b|\bo'?clock\b/i;
 const HAS_DAY =
   /\b(?:today|tonight|tomorrow|tmrw|mon|tue|wed|thu|fri|sat|sun|week|month|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|\d{1,2}[/.-]\d{1,2}|\b\d{1,2}(?:st|nd|rd|th)\b/i;
+const DATE_START =
+  /\b\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b|\b(?:(?:next|this|coming|upcoming)\s+)?(?:today|tonight|tomorrow|tmrw|mon|tue|wed|thu|fri|sat|sun|week|month|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b|\d{1,2}[/.\-]\d{1,2}|\b\d{1,2}(?:st|nd|rd|th)\b|\d\s*(?:am|pm|a\.m\.|p\.m\.)|\d:\d\d|\b(?:noon|midnight|morning|afternoon|evening|o'?clock)\b/i;
 const DANGLING = /^(?:on|at|for|with|and|from|by|to|in|,|-|–|·)\s+|\s+(?:on|at|for|with|and|from|by|to|in|,|-|–|·)$/i;
 
 function cut(text: string, start: number, length: number): string {
@@ -87,7 +89,11 @@ export function parseQuickEvent(
   const found = dates[0];
   if (!found) return null;
   const matched = input.slice(found.start, found.start + found.length);
-  let rest = cut(input, found.start, found.length);
+  // NSDataDetector can absorb the end of a title into its date range. Keep
+  // everything before the first date/time marker, whatever the title says.
+  const dateStart = DATE_START.exec(matched)?.index ?? matched.length;
+  const titlePrefix = matched.slice(0, dateStart);
+  let rest = `${input.slice(0, found.start)} ${titlePrefix} ${input.slice(found.start + found.length)}`;
 
   const guests = [...new Set(rest.match(EMAIL) ?? [])].slice(0, 20);
   rest = rest.replace(EMAIL, " ");
